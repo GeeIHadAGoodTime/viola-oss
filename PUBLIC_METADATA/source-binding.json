@@ -30,10 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "af6a958a606fccf8a91b20879ec97804cb2cb03383499003adf39ee2df582d3b",
-  "source_tree_sha256": "6b0ac3031d79aedf90e76e8ded8131d62c3d267298492a1964ed33315c301fea",
+  "source_manifest_sha256": "25b0cfeed2145dc646564bfbef519e935259fabece2a233772fdba0ee40b4b57",
+  "source_tree_sha256": "6edce463178c906388c6c64a3d075ad5e858fa7ca21d05bef7e9addc16c48474",
   "source_file_count": 2811,
-  "source_revision": "6ffe36e8cfa03075d8329ecc09a7bddd409f7251",
+  "source_revision": "d21fbdc95a3acf8a7c5f8e718a4042af2e751e75",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "LICENSES/SPEECH_COMPONENT_NOTICES.md",
@@ -157,7 +157,9 @@
     "music/player/playback.py",
     "music/player/state.py",
     "music/playlist_manager.py",
+    "music/playlists/likes_store.py",
     "music/playlists/playlist_player.py",
+    "music/playlists/playlist_store.py",
     "music/providers/browser/auth_manager.py",
     "music/providers/browser_search.py",
     "music/providers/selection.py",
@@ -337,6 +339,7 @@
     "ui/react-app/src/auth/authProviders.ts",
     "ui/react-app/src/auth/desktopOAuth.test.ts",
     "ui/react-app/src/auth/desktopOAuth.ts",
+    "ui/react-app/src/auth/legalVersions.js",
     "ui/react-app/src/components/AccountTab.cloudPlan.test.jsx",
     "ui/react-app/src/components/AccountTab.jsx",
     "ui/react-app/src/components/AccountTab.signInLayout.test.jsx",
@@ -529,9 +532,11 @@
     "voice/speech_language.py",
     "voice/stage_reply.py",
     "voice/streamed_reply.py",
+    "voice/synthesis/engine.py",
     "voice/synthesis/kokoro_engine.py",
     "voice/synthesis/text_normalizer.py",
     "voice/transcription/whisper.py",
+    "voice/transcription/whisper_model_cache.py",
     "voice/wake_chime.py",
     "voice/wake_detector/active_word.py",
     "voice/wake_detector/aec_delay_tracker.py",
@@ -621,8 +626,8 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "6ffe36e8cfa03075d8329ecc09a7bddd409f7251",
-    "kind": "botcheck"
+    "source_commit": "d21fbdc95a3acf8a7c5f8e718a4042af2e751e75",
+    "kind": "music"
   },
   "historical_bindings": [
     {
