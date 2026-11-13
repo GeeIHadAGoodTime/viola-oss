@@ -18,6 +18,7 @@ import time
 import unicodedata
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 from core.logging_config import get_logger
@@ -66,10 +67,17 @@ if sys.platform == "win32":
     _ENUMWINDOWSPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
     _user32.EnumWindows.argtypes = [_ENUMWINDOWSPROC, ctypes.c_void_p]
     _user32.EnumWindows.restype = ctypes.c_bool
+    try:
+        _dwmapi: Any = ctypes.windll.dwmapi
+    except (AttributeError, OSError):  # pragma: no cover - DWM is always present on supported Windows
+        _dwmapi = None
 else:  # pragma: no cover - exercised on Linux/macOS only
     wintypes = None  # type: ignore[assignment]
     _user32 = None  # type: ignore[assignment]
     _ENUMWINDOWSPROC = None  # type: ignore[assignment]
+    _dwmapi = None
+
+_DWMWA_CLOAKED = 14
 
 
 def _get_window_title_fast(hwnd: int) -> str:
@@ -313,10 +321,10 @@ def _window_to_info(window: Any) -> WindowInfo:
     )
 
 
-def list_windows(*, include_minimized: bool = False, include_titles: bool = True) -> dict[str, object]:
-    """List visible top-level windows.
+def list_windows(*, include_minimized: bool = True, include_titles: bool = True) -> dict[str, object]:
+    """List open top-level windows. A minimized window is open, so it is listed and marked.
 
-    Windows uses pywinauto's UIA backend. macOS uses native Quartz
+    Windows uses Win32 EnumWindows (UIA only if that returns nothing). macOS uses native Quartz
     ``CGWindowListCopyWindowInfo`` — the UIA backend is Windows-only and
     ``Desktop(backend="uia")`` HANGS for minutes on macOS (pywinauto trying to
     reach a Windows UIA COM server that does not exist), which stalled the whole
@@ -329,24 +337,60 @@ def list_windows(*, include_minimized: bool = False, include_titles: bool = True
         logger.debug("No native window-listing path on %s; reporting empty", sys.platform)
         return {"ok": True, "action": "list_windows", "windows": [], "count": 0}
 
-    Desktop = _import_desktop()
-    desktop = Desktop(backend="uia")
+    # Win32 first. The UIA listing needs pywinauto, comtypes and a working COM
+    # apartment in whichever thread the tool runs on; on the 1.0.5 build 10
+    # laptop it produced no windows at all while three Notepad windows were
+    # open. EnumWindows needs none of that, so it is the source of the list and
+    # UIA is only asked when Win32 itself returns nothing.
+    source = "win32"
+    handles = _enum_top_level_handles()
+    candidates: list[Any] = [SimpleNamespace(handle=handle, element_info=None) for handle in handles]
+    uia_error = ""
+    if not candidates:
+        source = "uia"
+        try:
+            candidates = list(_import_desktop()(backend="uia").windows())
+        except Exception as exc:  # noqa: BLE001, RUF100 - pywinauto/COM raise an unenumerable set
+            uia_error = type(exc).__name__
+            logger.warning("list_windows: Win32 listed nothing and the UIA listing failed: %s", uia_error)
+
     windows: list[dict[str, object]] = []
-    unreadable = 0
-    for window in desktop.windows():
+    unreadable = hidden = chrome = minimized_out = unnamed = 0
+    for window in candidates:
         try:
             info = _window_to_info(window)
         except Exception as exc:
             unreadable += 1
             logger.warning("Skipping window with unreadable metadata: %s", type(exc).__name__)
             continue
-        if not info.visible or info.class_name in _SHELL_CHROME_CLASSES:
+        if not info.visible or _is_cloaked(info.handle):
+            hidden += 1
+            continue
+        if info.class_name in _SHELL_CHROME_CLASSES:
+            chrome += 1
             continue
         if info.minimized and not include_minimized:
+            minimized_out += 1
             continue
-        if not info.title and not info.executable:
+        if not info.title if source == "win32" else (not info.title and not info.executable):
+            # EnumWindows also returns the untitled helper windows every app owns.
+            unnamed += 1
             continue
         windows.append(info.to_dict(include_title=include_titles))
+
+    # One line that settles "why was the list empty" from a customer log. Counts only, never titles.
+    logger.info(
+        "list_windows source=%s candidates=%d listed=%d hidden=%d shell=%d minimized_left_out=%d "
+        "untitled=%d unreadable=%d",
+        source,
+        len(candidates),
+        len(windows),
+        hidden,
+        chrome,
+        minimized_out,
+        unnamed,
+        unreadable,
+    )
 
     result: dict[str, object] = {
         "ok": True,
@@ -357,7 +401,50 @@ def list_windows(*, include_minimized: bool = False, include_titles: bool = True
     if unreadable:
         # Never let a partial list read as the whole desktop.
         result["unreadable_windows"] = unreadable
+    if minimized_out:
+        result["minimized_windows_not_listed"] = minimized_out
+    if not candidates:
+        # Windows always has top-level windows. Nothing enumerated means the
+        # listing failed, not that the desktop is empty.
+        result["ok"] = False
+        result["error"] = (
+            "Windows returned no windows to list%s. This is a failed listing, not an empty desktop: "
+            "do not tell the user that nothing is open." % (" (%s)" % uia_error if uia_error else "")
+        )
     return result
+
+
+def _enum_top_level_handles() -> list[int]:
+    """Every top-level window handle, front to back, straight from Win32."""
+    if _user32 is None or _ENUMWINDOWSPROC is None:
+        return []
+    handles: list[int] = []
+
+    @_ENUMWINDOWSPROC
+    def _enum_proc(hwnd: int, _lparam: int) -> bool:
+        if hwnd:
+            handles.append(int(hwnd))
+        return True
+
+    try:
+        _user32.EnumWindows(_enum_proc, 0)
+    except Exception as exc:  # noqa: BLE001, RUF100 - ctypes callback failures are not one type
+        logger.warning("EnumWindows failed while listing windows: %s", type(exc).__name__)
+    return handles
+
+
+def _is_cloaked(handle: int) -> bool:
+    """True for a window Windows keeps invisible (a suspended Store app, another virtual desktop)."""
+    if not handle or _dwmapi is None:
+        return False
+    cloaked = ctypes.c_int(0)
+    try:
+        failed = _dwmapi.DwmGetWindowAttribute(
+            ctypes.c_void_p(int(handle)), _DWMWA_CLOAKED, ctypes.byref(cloaked), ctypes.sizeof(cloaked)
+        )
+    except Exception:  # noqa: BLE001, RUF100 - no DWM (old or headless Windows): treat as shown
+        return False
+    return failed == 0 and cloaked.value != 0
 
 
 def _list_windows_darwin(*, include_minimized: bool, include_titles: bool) -> dict[str, object]:

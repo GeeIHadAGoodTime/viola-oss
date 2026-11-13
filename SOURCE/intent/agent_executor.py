@@ -9837,11 +9837,16 @@ class AgentExecutor:
         try:
             from diagnostics.failure_envelope import emit_failure
 
+            asked_first = (
+                str(result.error_category or "").upper() == "CONFIRMATION_REQUIRED"
+                or result.error == "confirmation_required"
+            )
             emit_failure(
                 code="tool_execution_failed",
                 component="agent.tool.%s" % tool_name,
                 message=result.error or "Tool returned error",
-                severity="WARNING",
+                # A question to the user is the normal path, not a failure.
+                severity="INFO" if asked_first else "WARNING",
                 retryable=result.retryable,
                 tool_name=tool_name,
                 tool_args_summary=str(tool_args)[:200],

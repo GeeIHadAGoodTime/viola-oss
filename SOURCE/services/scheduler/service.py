@@ -21,7 +21,7 @@ import inspect
 import re
 import threading
 import time
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -58,6 +58,11 @@ _ERROR_BACKOFF_SECONDS = TIMEOUT_5_MINUTES  # 300s backoff after error/timeout
 # actions keep their policy: fire once when due, no catch-up burst.
 ONE_SHOT_STALE_AFTER_SECONDS = 24 * 60 * 60
 ONE_SHOT_STALE_ERROR = "Skipped: it was more than 24 hours late when Viola could run it."
+# A one-time reminder that has fired is deleted this many days after it fired
+# (Jay, 2026-11-12). Never a recurring one, one still pending, one switched off
+# before it fired, or one skipped because it was too late (it never fired).
+FIRED_REMINDER_RETENTION_DAYS = 30
+_FIRED_REMINDER_SWEEP_SECONDS = 60 * 60
 MIN_SCHEDULE_INTERVAL_SECONDS = TIMEOUT_5_MINUTES
 _CRON_FREQUENCY_SAMPLE_COUNT = 64
 _DANGEROUS_FREQUENCY_PATTERNS = frozenset(
@@ -274,6 +279,7 @@ class SchedulerService:
         self._intent_pipeline: Any = None
         # MCP hub reference (set externally after bootstrap)
         self._mcp_hub: Any = None
+        self._sweep_task: asyncio.Task[None] | None = None
 
     # ------------------------------------------------------------------ CRUD
 
@@ -522,6 +528,7 @@ class SchedulerService:
         # that tear down and recreate the loop between cases).
         self._stop_event = asyncio.Event()
         self._check_task = asyncio.create_task(self._check_loop())
+        self._sweep_task = asyncio.create_task(self._fired_reminder_sweep_loop())
         logger.info("Scheduler started with %d enabled schedule(s)", count)
 
     async def stop(self) -> None:
@@ -539,6 +546,13 @@ class SchedulerService:
             except asyncio.CancelledError:
                 pass
             self._check_task = None
+        if self._sweep_task is not None:
+            self._sweep_task.cancel()
+            try:
+                await self._sweep_task
+            except asyncio.CancelledError:
+                pass
+            self._sweep_task = None
         self._stop_event = None
 
         # Wait for in-flight sub-agents with grace period
@@ -577,6 +591,56 @@ class SchedulerService:
                 logger.exception("Scheduler check loop error: %s", exc)
 
             await self._wait_for_next_tick()
+
+    async def _fired_reminder_sweep_loop(self) -> None:
+        """Hourly, separate from the due-schedule poll so a cleanup can never delay a reminder."""
+        while self._running:
+            try:
+                await self.prune_fired_reminders()
+            except asyncio.CancelledError:
+                break
+            except Exception:  # noqa: BLE001, RUF100 - cleanup must never stop the scheduler
+                logger.warning("Fired-reminder cleanup failed", exc_info=True)
+            stop_event = self._stop_event
+            if stop_event is None:
+                break
+            try:
+                await asyncio.wait_for(stop_event.wait(), timeout=_FIRED_REMINDER_SWEEP_SECONDS)
+            except TimeoutError:
+                continue
+            break
+
+    @staticmethod
+    def _is_expired_fired_reminder(schedule: Schedule, cutoff: datetime) -> bool:
+        """A one-time notify reminder that fired, will never fire again, and fired before ``cutoff``."""
+        if schedule.cron_expr or not schedule.one_shot_at or schedule.enabled:
+            return False
+        if int(schedule.run_count or 0) <= 0 or str(schedule.last_status or "") == "skipped":
+            return False
+        decoded = decode_tool_action(str(schedule.action or ""))
+        if not decoded or decoded.get("tool") != "notify":
+            return False
+        try:
+            fired_at = datetime.fromisoformat(str(schedule.last_run_at))
+        except (TypeError, ValueError):
+            return False
+        if fired_at.tzinfo is None:
+            fired_at = fired_at.replace(tzinfo=UTC)
+        return fired_at <= cutoff
+
+    async def prune_fired_reminders(self, now: datetime | None = None) -> int:
+        """Delete each user's one-time reminders that fired over FIRED_REMINDER_RETENTION_DAYS ago."""
+        cutoff = (now or datetime.now(UTC)) - timedelta(days=FIRED_REMINDER_RETENTION_DAYS)
+        user_ids = await self._store.user_ids_with_finished_one_shots_async()
+        deleted = 0
+        for user_id in user_ids:
+            for schedule in await self._store.list_schedules_async(user_id, enabled_only=False):
+                if self._is_expired_fired_reminder(schedule, cutoff):
+                    if await self._store.delete_async(user_id, schedule.id):
+                        deleted += 1
+        if deleted:
+            logger.info("Deleted %d fired one-time reminder(s) older than %d days", deleted, FIRED_REMINDER_RETENTION_DAYS)
+        return deleted
 
     async def _wait_for_next_tick(self) -> None:
         """Stop-aware sleep between check loops.

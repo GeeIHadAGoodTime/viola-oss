@@ -525,6 +525,46 @@ def _spoken_path(raw_path: str) -> str:
     return raw_path
 
 
+def delete_targets(args: Mapping[str, Any] | None) -> list[str]:
+    """Every path one ``file_write`` delete removes, in order, no repeats.
+
+    With ``paths`` given, a folder in ``path`` is only where relative entries
+    are: it is not deleted itself (a file in ``path`` is one more target). Given the
+    folder in ``path`` and two files in ``paths``, the folder was added to the
+    targets and went to the Recycle Bin on "yes" (seen live 2026-11-12).
+    """
+    params = args or {}
+    single = str(params.get("path") or params.get("filename") or "").strip()
+    several = params.get("paths")
+    listed = [str(item or "").strip() for item in several] if isinstance(several, (list, tuple)) else []
+    listed = [item for item in listed if item]
+    if not listed:
+        return [single] if single else []
+    base = _resolve(single) if single else None
+    folder = base if base is not None and base.is_dir() else None
+    targets: list[str] = [single] if single and folder is None else []
+    for item in listed:
+        if folder is not None and not Path(item).expanduser().is_absolute():
+            item = str(folder / item)
+        if item not in targets:
+            targets.append(item)
+    return targets
+
+
+def _describe_one_delete(raw_path: str) -> tuple[str, bool]:
+    """(what to call it, is a folder) for one delete target."""
+    target = _spoken_path(raw_path)
+    path = _resolve(raw_path)
+    if path is not None and path.is_dir():
+        count = _folder_file_count(path)
+        if count > BULK_FILE_THRESHOLD:
+            inside = "more than %d files" % BULK_FILE_THRESHOLD
+        else:
+            inside = "1 file" if count == 1 else "%d files" % count
+        return "the folder %s and the %s in it" % (target, inside), True
+    return target, False
+
+
 def describe_file_action(action_class: str, args: Mapping[str, Any] | None) -> str | None:
     """Plain-words description for the confirm prompt, or None if not a file class."""
     params = args or {}
@@ -532,7 +572,13 @@ def describe_file_action(action_class: str, args: Mapping[str, Any] | None) -> s
     target = raw_path or "the file"
     action = _action_of(params)
     destination = str(params.get("destination") or "").strip()
+    if action_class == FILE_DELETE and len(delete_targets(params)) > 1:
+        # One question for the whole request, naming every item.
+        named = [_describe_one_delete(item)[0] for item in delete_targets(params)]
+        listing = ", ".join(named[:-1]) + " and " + named[-1]
+        return "delete %d items: %s (they go to the Recycle Bin and can be undone)" % (len(named), listing)
     if action_class == FILE_DELETE:
+        raw_path = next(iter(delete_targets(params)), raw_path)
         target = _spoken_path(raw_path) if raw_path else target
         path = _resolve(raw_path) if raw_path else None
         if path is not None and path.is_dir():
@@ -578,6 +624,7 @@ __all__ = [
     "active_file_gate_context",
     "base_file_write_class",
     "bind_file_gate_context",
+    "delete_targets",
     "describe_file_action",
     "file_write_action_class",
     "is_autostart_location",
