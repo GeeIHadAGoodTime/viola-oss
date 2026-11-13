@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "d21fbdc95a3acf8a7c5f8e718a4042af2e751e75",
-  "sha256": "6edce463178c906388c6c64a3d075ad5e858fa7ca21d05bef7e9addc16c48474",
+  "revision": "f0ab523455f00318d6281b4fbdd24f5ec9e971f3",
+  "sha256": "30ac3054bc4f82680cb474d8e31235b2a0ca47336de646256228d5b48892b337",
   "files": [
     {
       "path": ".env.example",
@@ -3175,8 +3175,8 @@
     },
     {
       "path": "music/resolution/provider_router.py",
-      "sha256": "769c32f76f4e9ad221e93393913c82b0a9e70c5fb4e602ce925300c10e808c15",
-      "bytes": 32288
+      "sha256": "54d72369b5d3f9585aaa84cd19cb3dc31001ae7230aa84940e60f9ed4ab895ec",
+      "bytes": 33238
     },
     {
       "path": "music/resolution/provider_router_metadata.py",
