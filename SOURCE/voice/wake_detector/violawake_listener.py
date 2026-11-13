@@ -1443,6 +1443,7 @@ class ViolaWakeListener:
             processed = np.concatenate(processed_frames)
             self._note_output_level(served_reference)
             self._track_aec_delay(mic_int16, served_reference)
+            self._log_reference_timing()
             return self._never_louder_than_mic(mic_int16, processed)
 
         except Exception as e:
@@ -1481,6 +1482,18 @@ class ViolaWakeListener:
             self._aec_delay_ms = delay_ms
             self._propagate_delay_to_aec()
 
+    def _log_reference_timing(self) -> None:
+        """Log the loopback reference's late-packet/overflow counts (at most once a minute, only when they change)."""
+        report = getattr(getattr(self, "_aec_adapter", None), "reference_timing_report", None)
+        if not callable(report):
+            return
+        try:
+            line = report()
+        except (AttributeError, RuntimeError, TypeError, ValueError):
+            return
+        if isinstance(line, str):
+            logger.info(line)
+
     def _never_louder_than_mic(self, mic_int16: np.ndarray, processed: np.ndarray) -> np.ndarray:
         """Hand on the raw microphone when the canceller made this chunk louder.
 
@@ -1497,7 +1510,8 @@ class ViolaWakeListener:
             return processed
         self._aec_louder_chunks += 1
         now = time.monotonic()
-        if now - self._aec_louder_logged_at >= 60.0:
+        # Every 10 minutes, not every minute: during music this is routine (1.0.5 log-noise list).
+        if now - self._aec_louder_logged_at >= 600.0:
             self._aec_louder_logged_at = now
             logger.info(
                 "[AEC_HEALTH] echo canceller output above the microphone on %d chunks; using the microphone there",

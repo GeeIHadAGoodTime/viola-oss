@@ -38,6 +38,7 @@ Author: Claude for Viola wake word project
 
 from __future__ import annotations
 
+import time
 from collections import deque
 
 import numpy as np
@@ -53,6 +54,8 @@ logger = get_logger(__name__)
 # recovery counted down), means the filter is adding signal, not removing it.
 _DIVERGED_POWER_RATIO = 1.5
 _DIVERGED_FRAMES = 30
+# Longest gap between two reports of filter resets.
+_DIVERGED_LOG_EVERY_S = 600.0
 
 
 class ViolaAEC:
@@ -587,10 +590,18 @@ class ViolaAEC:
         if error_power > mic_power * _DIVERGED_POWER_RATIO and mic_power > 1e-9:
             self._diverged_frames += 1
             if self._diverged_frames >= _DIVERGED_FRAMES:
-                logger.warning(
-                    "[AEC] filter diverged (output above the microphone for %d frames); resetting it",
-                    self._diverged_frames,
-                )
+                # About once a minute during music on the 1.0.5 laptop: a reset
+                # is the canceller recovering, not a fault, so it is counted and
+                # reported at most every _DIVERGED_LOG_EVERY_S.
+                now = time.monotonic()
+                if now - getattr(self, "_diverged_logged_at", -_DIVERGED_LOG_EVERY_S) >= _DIVERGED_LOG_EVERY_S:
+                    logger.info(
+                        "[AEC] filter diverged (output above the microphone for %d frames); resetting it "
+                        "(%d reset(s) in all)",
+                        self._diverged_frames,
+                        self._diverged_resets + 1,
+                    )
+                    self._diverged_logged_at = now
                 self._W[:] = 0.0
                 self._diverged_frames = 0
                 self._diverged_resets += 1

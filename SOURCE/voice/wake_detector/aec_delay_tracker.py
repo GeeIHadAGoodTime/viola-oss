@@ -45,7 +45,8 @@ MIN_PEAK_RATIO = 9.0
 # Above this one measurement is enough (the first reply after start-up matters).
 SURE_PEAK_RATIO = 16.0
 AGREE_MS = 12.0  # two measurements this close agree
-CHANGE_MS = 15.0  # smaller changes are left alone: the filter already covers them
+CHANGE_MS = 15.0
+JUMP_MS = 40.0  # a change this big is believed only when two measurements agree  # smaller changes are left alone: the filter already covers them
 # The filter is causal: leave it room for the direct path to land inside it.
 LEAD_MS = 15.0
 MIN_REFERENCE_RMS = 150.0  # int16; quieter playback says nothing about the path
@@ -162,6 +163,12 @@ class AECDelayTracker:
         if not agreed and measured.peak_ratio < SURE_PEAK_RATIO:
             return None
         delay = max(0.0, measured.lag_ms - LEAD_MS)
+        if not agreed and self.current_ms is not None and abs(delay - self.current_ms) >= JUMP_MS:
+            # Laptop log 2026-11-12: a delay settled at 12 ms jumped to 472 ms (and
+            # 2 -> 60, 8 -> 93, 6 -> 224 ms) on one measurement, then came back on the
+            # next, leaving the canceller misaligned for seconds each time. A jump
+            # this big now needs two measurements that agree.
+            return None
         if measured.lag_ms < 0:
             logger.warning(
                 "[AEC_DELAY] echo arrives %.0f ms before the reference (%s); a reference delay cannot fix that",

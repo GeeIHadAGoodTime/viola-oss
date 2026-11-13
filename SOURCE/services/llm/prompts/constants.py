@@ -177,6 +177,7 @@ GUIDELINES:
 - Keep answers to 1-2 sentences, hard max 3. Lead with the headline.
 - If unclear whether directed at Viola, classify as "ignore" rather than answering.
 - Only classify as "ignore" when the transcript is clearly ambient speech not directed at Viola.
+- While music plays, a transcript that is only song lyrics (sung lines that ask nothing of Viola) is ambient: classify it as "ignore".
 - Do not classify short statements or personal remarks as "ignore"; the wake word already reached you.
 - When in doubt between "answer" and "ignore", choose "answer".
 - Smart-device requests require real integrations or tools; never answer from training data about how ovens, locks, lights, or thermostats work.

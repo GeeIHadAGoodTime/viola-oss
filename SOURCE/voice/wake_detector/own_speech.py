@@ -217,6 +217,31 @@ def busy_turn_active() -> bool:
         return _busy_turn
 
 
+# Push-to-talk (the mic button) records through the app's own microphone stream
+# while the wake listener keeps listening to the same room. Laptop log 2026-11-12
+# 08:37:54-08:37:57: Jay held the button and said "Viola, what's the weather
+# tomorrow?"; the button's take ran it, and the wake listener woke on the same
+# words, recorded only their tail, and played the nothing-heard tone and notice.
+_push_to_talk_until = 0.0
+# The wake check finishes about a second after the words end, after the take ended.
+PUSH_TO_TALK_GRACE_S = 2.0
+# A take that never reports its end stops counting after this long.
+PUSH_TO_TALK_MAX_S = 60.0
+
+
+def set_push_to_talk(active: bool) -> None:
+    """The mic button started (True) or finished (False) a take."""
+    global _push_to_talk_until
+    with _lock:
+        _push_to_talk_until = time.monotonic() + (PUSH_TO_TALK_MAX_S if active else PUSH_TO_TALK_GRACE_S)
+
+
+def push_to_talk_active() -> bool:
+    """True while a mic-button take is recording or was just handed in."""
+    with _lock:
+        return time.monotonic() < _push_to_talk_until
+
+
 __all__ = [
     "OVER_SPEECH_RULE",
     "OWN_WORD_SCORE",
@@ -228,6 +253,8 @@ __all__ = [
     "clear_barge_in_target",
     "deliver_barge_in",
     "judge_wake_over_speech",
+    "push_to_talk_active",
+    "set_push_to_talk",
     "reference_wake_score",
     "set_barge_in_target",
     "set_busy_turn",

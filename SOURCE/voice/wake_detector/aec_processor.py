@@ -250,6 +250,85 @@ _WARMUP_WATCHDOG_FRAMES = 300
 # warning isn't lost in log rotation.
 _WARMUP_WATCHDOG_FRAMES_ESCALATE = 1500
 
+# A reference frame quieter than this (int16 RMS ~ -60 dBFS) carries no echo to cancel.
+_ECHO_WINDOW_REF_POWER = 33.0**2
+# 60 s of 10 ms frames.
+_ECHO_WINDOW_FRAMES = 6000
+
+
+def _dbfs(power: float) -> float:
+    return float(10.0 * np.log10(max(power, 1e-3) / 32768.0**2))
+
+
+class EchoWindow:
+    """How well the echo was removed over one stretch (one spoken reply).
+
+    1.0.5 build-10 laptop: `AEC degraded ... ERLE below 20 dB` all session, read
+    from the canceller's ``erle_db`` at the moment a barge-in candidate fired.
+    That number cannot say whether the canceller works: it is a smoothed value
+    that decays toward 0 dB in every pause between her words, it is read exactly
+    when the microphone hears the most sound, and a working canceller cannot go
+    above the echo-to-noise ratio of the microphone (offline: a perfect linear
+    echo path with -50 dBFS mic noise measured 18.6 dB). This keeps per-frame
+    powers of the frames where she was actually playing sound, so one log line per
+    reply says how loud her voice was at the microphone and how loud it still was
+    after cancelling, which is what decides whether the barge-in monitor hears her.
+    """
+
+    def __init__(self) -> None:
+        self._frames: deque[tuple[float, float]] = deque(maxlen=_ECHO_WINDOW_FRAMES)
+        self._silent_frames = 0
+
+    def start(self) -> None:
+        self._frames.clear()
+        self._silent_frames = 0
+
+    def add(
+        self,
+        mic_frame: npt.NDArray[np.int16],
+        out_frame: npt.NDArray[np.int16],
+        ref_frame: npt.NDArray[np.int16] | None,
+    ) -> None:
+        try:
+            if ref_frame is None or len(ref_frame) == 0:
+                self._silent_frames += 1
+                return
+            ref_power = float(np.mean(np.square(ref_frame, dtype=np.float64)))
+            if ref_power < _ECHO_WINDOW_REF_POWER:
+                self._silent_frames += 1
+                return
+            mic_power = float(np.mean(np.square(mic_frame, dtype=np.float64)))
+            out_power = float(np.mean(np.square(np.asarray(out_frame), dtype=np.float64)))
+            self._frames.append((mic_power, out_power))
+        except (TypeError, ValueError):
+            return
+
+    def summary(self) -> dict | None:
+        """Medians over the frames she played sound in, or None if there were none."""
+        for _ in range(3):
+            try:
+                frames = list(self._frames)
+                break
+            except RuntimeError:  # appended to by the audio thread while copying
+                continue
+        else:
+            return None
+        if not frames:
+            return None
+        mic = np.array([f[0] for f in frames])
+        out = np.array([f[1] for f in frames])
+        erle = 10.0 * np.log10(np.maximum(mic, 1e-3) / np.maximum(out, 1e-3))
+        total = len(frames) + self._silent_frames
+        return {
+            "seconds_playing": len(frames) / 100.0,
+            "reference_active_share": len(frames) / total if total else 0.0,
+            "erle_median_db": float(np.median(erle)),
+            "erle_p10_db": float(np.percentile(erle, 10)),
+            "mic_median_dbfs": _dbfs(float(np.median(mic))),
+            "residual_median_dbfs": _dbfs(float(np.median(out))),
+            "residual_p90_dbfs": _dbfs(float(np.percentile(out, 90))),
+        }
+
 
 class _RefGate:
     """Reference-signal delay alignment + activity gate.
@@ -871,6 +950,7 @@ class ViolaAECAdapter(AECProcessor):
         # phone call, external room audio), where the reference is unknown.
         self._local_playback_active = False
         self._downshift_backend: AECProcessor | None = None
+        self.echo_window = EchoWindow()
 
         if not VIOLA_AEC_AVAILABLE or _ViolaAECImpl is None:
             return
@@ -959,13 +1039,17 @@ class ViolaAECAdapter(AECProcessor):
         # Downshift: Viola is playing its own output — skip the heavy per-frame
         # FDAF FFT and use the native canceller (its _RefGate aligns the ref).
         if self._local_playback_active:
-            return self._ensure_downshift_backend().process_frame(mic_frame, ref_frame)
+            out = self._ensure_downshift_backend().process_frame(mic_frame, ref_frame)
+            self.echo_window.add(mic_frame, out, ref_frame)
+            return out
 
         # Align ref via the measured speaker-to-mic delay and gate adaptation
         # until sustained playback energy is observed (AUD-01, AUD-08).
         aligned_ref = self._ref_gate.apply(ref_frame)
 
-        return self._inner.process_frame(mic_frame, aligned_ref)
+        out = self._inner.process_frame(mic_frame, aligned_ref)
+        self.echo_window.add(mic_frame, out, aligned_ref)
+        return out
 
     def reset(self) -> None:
         """Reset ViolaAEC state."""

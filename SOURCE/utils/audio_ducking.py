@@ -17,6 +17,9 @@ from core.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+# How often a restore fade looks for a new duck that cancels it.
+_FADE_CANCEL_POLL_S = 0.005
+
 
 class AudioDucker:
     """
@@ -126,8 +129,12 @@ class AudioDucker:
                 return
 
             if self._duck_count == 1:
+                state = None
                 try:
-                    if self._reported_playing(self.music_player.state()) is False and not (
+                    # One read of the player state serves both the "is anything
+                    # playing" check and the level to restore (it was read twice).
+                    state = self.music_player.state()
+                    if self._reported_playing(state) is False and not (
                         self._fade_thread is not None and self._fade_thread.is_alive()
                     ):
                         self._duck_applied = False
@@ -139,7 +146,7 @@ class AudioDucker:
                         return
                 except Exception as e:
                     logger.debug("Duck could not read the player state: %s", e)
-                self._apply_duck_locked(th.current_thread().name)
+                self._apply_duck_locked(th.current_thread().name, state)
             else:
                 logger.debug("🔉 Nested duck request (count: %s)", self._duck_count)
 
@@ -178,11 +185,12 @@ class AudioDucker:
                 self._restore_target = None
             return level
 
-    def _apply_duck_locked(self, thread_name: str) -> None:
+    def _apply_duck_locked(self, thread_name: str, state: Any = None) -> None:
         """Save the current volume and drop to the duck level (caller holds the lock)."""
         # First applied duck - save current volume and drop
         try:
-            state = self.music_player.state()
+            if state is None:
+                state = self.music_player.state()
             if hasattr(state, "volume"):
                 current_volume = state.volume
             elif isinstance(state, dict):
@@ -219,10 +227,11 @@ class AudioDucker:
                 thread_name,
             )
 
-            # Cancel any ongoing fade
-            if self._fade_thread and self._fade_thread.is_alive():
+            # Cancel any ongoing fade. The duck-down thread waits for it to stop,
+            # not the wake path: the wake thread returns at once.
+            previous = self._fade_thread if self._fade_thread and self._fade_thread.is_alive() else None
+            if previous is not None:
                 self._fade_cancel.set()
-                self._fade_thread.join(timeout=TIMEOUT_MEDIUM)
 
             # Drop straight to the duck level: no fade down. Wake
             # feedback is the chime, and the music has to dip at the
@@ -232,10 +241,11 @@ class AudioDucker:
             # reached the YouTube player only with the next position
             # tick, about 1 s after the chime (1.0.5 build-4 laptop
             # test). The restore still fades up.
-            self._fade_cancel.clear()
+            if previous is None:
+                self._fade_cancel.clear()
             self._fade_thread = threading.Thread(
-                target=self._set_final_volume,
-                args=(self._active_duck_level,),
+                target=self._duck_down,
+                args=(self._active_duck_level, previous),
                 daemon=True,
                 name="audio-duck-down",
             )
@@ -349,9 +359,26 @@ class AudioDucker:
                 logger.warning("Failed to set volume during fade step %s: %s", i, e)
                 break
 
-            time.sleep(step_duration)
+            # Wait in short slices so a new duck that cancels this fade is not
+            # held back for a whole step; a cancel during the last step used to
+            # fall through and set the restore level after the duck.
+            step_end = time.monotonic() + step_duration
+            while (remaining := step_end - time.monotonic()) > 0:
+                if self._fade_cancel.is_set():
+                    logger.debug("Fade cancelled after step %d", i)
+                    return
+                time.sleep(min(_FADE_CANCEL_POLL_S, remaining))
+            if self._fade_cancel.is_set():
+                return
 
         # Ensure we reach exact target volume
+        self._set_final_volume(end_vol)
+
+    def _duck_down(self, end_vol: int, previous: threading.Thread | None) -> None:
+        """Let a restore fade that was still running stop, then set the duck level."""
+        if previous is not None:
+            previous.join(timeout=TIMEOUT_MEDIUM)
+            self._fade_cancel.clear()
         self._set_final_volume(end_vol)
 
     def _set_final_volume(self, end_vol: int) -> None:

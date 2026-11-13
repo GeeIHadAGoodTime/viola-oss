@@ -102,6 +102,16 @@ class VoiceWakeProcessor:
     def check_already_listening(self) -> bool:
         """Check if already listening for commands."""
         try:
+            from voice.wake_detector.own_speech import push_to_talk_active
+
+            if push_to_talk_active():
+                # The mic button's take already carries these words (laptop log 2026-11-12 08:37:57).
+                logger.info("Wake ignored: the mic button is recording this request")
+                self._unduck_audio()
+                return False
+        except ImportError:
+            logger.debug("Push-to-talk state unavailable")
+        try:
             from voice.wake_detector.own_speech import busy_turn_active
 
             if busy_turn_active():
