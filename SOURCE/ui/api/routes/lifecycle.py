@@ -986,8 +986,13 @@ def _setup_automatic_state_broadcast(*, hub: Any, music: Any, state: Any) -> Non
 
                         main_loop.call_soon_threadsafe(schedule_spoke_forward)
                         last_fwd_time[0] = fwd_now
-                        log.info(
-                            "[SPOKE_FWD] lifecycle: forwarding %s " "video_id=%s trigger=state_change",
+                        # Offered, not sent: the forwarder delivers only to rooms
+                        # that are connected right now and logs "Forwarded ..."
+                        # itself when one received it. At INFO this line read as
+                        # if every pause went to a room that had been offline for
+                        # weeks (1.0.5 build 10 laptop report).
+                        log.debug(
+                            "[SPOKE_FWD] lifecycle: offering %s to connected rooms video_id=%s trigger=state_change",
                             _cmd,
                             fwd_video_id,
                         )
