@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "6ffe36e8cfa03075d8329ecc09a7bddd409f7251",
-  "sha256": "6b0ac3031d79aedf90e76e8ded8131d62c3d267298492a1964ed33315c301fea",
+  "revision": "518a6020d47a28497561be92b079f92ced172b62",
+  "sha256": "713ba3f55882e628a6c3f1e0b4251ee59bdcbf1598f7b7b9374df4a7f6c9fd7b",
   "files": [
     {
       "path": ".env.example",
@@ -1595,13 +1595,13 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "3785784b3a8f8cc92398bd4a52dc5674316bed21d52b0fa4054badcc2c6882d6",
-      "bytes": 640058
+      "sha256": "aae52b936b64bdcccb949f7ef641343c6b0373bd1c739ccd2bafab2c0734e258",
+      "bytes": 640508
     },
     {
       "path": "intent/agent_loop.py",
-      "sha256": "ebd36ad5d7a06c02b0cfab3d8eb78ac1353d1f0e009796e6660bb0ab0624aec6",
-      "bytes": 272837
+      "sha256": "e13d8175b39c25a064408234a0467ebe5ecfe6e11f95fcad54b811433ad95de3",
+      "bytes": 274422
     },
     {
       "path": "intent/agent_message_manager.py",
@@ -1905,8 +1905,8 @@
     },
     {
       "path": "intent/pipeline.py",
-      "sha256": "48765f21f838714ad369b0b5df753b78b6e439f93f010cedc05f794abf39a06c",
-      "bytes": 111144
+      "sha256": "bd985e7ad96b32cd7d4a6fe2dc84270cb4928ff6b9e5bcd89681b5a45755a333",
+      "bytes": 113013
     },
     {
       "path": "intent/pipeline_contracts.py",
@@ -4585,8 +4585,8 @@
     },
     {
       "path": "services/llm/cost_circuit_breaker.py",
-      "sha256": "6984dc22ef21e578bf0d380ffe97298d712eff0eba7c963dc5b3dbe6b92145f4",
-      "bytes": 10954
+      "sha256": "34a147a1d160c3da4e3876bc6bf066a4298dfc2662700c59c29c2b6e0192eff1",
+      "bytes": 17841
     },
     {
       "path": "services/llm/factory.py",
@@ -5195,8 +5195,8 @@
     },
     {
       "path": "services/scheduler/service.py",
-      "sha256": "aaa329b1ba37d6abdc14c532e636664f76260ad90160db2ca264aa720aa2ab24",
-      "bytes": 49856
+      "sha256": "f932e3e4152f4987bd6c2d6b2379fedf89e99af2cf25129ddd99e84316b2fb0d",
+      "bytes": 53571
     },
     {
       "path": "services/scheduler/store.py",
@@ -10545,17 +10545,17 @@
     },
     {
       "path": "ui/react-app/src/components/AgentCard.jsx",
-      "sha256": "df0227ed6eb8bdb1db51b57ff4b3618baef455b192a074e6076f734f9338da02",
-      "bytes": 6411
+      "sha256": "3143b2e0a5d688f05966f022bf3fdb42196b98a7a2a1915f547769b1ecfb68d4",
+      "bytes": 6476
     },
     {
       "path": "ui/react-app/src/components/AgentCard.test.jsx",
-      "sha256": "f98ecc5cda7b3c3145924338864ccb90e6473455ce151ac8011020f4d8faf253",
-      "bytes": 3371
+      "sha256": "63d2d742d33daace9bc40e176e8dd91e38f2fadd2a9d7525ac081c767cc4fe7a",
+      "bytes": 3321
     },
     {
       "path": "ui/react-app/src/components/AgentDrawer.jsx",
-      "sha256": "936c58db62fb8f4dfbf48664726c18eb8c72c055c938ce365962471a0948afd8",
+      "sha256": "b7364aaa895146753cf5c1279402c4734ac2261984fc456183b168df55583673",
       "bytes": 6068
     },
     {
@@ -11969,14 +11969,19 @@
       "bytes": 12624
     },
     {
+      "path": "ui/react-app/src/hooks/useAgentRegistry.activity.test.jsx",
+      "sha256": "a9735be15adf3cb0c6cab4062c739fe1785150dec05f580214df2d9201201306",
+      "bytes": 2429
+    },
+    {
       "path": "ui/react-app/src/hooks/useAgentRegistry.betweenPolls.test.jsx",
       "sha256": "d29d426de20451bb6dfab5b02c116f04be89b583cc4be76d8c3f3c1ad5ca9130",
       "bytes": 3067
     },
     {
       "path": "ui/react-app/src/hooks/useAgentRegistry.js",
-      "sha256": "41daf2d4ae80f59dbf55690b89f70c25b112a7626997dc9f1b1b71edd6e7b877",
-      "bytes": 8786
+      "sha256": "44eeaf7f4898d81745a9694ee64c2b471fcc158ee87d800376c1c90f00db8998",
+      "bytes": 8981
     },
     {
       "path": "ui/react-app/src/hooks/useAuth.jsx",
