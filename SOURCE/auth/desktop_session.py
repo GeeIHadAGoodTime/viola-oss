@@ -81,6 +81,7 @@ _TRANSIENT_VALIDATION_REASONS = frozenset(
         "gotrue_refresh_transient",
         "desktop_token_store_unavailable",
         "desktop_session_validation_error",
+        "shutting_down",
     }
 )
 
@@ -292,7 +293,9 @@ class DesktopSessionStore:
                     type(exc).__name__,
                     exc,
                 )
-                return DesktopSessionValidation(authenticated=False, reason="desktop_session_validation_error")
+                # A distinct reason so the auth middleware can tell a quit
+                # cancel from a real rejection and not count it as a login failure.
+                return DesktopSessionValidation(authenticated=False, reason="shutting_down")
             logger.exception("Desktop local session validation failed closed (session kept)")
             return DesktopSessionValidation(authenticated=False, reason="desktop_session_validation_error")
 
