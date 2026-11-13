@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "98ce6d3618879db5a6285b89ed88ea331e0ef445",
-  "sha256": "b1316aed036741f8d086ec21630125afc36be0ec9ca86dd95082e7014e44f688",
+  "revision": "c7c7b024186517753e41e80f1a0f4616b5140f4e",
+  "sha256": "9150bccca894e456dc2014deee0aa105e0949672ecb1bcd7bbbc7ef983249ba8",
   "files": [
     {
       "path": ".env.example",
@@ -4645,8 +4645,8 @@
     },
     {
       "path": "services/llm/pricing.py",
-      "sha256": "c35c3277ffc015234701410f8d4bf9f7b831471914c5a0ec540868161d81d07a",
-      "bytes": 11234
+      "sha256": "d42fcbc7123fa94d3fa55d1656d12b391e8b25e2d0d8e8eabfcfb0e3f201b661",
+      "bytes": 11261
     },
     {
       "path": "services/llm/prompts/__init__.py",
@@ -5805,8 +5805,8 @@
     },
     {
       "path": "telephony/cost_tracker.py",
-      "sha256": "7646e37fd343ccda1b110f9be0e0d1d15509ccf395134cb71f20ebd79163da30",
-      "bytes": 20621
+      "sha256": "5116d37c29afae3777cc3c94d60ceebd54d30b7c5f148539f0432545c1a936a8",
+      "bytes": 20880
     },
     {
       "path": "telephony/disclosure_playback_marker.py",
