@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "9aac42c57599334126f41c369f0158eb117f4010",
-  "sha256": "e7b4a1897eeab6fcf20e29c716f503d38710ff336bcd4b7f850c7255a4b76d45",
+  "revision": "97b3e6ec9ea9b713c872da34181053da67e78920",
+  "sha256": "e58a1ffeb3116dfefc83456c5eddc6aad4fb746e6fd9b8e746d4bd39bbc7e730",
   "files": [
     {
       "path": ".env.example",
@@ -5995,8 +5995,8 @@
     },
     {
       "path": "telephony/routes.py",
-      "sha256": "a04fcfae884bb0649a0e227beb5bc9bc7f3855db1ae4ef4bb592124416d6f0c4",
-      "bytes": 62194
+      "sha256": "ca1a35d398ee72e70975c12be46d5d87934591ad2b480d56e6f6d9159cb9513d",
+      "bytes": 62451
     },
     {
       "path": "telephony/spoken_transcript_pacer.py",
