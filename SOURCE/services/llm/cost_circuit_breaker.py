@@ -84,6 +84,8 @@ _PER_MINUTE_WAIT_DEFAULT_STEPS_S = (5.0, 10.0, 15.0, 20.0)
 # The reason text an older cloud sends without ``limit_type`` (see
 # ``per_minute_denial_wait_seconds``).
 _PER_MINUTE_REASON_PREFIX = "Per-minute LLM call limit reached"
+# Looked up at call time so tests can replace the wait.
+_sleep = asyncio.sleep
 
 
 def _cost_limit_error(
@@ -381,7 +383,7 @@ async def call_waiting_out_per_minute_limit(
     *,
     cancelled: Callable[[], bool] | None = None,
     budget_s: float = PER_MINUTE_WAIT_BUDGET_S,
-    sleep: Callable[[float], Awaitable[Any]] = asyncio.sleep,
+    sleep: Callable[[float], Awaitable[Any]] | None = None,
     label: str = "",
 ) -> Any:
     """Run one model turn; when the per-minute cap refuses it, wait and resend.
@@ -392,6 +394,7 @@ async def call_waiting_out_per_minute_limit(
     waiting, or once ``cancelled()`` is true, the refusal itself is returned
     and the caller ends the task as before.
     """
+    pause = sleep or _sleep
     waited = 0.0
     attempt = 0
     while True:
@@ -427,7 +430,7 @@ async def call_waiting_out_per_minute_limit(
         remaining = wait_s
         while remaining > 0:
             step = min(1.0, remaining)
-            await sleep(step)
+            await pause(step)
             remaining -= step
             if cancelled is not None and cancelled():
                 return response
