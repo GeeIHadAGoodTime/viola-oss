@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "fd7684258d1d12d9a765dace044caf3a646ccb4c",
-  "sha256": "e2b067e24dcce53880d30ac2c73a8a84af1df25a7eaf245eeef28e9cb6ff3366",
+  "revision": "579ea7dbf37ef97d4f52f396b5eee989d6bdee53",
+  "sha256": "ae1743cae6f29b7cfd7b8908c27c1d9c31ada63a14027a5017d9cb2987ad86bc",
   "files": [
     {
       "path": ".env.example",
@@ -1595,8 +1595,8 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "e77baddf10bb2148c708e17f42aaf3c85ff7d79bec3b93598936ee6e2322034e",
-      "bytes": 641687
+      "sha256": "6a220c68da43308d6c2a81edb6aa9e284cdb87b360ba321c8dbc094815710758",
+      "bytes": 642054
     },
     {
       "path": "intent/agent_loop.py",
@@ -1885,8 +1885,8 @@
     },
     {
       "path": "intent/log_redaction.py",
-      "sha256": "f74be8695e46ff41f48c179c4b7bbff49e4f05de3b037ed41a5ce77356cbad0a",
-      "bytes": 26943
+      "sha256": "ed13336a290caac3f6513f400db1d3f65d85550f0744a9044f8692c36e83a6bc",
+      "bytes": 27721
     },
     {
       "path": "intent/permissions/policy.py",
