@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "b7dd17964f857d8397ee200a5ee627c72659023e",
-  "sha256": "14368fa98a2ad3a23866c4cc74c8056066fcf336767255a658fe5f61bd3cb320",
+  "revision": "e82eb19055c2338aa847fcf83b95339cb80f4ccc",
+  "sha256": "bf99dcf5aaf1bf3aa659b562c082b58f4e59cde471e44d32db3602f97d4603c2",
   "files": [
     {
       "path": ".env.example",
@@ -6415,13 +6415,13 @@
     },
     {
       "path": "tests/public/test_scheduler_one_shot_staleness.py",
-      "sha256": "146a25b53eecebd3991855e54c78c513bc64b54aa060df97bf300e59c6c5511e",
-      "bytes": 4329
+      "sha256": "3d89e4c9edbc07c9e4ce5dbb3d0816e7155bbc32c5953c109a26498ee8ec0073",
+      "bytes": 4549
     },
     {
       "path": "tests/public/test_scheduler_poll_admission.py",
-      "sha256": "8a8b39fc8b782cdacf7915306a494bb90228deec7803629915d58dc05e3829ce",
-      "bytes": 4114
+      "sha256": "a4f32ac5a8e03f92bcba9018dd177a21c2879eaed17283b8127fabc966415cd2",
+      "bytes": 4324
     },
     {
       "path": "tests/public/test_selected_audio_output.py",
