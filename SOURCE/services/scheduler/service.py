@@ -279,7 +279,7 @@ class SchedulerService:
         self._intent_pipeline: Any = None
         # MCP hub reference (set externally after bootstrap)
         self._mcp_hub: Any = None
-        self._last_reminder_sweep = 0.0
+        self._sweep_task: asyncio.Task[None] | None = None
 
     # ------------------------------------------------------------------ CRUD
 
@@ -528,6 +528,7 @@ class SchedulerService:
         # that tear down and recreate the loop between cases).
         self._stop_event = asyncio.Event()
         self._check_task = asyncio.create_task(self._check_loop())
+        self._sweep_task = asyncio.create_task(self._fired_reminder_sweep_loop())
         logger.info("Scheduler started with %d enabled schedule(s)", count)
 
     async def stop(self) -> None:
@@ -545,6 +546,13 @@ class SchedulerService:
             except asyncio.CancelledError:
                 pass
             self._check_task = None
+        if self._sweep_task is not None:
+            self._sweep_task.cancel()
+            try:
+                await self._sweep_task
+            except asyncio.CancelledError:
+                pass
+            self._sweep_task = None
         self._stop_event = None
 
         # Wait for in-flight sub-agents with grace period
@@ -584,14 +592,23 @@ class SchedulerService:
 
             await self._wait_for_next_tick()
 
-    async def _sweep_fired_reminders_hourly(self, now: datetime) -> None:
-        if time.monotonic() - self._last_reminder_sweep < _FIRED_REMINDER_SWEEP_SECONDS and self._last_reminder_sweep:
-            return
-        self._last_reminder_sweep = time.monotonic()
-        try:
-            await self.prune_fired_reminders(now=now)
-        except Exception:  # noqa: BLE001, RUF100 - cleanup must never stop due reminders from firing
-            logger.warning("Fired-reminder cleanup failed", exc_info=True)
+    async def _fired_reminder_sweep_loop(self) -> None:
+        """Hourly, separate from the due-schedule poll so a cleanup can never delay a reminder."""
+        while self._running:
+            try:
+                await self.prune_fired_reminders()
+            except asyncio.CancelledError:
+                break
+            except Exception:  # noqa: BLE001, RUF100 - cleanup must never stop the scheduler
+                logger.warning("Fired-reminder cleanup failed", exc_info=True)
+            stop_event = self._stop_event
+            if stop_event is None:
+                break
+            try:
+                await asyncio.wait_for(stop_event.wait(), timeout=_FIRED_REMINDER_SWEEP_SECONDS)
+            except TimeoutError:
+                continue
+            break
 
     @staticmethod
     def _is_expired_fired_reminder(schedule: Schedule, cutoff: datetime) -> bool:
@@ -650,8 +667,6 @@ class SchedulerService:
         """
         now = datetime.now(UTC)
         now_iso = now.isoformat()
-
-        await self._sweep_fired_reminders_hourly(now)
 
         due = await self._store.get_due_schedules_for_all_users_async(now_iso)
         if not due:
