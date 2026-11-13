@@ -1,7 +1,7 @@
 /**
  * WakeWordSection - custom wake-word model switching UI.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { authFetch } from '../hooks/useViolaApi';
 import { THEME } from '../config';
@@ -257,6 +257,10 @@ export default function WakeWordSection({ theme = THEME }) {
   const [trainingUnavailableReason, setTrainingUnavailableReason] = useState(null);
   const [wordRefusal, setWordRefusal] = useState(null);
   const [wordChecked, setWordChecked] = useState('');
+  // One switch at a time. On the build-10 laptop the word was switched 8 times in
+  // 2 seconds (each one a detector reload): the button stayed live while it worked.
+  const [activating, setActivating] = useState(false);
+  const activatingRef = useRef(false);
 
   const activeModel = useMemo(
     () => models.find((model) => model.is_active) || null,
@@ -458,7 +462,9 @@ export default function WakeWordSection({ theme = THEME }) {
   }, [samples, wakeWordText]);
 
   const activateModel = useCallback(async (model) => {
-    if (!model) return;
+    if (!model || activatingRef.current) return false;
+    activatingRef.current = true;
+    setActivating(true);
     try {
       await wakeRequest('/v1/wake/activate', {
         method: 'POST',
@@ -472,6 +478,9 @@ export default function WakeWordSection({ theme = THEME }) {
     } catch (err) {
       setLoadError(err?.message || 'Could not activate that wake word.');
       return false;
+    } finally {
+      activatingRef.current = false;
+      setActivating(false);
     }
   }, [reloadModels]);
 
@@ -676,11 +685,11 @@ export default function WakeWordSection({ theme = THEME }) {
               </div>
               <button
                 onClick={() => activateModel(model)}
-                disabled={model.is_active || model.is_supported === false}
+                disabled={activating || model.is_active || model.is_supported === false}
                 style={buttonStyle(
                   theme,
                   model.is_active || model.is_supported === false ? 'secondary' : 'primary',
-                  model.is_active || model.is_supported === false,
+                  activating || model.is_active || model.is_supported === false,
                 )}
               >
                 {model.is_supported === false ? 'Unsupported' : model.is_active ? 'In use' : USE_WORD_LABEL}
@@ -835,7 +844,8 @@ export default function WakeWordSection({ theme = THEME }) {
               </span>
               <button
                 onClick={() => applyCompletedModel(completedModelRow)}
-                style={buttonStyle(theme, 'primary')}
+                disabled={activating}
+                style={buttonStyle(theme, 'primary', activating)}
               >
                 {USE_WORD_LABEL}
               </button>

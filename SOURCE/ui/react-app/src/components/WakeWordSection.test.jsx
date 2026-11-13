@@ -195,6 +195,28 @@ describe('WakeWordSection one action makes a trained word active', () => {
     expect(screen.queryByRole('button', { name: 'Use this word' })).toBeEnabled();
   });
 
+  it('a burst of clicks switches the word once (the laptop log had 8 switches in 2 seconds)', async () => {
+    let release;
+    let calls = 0;
+    backend({
+      '/v1/wake/models': () => reply({ models: [VIOLA, COMPUTER], active_model_path: 'viola.onnx' }),
+      '/v1/wake/activate': () => {
+        calls += 1;
+        return new Promise((resolve) => { release = () => resolve(reply({ reload: { reloaded: true } })); })
+          .then((value) => value);
+      },
+    });
+    render(<WakeWordSection />);
+    const button = await screen.findByRole('button', { name: 'Use this word' });
+
+    for (let i = 0; i < 8; i += 1) fireEvent.click(button);
+
+    expect(calls).toBe(1);
+    await waitFor(() => expect(button).toBeDisabled());
+    release();
+    await waitFor(() => expect(screen.getByText('Selected "computer" as your wake word.')).toBeInTheDocument());
+  });
+
   it('after Settings is closed and reopened the trained word still offers the same action', async () => {
     backend({
       '/v1/wake/models': () => reply({ models: [VIOLA, COMPUTER], active_model_path: 'viola.onnx' }),
