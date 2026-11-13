@@ -2645,6 +2645,9 @@ class _OpenAISpendAccounting:
         gate = await reserve_managed_llm_spend_cap_async(
             self.user_id,
             estimated_cents=_estimated_spend_cents(self.model, self.estimated_usage),
+            # Cloud phone calls always run on Viola's OpenAI key (telephony/
+            # cloud_routes.py), whatever the user's AI source setting is.
+            managed_llm=True,
         )
         if not gate.allowed:
             raise LLMQuotaExceededError(

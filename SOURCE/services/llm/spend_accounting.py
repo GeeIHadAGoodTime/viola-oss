@@ -269,8 +269,12 @@ class LlmSpendReservation:
         fail_closed_on_settle_error: bool = False,
         reserve_tokens: bool = True,
         provider: object = None,
+        viola_key: bool = False,
     ) -> None:
         self.user_id = user_id or ""
+        # True when the call runs on Viola's own provider key whatever the
+        # user's AI source setting says (cloud proxy): it is always charged.
+        self.viola_key = viola_key
         self.model = model
         self.estimated_usage = estimated_usage
         self.operation = operation
@@ -294,7 +298,7 @@ class LlmSpendReservation:
             user_uses_managed_llm,
         )
 
-        self._managed_llm = user_uses_managed_llm(self.user_id)
+        self._managed_llm = True if self.viola_key else user_uses_managed_llm(self.user_id)
         self.remotely_accounted = self._managed_llm and provider_managed_spend_accounted_remotely(self.provider)
 
         gate = await reserve_managed_llm_spend_cap_async(
@@ -368,7 +372,7 @@ class LlmSpendReservation:
         if self._managed_llm is None:
             from services.llm.managed_budget import user_uses_managed_llm
 
-            self._managed_llm = user_uses_managed_llm(self.user_id)
+            self._managed_llm = True if self.viola_key else user_uses_managed_llm(self.user_id)
         if not self.settle_spend or not self.user_id or not self._managed_llm or self.remotely_accounted:
             return
 
