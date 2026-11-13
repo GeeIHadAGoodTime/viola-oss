@@ -354,6 +354,15 @@ class AuthenticationPlugin(SecurityPlugin):
         """Handle authentication failure with persistent rate limiting + exponential backoff."""
         path = request.url.path
 
+        # A request caught in flight by Quit is cancelled, not a failed login:
+        # it must not be counted (auth_failures.db) or logged as a failure.
+        if getattr(request.state, "shutdown_cancel", False):
+            log.info("Request %s cancelled because Viola is shutting down", path)
+            return JSONResponse(
+                status_code=503,
+                content={"detail": "Viola is shutting down"},
+            )
+
         # Check if already rate-limited before recording new failure
         is_limited, retry_after = self._failure_store.check_rate_limited(client_ip)
         if is_limited:
@@ -529,6 +538,14 @@ class AuthenticationPlugin(SecurityPlugin):
 
             validation = await validate_desktop_session_token(token)
             if not validation.authenticated or validation.user is None or validation.session is None:
+                if validation.reason == "shutting_down":
+                    # Viola is quitting and this request was caught in flight.
+                    # It is not a bad token: do not warn, do not count it.
+                    log.info("Desktop local UI auth cancelled: Viola is shutting down")
+                    if request is not None:
+                        request.state.desktop_session_kept = True
+                        request.state.shutdown_cancel = True
+                    return False
                 log.warning("Desktop local UI auth rejected token: %s", validation.reason)
                 if validation.transient and request is not None:
                     request.state.desktop_session_kept = True
