@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "1fbe85616cbf80e0cd51552cbb065f387f57429d",
-  "sha256": "c958f42e98d761e4db820fc51ae44b22275c462b6f110ae8ae1e92d0b1c8cb20",
+  "revision": "947416938da4df56d12ea7df917b5197b223bd01",
+  "sha256": "f5c007ddeb032e19274a44acf0c6b220d7a29d9d5337b251970879da8a7bc74b",
   "files": [
     {
       "path": ".env.example",
@@ -150,8 +150,8 @@
     },
     {
       "path": "audio_core/aec_reference_base.py",
-      "sha256": "7c3c7cf0b2f6af23b29b305d94af607dfb81349d6ad88d839ca922a9d8014af2",
-      "bytes": 24059
+      "sha256": "7bdb632a6e5b9163cbd67b292ff4b1efcc37be0b6cfaaad3a4b52035c0496ec6",
+      "bytes": 28050
     },
     {
       "path": "audio_core/calibration/__init__.py",
@@ -1250,8 +1250,8 @@
     },
     {
       "path": "core/voice_command_handler.py",
-      "sha256": "97b25b3f6829b176bad357bc56d890119f15b4ff4c8253bd2ce5f7c7e86c9311",
-      "bytes": 117919
+      "sha256": "c9441e7f4e7a47edc0dd609cf8681ca35cfef295de94209dfadf6400454dbd92",
+      "bytes": 120702
     },
     {
       "path": "core/voice_orchestrator.py",
@@ -13835,8 +13835,8 @@
     },
     {
       "path": "voice/transcription/whisper.py",
-      "sha256": "72191dfc47579d574b7cd87a28dfd8bf363eae1bef4d2508b93ac54cb346ea2f",
-      "bytes": 18708
+      "sha256": "4bebd50ed5ea273fa8a5969c4a825f0188ce40de6ff70bb491182eed71f98fc9",
+      "bytes": 21463
     },
     {
       "path": "voice/transcription/whisper_model_cache.py",
@@ -14020,8 +14020,8 @@
     },
     {
       "path": "voice/wake_detector/violawake_listener.py",
-      "sha256": "bf5b0582eff687927e399d7e4a64f8e209d74406caab4e30f850ffb5f3c2dfcc",
-      "bytes": 193063
+      "sha256": "731abf261e5b720a06bf044668b828cf9b0f27dd8040bdd705e03f2aaf606da4",
+      "bytes": 193610
     },
     {
       "path": "voice/wake_detector/wake/__init__.py",
