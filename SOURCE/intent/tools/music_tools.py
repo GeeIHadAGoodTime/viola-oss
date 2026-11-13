@@ -216,26 +216,6 @@ def _notify_spotify_fallback() -> None:
         logger.debug("Spotify fallback notice failed", exc_info=True)
 
 
-def _spotify_stays_the_source(provider_id: str, active_provider_before: str) -> bool:
-    """A play on another service while Spotify can't play is a fallback, not a choice.
-
-    The music source was silently rewritten to YouTube here (build 9,
-    `Provider switch: spotify -> youtube_iframe` 9 s after play), which then hid
-    every later "Spotify isn't connected" notice.
-    """
-    if _provider_family(active_provider_before) != _provider_family("spotify"):
-        return False
-    if _provider_family(provider_id) == _provider_family("spotify"):
-        return False
-    try:
-        from music.spotify.connection import spotify_usable
-
-        return not spotify_usable()
-    except Exception:
-        logger.debug("Spotify usability check failed", exc_info=True)
-        return True
-
-
 _PROVIDER_FAMILIES: tuple[frozenset[str], ...] = (
     frozenset({"spotify", "spotify_cdp"}),
     frozenset({"youtube", "youtube_iframe", "youtube_music"}),
@@ -1191,10 +1171,10 @@ async def play_music_handler(
     Args:
         query: What to play: artist, song, genre, mood, or any music query.
         provider: Optional provider override, such as spotify, youtube_music,
-            youtube, or local. When provided, Viola switches the active
-            provider once playback starts.
-        remember_provider: False when the caller picked this provider for one
-            song (a search result), so the user's music source stays as it is.
+            youtube, or local. It applies to this request only; the saved
+            music source is not changed.
+        remember_provider: Kept for callers; no longer changes the saved
+            music source.
         target_room: Optional Viola room, room group, or paired Spoke speaker.
             When provided, the runtime returns structured room-route and
             pairing-flow facts when the target is not paired.
@@ -1243,9 +1223,10 @@ async def play_music_handler(
         status_code = int(data.get("_status_code", 0) or 0)
 
         if status_code == 200 and data.get("ok"):
-            if provider_id and remember_provider and not _spotify_stays_the_source(provider_id, active_provider_before):
-                with user_scope(scoped_user_id):
-                    _select_provider(provider_id, scoped_user_id)
+            # A provider named in a play request applies to that request only
+            # (decision 2026-11-12, build 11): "play X on Spotify" no longer
+            # makes Spotify the saved music source. The source changes in
+            # Settings, by an explicit switch, or when Spotify is first connected.
             # record_and_call/ensure_envelope (contracts/api_response.py)
             # always nests a legacy {"ok": ..., <fields>} handler return under
             # "data" when the handler itself did not set a top-level "data"
