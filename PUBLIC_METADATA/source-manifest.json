@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "2b9c274f4596cd1c2542939c60b6f6b253ccf5be",
-  "sha256": "d1322678b6b88c41a29ee7d0b444b63bd68fe60047f49749d0689f94f9e17716",
+  "revision": "90726b689579e904cd6d5ec32ab21dc8cb7dd537",
+  "sha256": "d67047b995fad303ab0ffb82b4c8880b2d304ab32542a68d613dc358e134c059",
   "files": [
     {
       "path": ".env.example",
@@ -1635,8 +1635,8 @@
     },
     {
       "path": "intent/approval.py",
-      "sha256": "5739c675736c177ef5b3a990f4704470422b8b9c9971250d772b26b4eb98af04",
-      "bytes": 65099
+      "sha256": "1ec9cb1ff971b96347a675ee23be17bd02dc26c80c94878fb36aa57fd377d480",
+      "bytes": 65557
     },
     {
       "path": "intent/capability_resolver.py",
@@ -1695,8 +1695,8 @@
     },
     {
       "path": "intent/context_builder.py",
-      "sha256": "da03d7a716503a9d8c9a389366201ddc37f67220687405742c2ba04f25873613",
-      "bytes": 125698
+      "sha256": "6fd33586d32fd51a4c1a8b3b58506506eb9b84560cbf218fd8a60473fba19c5e",
+      "bytes": 125756
     },
     {
       "path": "intent/context_compaction.py",
@@ -1705,8 +1705,8 @@
     },
     {
       "path": "intent/file_gates.py",
-      "sha256": "ddbb5318a35bf4fd73f7ec5ac0a52a26ec21dfe8507af1eb0d65891368291264",
-      "bytes": 23325
+      "sha256": "5274042a0b9edbbfb25459c022a1946b2b9709d705458506a16ec5cebfc517fc",
+      "bytes": 23995
     },
     {
       "path": "intent/gate_protocol.py",
@@ -2390,8 +2390,8 @@
     },
     {
       "path": "mcp_servers/core_tools/server.py",
-      "sha256": "53252d39e6b53a03de80459b14453334e1a7a64db50a6baf173f697f7210ecfc",
-      "bytes": 267176
+      "sha256": "7f280affd65e114b366b811c495ef1712eb4b4ed118d23841b30bae7002b9e65",
+      "bytes": 267300
     },
     {
       "path": "mcp_servers/phone_tool_descriptions.py",
