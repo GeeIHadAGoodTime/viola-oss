@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "c98cf50140c0eda141aa3787f6097260b06f0a4d",
-  "sha256": "bf9d5419ae27441b352c7bf21902504a71c955b5b10a36e31361385bb0991032",
+  "revision": "3876cd6e5b3b85c8d586d95c57891585da07ae1b",
+  "sha256": "7d69abff80c00a4cf523d474d4de47fd2f7c625e42c49fd5fe57c685eec4ba15",
   "files": [
     {
       "path": ".env.example",
@@ -6135,8 +6135,8 @@
     },
     {
       "path": "tests/public/test_carrier_event_adapter_contract.py",
-      "sha256": "0e6b2c96b6b89887680fcbedb672609b63eefc4c9c7a86e7161b61dcd96e57c4",
-      "bytes": 11905
+      "sha256": "787e3eaa44f4fd70a01eb8d86074367092fe02b94519660d24a6c8509b7941bf",
+      "bytes": 12007
     },
     {
       "path": "tests/public/test_cjk_runtime_reconstruction.py",
