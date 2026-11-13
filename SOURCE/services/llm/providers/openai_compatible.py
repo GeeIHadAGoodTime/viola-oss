@@ -740,6 +740,21 @@ def _enforce_storage_consent_for_config(config: LLMConfig, api_kwargs: dict[str,
     return api_kwargs
 
 
+def _ask_reported_usage(usage: Any) -> Any:
+    """The provider's reported token usage for one ask() call, or None.
+
+    Only a count the provider reported for both input and output is returned;
+    the caller keeps its own estimate otherwise.
+    """
+    if usage is None:
+        return None
+    from services.llm.spend_accounting import LlmTokenUsage, usage_from_openai_usage, usage_source_from_openai_usage
+
+    if usage_source_from_openai_usage(usage) != "provider":
+        return None
+    return usage_from_openai_usage(usage, LlmTokenUsage(input_tokens=0, output_tokens=0))
+
+
 async def _responses_create_with_storage_consent(client: Any, config: LLMConfig, api_kwargs: dict[str, Any]) -> Any:
     _enforce_storage_consent_for_config(config, api_kwargs)
     from diagnostics import latency_spans
@@ -2393,6 +2408,11 @@ class OpenAICompatibleProvider(BaseLLMProvider):
                         "response_id": continuity["response_id"],
                         "_continuity": continuity,
                     }
+                    reported = _ask_reported_usage(usage)
+                    if reported is not None:
+                        # Callers that bill this call (screen-share vision)
+                        # charge the provider's own count, image included.
+                        result_payload["usage"] = reported
                     if no_result_payload is not None:
                         result_payload["no_result"] = no_result_payload["no_result"]
                         result_payload["error_state"] = no_result_payload["error_state"]
@@ -2431,12 +2451,16 @@ class OpenAICompatibleProvider(BaseLLMProvider):
                 tokens_used=tokens_used,
             )
 
-            return {
+            ask_payload: dict[str, Any] = {
                 "content": content.strip(),
                 "tokens_used": tokens_used,
                 "model": self.config.model,
                 "error": None,
             }
+            reported = _ask_reported_usage(getattr(response, "usage", None))
+            if reported is not None:
+                ask_payload["usage"] = reported
+            return ask_payload
 
         except Exception as e:
             if _supports_responses_api(self.config) and _responses_error_should_surface(e):
