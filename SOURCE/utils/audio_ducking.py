@@ -9,12 +9,16 @@ This helps Viola hear you better by reducing background music volume when:
 from __future__ import annotations
 
 import threading
+import time
 from typing import Any, Literal
 
 from core.constants import TIMEOUT_MEDIUM
 from core.logging_config import get_logger
 
 logger = get_logger(__name__)
+
+# How often a restore fade looks for a new duck that cancels it.
+_FADE_CANCEL_POLL_S = 0.005
 
 
 class AudioDucker:
@@ -328,11 +332,16 @@ class AudioDucker:
                 logger.warning("Failed to set volume during fade step %s: %s", i, e)
                 break
 
-            # Wakes at once when a new duck cancels this fade (a plain sleep held
-            # the next duck back by up to a step, and a cancel during the last
-            # step still set the restore level after the duck).
-            if self._fade_cancel.wait(step_duration):
-                logger.debug("Fade cancelled after step %d", i)
+            # Wait in short slices so a new duck that cancels this fade is not
+            # held back for a whole step; a cancel during the last step used to
+            # fall through and set the restore level after the duck.
+            step_end = time.monotonic() + step_duration
+            while (remaining := step_end - time.monotonic()) > 0:
+                if self._fade_cancel.is_set():
+                    logger.debug("Fade cancelled after step %d", i)
+                    return
+                time.sleep(min(_FADE_CANCEL_POLL_S, remaining))
+            if self._fade_cancel.is_set():
                 return
 
         # Ensure we reach exact target volume

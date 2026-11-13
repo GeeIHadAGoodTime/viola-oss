@@ -397,7 +397,17 @@ def classify_after_wake(transcript: str, reply: str) -> BargeInDecision:
     tokens = _BARGE_IN_TOKEN_RE.findall((transcript or "").replace("\u2019", "'"))
     wake_at = max((i for i, t in enumerate(tokens) if _is_barge_in_wake_word(t)), default=None)
     after = tokens if wake_at is None else tokens[wake_at + 1 :]
-    return _request_after_wake(after, reply, empty=BargeInDecision("listen", "wake_word_over_speech"))
+    decision = _request_after_wake(after, reply, empty=BargeInDecision("listen", "wake_word_over_speech"))
+    if decision.kind == "command":
+        # Laptop log 2026-11-12 (08:33:15, 08:34:26): Jay's "Viola" was cleared as
+        # his (reference scores 0.03 to 0.05) and she went quiet at once, but what
+        # Whisper made of the next seconds over her voice was neither her words nor
+        # his ("First first first first first" over a reply about the piano,
+        # "What's the first one Stop" over one about the guitar). Nothing heard
+        # over her own voice is run: she is already quiet, so she listens for the
+        # request on clean audio. Exactly "stop" (or a dismiss phrase) still stops.
+        return BargeInDecision("listen", "request_over_her_voice")
+    return decision
 
 
 # A removed word this long is evidence that Viola's voice is in the recording.

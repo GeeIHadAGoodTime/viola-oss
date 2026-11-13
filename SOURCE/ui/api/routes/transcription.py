@@ -315,6 +315,11 @@ def register_transcription_routes(context: ApiContext) -> None:
         try:
             from utils.audio_ducking import get_global_ducker
 
+            from voice.wake_detector.own_speech import set_push_to_talk
+
+            # Only the mic button calls this: the wake listener must not also
+            # run a turn on the words of this take.
+            set_push_to_talk(True)
             ducker = get_global_ducker()
             if ducker:
                 ducker.duck()
@@ -342,6 +347,9 @@ def register_transcription_routes(context: ApiContext) -> None:
         try:
             from utils.audio_ducking import get_global_ducker
 
+            from voice.wake_detector.own_speech import set_push_to_talk
+
+            set_push_to_talk(False)
             ducker = get_global_ducker()
             if ducker:
                 ducker.unduck()
