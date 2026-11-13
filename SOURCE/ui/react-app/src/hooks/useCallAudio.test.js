@@ -185,6 +185,22 @@ describe('useCallAudio', () => {
     expect(response).toEqual({ ok: true, ended: true });
   });
 
+  it('tells the caller the call is over when End succeeds or the call is already gone', async () => {
+    const { result } = renderHook(() => useCallAudio('call-1'));
+    for (const [status, expected] of [[200, ['call-1']], [404, ['call-1']], [500, []], [403, []]]) {
+      authFetch.mockResolvedValueOnce({
+        ok: status === 200,
+        status,
+        json: async () => ({ ok: status === 200 }),
+      });
+      const over = [];
+      await act(async () => {
+        await result.current.endCall('call-1', { onCallOver: (id) => over.push(id) });
+      });
+      expect(over).toEqual(expected);
+    }
+  });
+
   it('posts operator messages and appends an optimistic system transcript', async () => {
     authFetch.mockResolvedValueOnce({
       ok: true,

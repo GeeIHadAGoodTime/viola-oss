@@ -366,6 +366,7 @@ class PipecatVoicemailDetectionHandler:
         record.voicemail_detection_source = ""
         record.outcome = ""
         record._end_call_committed = False
+        record._voicemail_auto_hangup_queued = False
         record._pending_end_call = None
         self._response_gate.reopen_for_conversation()
 
