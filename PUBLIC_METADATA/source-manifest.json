@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "518a6020d47a28497561be92b079f92ced172b62",
-  "sha256": "713ba3f55882e628a6c3f1e0b4251ee59bdcbf1598f7b7b9374df4a7f6c9fd7b",
+  "revision": "b7dd17964f857d8397ee200a5ee627c72659023e",
+  "sha256": "14368fa98a2ad3a23866c4cc74c8056066fcf336767255a658fe5f61bd3cb320",
   "files": [
     {
       "path": ".env.example",
@@ -4585,8 +4585,8 @@
     },
     {
       "path": "services/llm/cost_circuit_breaker.py",
-      "sha256": "34a147a1d160c3da4e3876bc6bf066a4298dfc2662700c59c29c2b6e0192eff1",
-      "bytes": 17841
+      "sha256": "4b90226fe443c035390d4a48bfc323314c4b6b7f201acd36032dcdd323e9e1e4",
+      "bytes": 17946
     },
     {
       "path": "services/llm/factory.py",

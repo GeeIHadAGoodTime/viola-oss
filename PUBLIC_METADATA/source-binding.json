@@ -30,10 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "bcf7a6053a708f912e3d6e635ad20b190f72c41d72561895bf799fd86611e003",
-  "source_tree_sha256": "713ba3f55882e628a6c3f1e0b4251ee59bdcbf1598f7b7b9374df4a7f6c9fd7b",
+  "source_manifest_sha256": "02fb96f8f4a2c25018a16081c04aa2d5425c7737e8ec6eedfc1f71ba1ec8bc9c",
+  "source_tree_sha256": "14368fa98a2ad3a23866c4cc74c8056066fcf336767255a658fe5f61bd3cb320",
   "source_file_count": 2812,
-  "source_revision": "518a6020d47a28497561be92b079f92ced172b62",
+  "source_revision": "b7dd17964f857d8397ee200a5ee627c72659023e",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "LICENSES/SPEECH_COMPONENT_NOTICES.md",
@@ -626,7 +626,7 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "518a6020d47a28497561be92b079f92ced172b62",
+    "source_commit": "b7dd17964f857d8397ee200a5ee627c72659023e",
     "kind": "agentcore build 11"
   },
   "historical_bindings": [
