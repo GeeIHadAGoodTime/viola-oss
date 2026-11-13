@@ -28,6 +28,7 @@ _NAMES = {
     "CarrierEvent",
     "CarrierEventProjection",
     "CarrierEventAdapter",
+    "_conference_leg_cost_usd",
 }
 _METHODS = {
     "get_record",
@@ -40,6 +41,8 @@ _METHODS = {
     "_bind_carrier_call_control_id",
     "handle_call_answered",
     "handle_call_cost",
+    "_record_for_conference_leg",
+    "_charge_conference_leg_floor",
 }
 
 
