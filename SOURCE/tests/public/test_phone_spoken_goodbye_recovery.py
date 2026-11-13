@@ -88,7 +88,7 @@ def _load_namespace():
         "_function_result_properties", "_continue_llm_function_result_properties", "_no_llm_function_result_properties",
         "_SPOKEN_CLOSE_COURTESY", "_SPOKEN_CLOSE_FAREWELL", "_ASSISTANT_SPOKEN_CLOSE_RE",
         "_RECIPIENT_SPOKEN_CLOSE_RE", "_is_terminal_spoken_close", "_has_adjacent_spoken_close",
-        "complete_spoken_goodbye_end_call_if_omitted",
+        "complete_spoken_goodbye_end_call_if_omitted", "complete_voicemail_end_call_if_omitted",
     }, namespace)
     _execute_nodes("telephony/transcription_observer.py", {"TranscriptFrameCollector"}, namespace)
     return namespace
