@@ -1805,6 +1805,10 @@ def _tool_allowed_by_executor(executor: AgentExecutor, tool_name: str) -> bool:
 # StepLoggerMiddleware handles all step-level logging and summarization.
 
 
+# A model turn slower than this is logged with how long it took.
+_SLOW_MODEL_CALL_S = 20.0
+
+
 async def run_agent_loop(
     executor: AgentExecutor,
     provider: Any,
@@ -2996,11 +3000,24 @@ async def run_agent_loop(
         """
         from services.llm.cost_circuit_breaker import call_waiting_out_per_minute_limit
 
-        return await call_waiting_out_per_minute_limit(
+        started = time.monotonic()
+        response = await call_waiting_out_per_minute_limit(
             lambda: provider.route_command_native(**turn_kwargs),
             cancelled=lambda: bool(getattr(executor, "_cancelled", False)),
             label="agent task %s" % task_id,
         )
+        # 1.0.5 build 10: "close the browser" spent 65 s in its first model
+        # call while a background agent ran, and nothing in the log said so.
+        elapsed = time.monotonic() - started
+        if elapsed >= _SLOW_MODEL_CALL_S:
+            logger.warning(
+                "Slow model call: agent task %s waited %.1fs for one turn (depth=%s, %d messages sent)",
+                task_id,
+                elapsed,
+                getattr(executor, "_depth", 0),
+                len(turn_kwargs.get("messages") or []),
+            )
+        return response
 
     async def _call_native_turn(
         *,
