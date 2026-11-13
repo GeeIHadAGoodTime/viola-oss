@@ -55,7 +55,7 @@ describe('wake model selection is not detector liveness', () => {
     });
     render(<WakeWordSection />);
     await screen.findByText('Athena');
-    fireEvent.click(screen.getAllByRole('button', { name: 'Switch' }).find((button) => !button.disabled));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Use this word' }).find((button) => !button.disabled));
     expect(await screen.findByText('Selected "Athena" as your wake word.')).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText(/Selected wake word:/)).toHaveTextContent('Athena'));
     expect(screen.queryByText(/Currently listening|Now listening/)).not.toBeInTheDocument();

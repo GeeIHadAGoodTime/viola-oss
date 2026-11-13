@@ -135,3 +135,96 @@ describe('WakeWordSection custom training', () => {
     await waitFor(() => expect(screen.getAllByText('Viola').length).toBeGreaterThan(0));
   });
 });
+
+describe('WakeWordSection one action makes a trained word active', () => {
+  const COMPUTER = {
+    model_id: 'computer-1',
+    name: 'computer',
+    is_default: false,
+    is_active: false,
+    is_supported: true,
+    architecture: 'temporal_cnn',
+  };
+
+  beforeEach(() => {
+    authFetch.mockReset();
+  });
+
+  function trainedBackend() {
+    let active = false;
+    const activations = [];
+    backend({
+      '/v1/wake/models': () => reply({
+        models: [{ ...VIOLA, is_active: !active }, { ...COMPUTER, is_active: active }],
+        active_model_path: active ? 'computer.onnx' : 'viola.onnx',
+      }),
+      '/v1/wake/jobs/current': () => reply({ job: { job_id: '7', status: 'training', wake_word: 'computer' } }),
+      '/v1/wake/jobs/7': () => reply({ job_id: '7', status: 'done', model_id: 'computer-1', model_path: 'computer.onnx' }),
+      '/v1/wake/activate': () => {
+        active = true;
+        activations.push('computer-1');
+        return reply({ model: { model_id: 'computer-1' }, reload: { reloaded: true } });
+      },
+    });
+    return activations;
+  }
+
+  it('names the finished-training action and the list action the same, with no Switch or Activate', async () => {
+    trainedBackend();
+    render(<WakeWordSection />);
+
+    expect(await screen.findByText(/"computer" is ready/)).toBeInTheDocument();
+    // One in the finished-training row, one on the model's own row: the same words.
+    expect(screen.getAllByRole('button', { name: 'Use this word' })).toHaveLength(2);
+    expect(screen.queryByRole('button', { name: 'Switch' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Activate' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'In use' })).toBeDisabled();
+  });
+
+  it('pressing it makes the word selected and closes the finished-training row', async () => {
+    const activations = trainedBackend();
+    render(<WakeWordSection />);
+    await screen.findByText(/"computer" is ready/);
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Use this word' })[1]);
+
+    expect(await screen.findByText('Selected "computer" as your wake word.')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(/Selected wake word:/)).toHaveTextContent('computer'));
+    await waitFor(() => expect(screen.queryByText(/"computer" is ready/)).not.toBeInTheDocument());
+    expect(activations).toEqual(['computer-1']);
+    expect(screen.queryByRole('button', { name: 'Use this word' })).toBeEnabled();
+  });
+
+  it('a burst of clicks switches the word once (the laptop log had 8 switches in 2 seconds)', async () => {
+    let release;
+    let calls = 0;
+    backend({
+      '/v1/wake/models': () => reply({ models: [VIOLA, COMPUTER], active_model_path: 'viola.onnx' }),
+      '/v1/wake/activate': () => {
+        calls += 1;
+        return new Promise((resolve) => { release = () => resolve(reply({ reload: { reloaded: true } })); })
+          .then((value) => value);
+      },
+    });
+    render(<WakeWordSection />);
+    const button = await screen.findByRole('button', { name: 'Use this word' });
+
+    for (let i = 0; i < 8; i += 1) fireEvent.click(button);
+
+    expect(calls).toBe(1);
+    await waitFor(() => expect(button).toBeDisabled());
+    release();
+    await waitFor(() => expect(screen.getByText('Selected "computer" as your wake word.')).toBeInTheDocument());
+  });
+
+  it('after Settings is closed and reopened the trained word still offers the same action', async () => {
+    backend({
+      '/v1/wake/models': () => reply({ models: [VIOLA, COMPUTER], active_model_path: 'viola.onnx' }),
+    });
+    render(<WakeWordSection />);
+
+    const row = await screen.findByRole('button', { name: 'Use this word' });
+    expect(row).toBeEnabled();
+    expect(screen.queryByText(/is ready/)).not.toBeInTheDocument();
+  });
+});
