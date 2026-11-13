@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "579ea7dbf37ef97d4f52f396b5eee989d6bdee53",
-  "sha256": "ae1743cae6f29b7cfd7b8908c27c1d9c31ada63a14027a5017d9cb2987ad86bc",
+  "revision": "1de68cf55768e290bde79fdde799674b78bcabf0",
+  "sha256": "4bf776d3cb5b348125c23ef404bc0be92dff89ccf6a0a2d52c09faa8df9790bb",
   "files": [
     {
       "path": ".env.example",
@@ -2120,8 +2120,8 @@
     },
     {
       "path": "intent/tools/memory.py",
-      "sha256": "8dc69875a5f01a4186b6a9b7495422cfef96353c9b94e743bc8719aba2c4011d",
-      "bytes": 12739
+      "sha256": "f762cf18d486f8d6e1ecc92c3421581796f51a558de6bce4f8fc469646851e14",
+      "bytes": 12010
     },
     {
       "path": "intent/tools/music_connect.py",
@@ -4820,8 +4820,8 @@
     },
     {
       "path": "services/memory/hygiene.py",
-      "sha256": "dafeb636d30d1c875ef1f958cb39d0cafa63ef8dca7393801f6c07a707d7aa3e",
-      "bytes": 12838
+      "sha256": "6ae4a7aacd5bf53da5de211419f9a181d3e8f46e14c4a6e299aa142d760b04c7",
+      "bytes": 12998
     },
     {
       "path": "services/memory/key_provider.py",
