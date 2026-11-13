@@ -8,11 +8,13 @@ It enforces two independent guards:
    conservative per-token cost model.  Default $10/month.  Resets on the first
    of the calendar month at 00:00 UTC.
 
-Both caps are GLOBAL (process-wide) by default.  The per-minute call cap can
-also be counted per ``scope`` (for example one window per account); no caller
-passes a scope yet, so today the cloud's 30 calls a minute are shared by every
-account.  Per-user managed spend caps are handled by plan_limiter; legacy
-quota counters are telemetry.
+The monthly cost cap is GLOBAL (process-wide).  The per-minute call cap is
+counted per ``scope``: the cloud passes the account id, so each account gets its
+own 30 calls a minute (1.0.5 build 10: one window shared by every account
+stopped a parent and its three research helpers).  The desktop app, and any
+pseudo or unauthenticated id in the cloud, use the one shared window (scope
+"").  Per-user managed spend caps are handled by plan_limiter; legacy quota
+counters are telemetry.
 
 A caller that is refused by the per-minute cap is told how long to wait
 (``retry_after_seconds``).  ``call_waiting_out_per_minute_limit`` is the
@@ -250,7 +252,8 @@ class CostCircuitBreaker:
         minute_decision = await check_redis_sliding_window(
             self._redis,
             scope="llm.cost.minute",
-            identifier=scope or "global",
+            # "user:" keeps an account id from ever naming the shared bucket.
+            identifier=("user:%s" % scope) if scope else "global",
             limit=cap,
             window_seconds=60,
         )
