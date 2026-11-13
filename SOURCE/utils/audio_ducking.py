@@ -76,6 +76,30 @@ class AudioDucker:
             value = state.get("is_playing")
         return None if value is None else bool(value)
 
+    def _player_detail(self) -> str:
+        """What the player says, for DUCK_SKIPPED.
+
+        Build 10 on the laptop: four DUCK_SKIPPED lines while Spotify played,
+        and nothing saying which state the player was in or which backend it held.
+        """
+        try:
+            player = getattr(self.music_player, "player", self.music_player)
+            phase = getattr(getattr(getattr(player, "_playback_sm", None), "phase", None), "name", None)
+            state = getattr(player, "_state", None)
+            now = getattr(state, "now_playing", None)
+            backend = getattr(player, "_backend", None)
+            handle = getattr(backend, "_handle", None)
+            active = getattr(handle, "is_active", None)
+            return "phase=%s track=%s provider=%s backend=%s handle_active=%s" % (
+                phase,
+                "yes" if now is not None else "no",
+                getattr(now, "provider", None),
+                type(backend).__name__ if backend is not None else None,
+                active() if callable(active) else None,
+            )
+        except Exception as exc:  # a log detail must never break ducking
+            return "detail_unavailable=%s" % type(exc).__name__
+
     def duck(self) -> None:
         """
         Duck (lower) the audio volume.
@@ -108,7 +132,10 @@ class AudioDucker:
                     ):
                         self._duck_applied = False
                         self._start_timeout_timer()
-                        logger.info("🔉 DUCK_SKIPPED: nothing is playing, volume left as it is")
+                        logger.info(
+                            "🔉 DUCK_SKIPPED: nothing is playing, volume left as it is (%s)",
+                            self._player_detail(),
+                        )
                         return
                 except Exception as e:
                     logger.debug("Duck could not read the player state: %s", e)
