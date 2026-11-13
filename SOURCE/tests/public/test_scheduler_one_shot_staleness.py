@@ -11,6 +11,7 @@ import unittest
 
 _METHODS = {"_check_and_fire", "_is_stale_one_shot", "_skip_stale_one_shot"}
 _CONSTANTS = {"ONE_SHOT_STALE_AFTER_SECONDS", "ONE_SHOT_STALE_ERROR"}
+_FUNCTIONS = {"_parse_due_time"}
 
 
 def scheduler_type():
@@ -18,15 +19,17 @@ def scheduler_type():
     tree = ast.parse(source.read_text(encoding="utf-8"))
     constants = [node for node in tree.body if isinstance(node, ast.Assign)
                  and any(isinstance(t, ast.Name) and t.id in _CONSTANTS for t in node.targets)]
+    functions = [node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name in _FUNCTIONS]
     owner = next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "SchedulerService")
     methods = [node for node in owner.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
                and node.name in _METHODS]
-    if len(methods) != len(_METHODS) or len(constants) != len(_CONSTANTS):
+    if len(methods) != len(_METHODS) or len(constants) != len(_CONSTANTS) or len(functions) != len(_FUNCTIONS):
         raise AssertionError("scheduler staleness seam is missing")
     namespace = {"asyncio": asyncio, "datetime": datetime, "UTC": UTC,
                  "logger": logging.getLogger("scheduler-staleness-test"), "Schedule": object}
     code = ast.Module(body=[ast.ImportFrom(module="__future__", names=[ast.alias(name="annotations")], level=0),
                             *constants,
+                            *functions,
                             ast.ClassDef(name="SchedulerService", bases=[], keywords=[], body=methods,
                                          decorator_list=[])], type_ignores=[])
     exec(compile(ast.fix_missing_locations(code), str(source), "exec"), namespace)

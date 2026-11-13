@@ -177,11 +177,16 @@ class LLMRateLimiter:
         from services.llm.cost_circuit_breaker import get_circuit_breaker
 
         circuit_breaker = get_circuit_breaker()
+        # The cloud counts the per-minute cap per account, so one account's
+        # burst cannot stop everyone's turns. The desktop app is one process
+        # for one user and keeps its single process-wide window.
+        scope = user_id if _is_cloud_surface() and not _is_pseudo_user_id(user_id) else ""
+        scope_kwargs = {"scope": scope} if scope else {}
         async_check = getattr(circuit_breaker, "check_and_record_async", None)
         if async_check is not None:
-            result = async_check(estimated_tokens)
+            result = async_check(estimated_tokens, **scope_kwargs)
         else:
-            result = circuit_breaker.check_and_record(estimated_tokens)
+            result = circuit_breaker.check_and_record(estimated_tokens, **scope_kwargs)
         if inspect.isawaitable(result):
             await result
 

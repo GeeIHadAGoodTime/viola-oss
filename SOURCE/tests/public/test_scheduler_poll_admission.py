@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import ast
 import asyncio
+from datetime import UTC, datetime, timedelta
 from contextlib import asynccontextmanager
 import logging
 from pathlib import Path
@@ -14,8 +15,9 @@ def scheduler_type():
     tree = ast.parse(source.read_text(encoding="utf-8"))
     owner = next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "SchedulerService")
     methods = [node for node in owner.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-               and node.name in {"set_poll_admission_factory", "_check_loop"}]
-    namespace = {"asyncio": asyncio, "logger": logging.getLogger("scheduler-poll-admission-test")}
+               and node.name in {"set_poll_admission_factory", "_check_loop", "_seconds_until_next_due"}]
+    namespace = {"asyncio": asyncio, "logger": logging.getLogger("scheduler-poll-admission-test"),
+                 "datetime": datetime, "UTC": UTC, "timedelta": timedelta, "_CHECK_INTERVAL": 30}
     code = ast.Module(body=[ast.ImportFrom(module="__future__", names=[ast.alias(name="annotations")], level=0),
                            ast.ClassDef(name="SchedulerService", bases=[], keywords=[], body=methods, decorator_list=[])], type_ignores=[])
     exec(compile(ast.fix_missing_locations(code), str(source), "exec"), namespace)
@@ -29,7 +31,7 @@ class SchedulerPollAdmission(unittest.IsolatedAsyncioTestCase):
         scheduler, called = scheduler_type(), []
         async def poll():
             called.append("original")
-        async def tick():
+        async def tick(_timeout=None):
             scheduler._running = False
         scheduler._check_and_fire, scheduler._wait_for_next_tick = poll, tick
         scheduler._running = True
@@ -46,7 +48,7 @@ class SchedulerPollAdmission(unittest.IsolatedAsyncioTestCase):
             yield
         async def poll():
             due.pop()
-        async def tick():
+        async def tick(_timeout=None):
             scheduler._running = False
         scheduler.set_poll_admission_factory(admission)
         scheduler._check_and_fire, scheduler._wait_for_next_tick = poll, tick
@@ -73,7 +75,7 @@ class SchedulerPollAdmission(unittest.IsolatedAsyncioTestCase):
             entered.set()
             await finish.wait()
             events.append("original-finished")
-        async def tick():
+        async def tick(_timeout=None):
             scheduler._running = False
         scheduler.set_poll_admission_factory(admission)
         scheduler._check_and_fire, scheduler._wait_for_next_tick = poll, tick

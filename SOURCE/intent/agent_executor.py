@@ -2405,7 +2405,7 @@ def _strip_old_browser_refs(native_messages: list[dict[str, Any]]) -> None:
                     content[key] = _REF_PATTERN.sub("", val)
 
 
-_CHECK_AGENTS_WAIT_S = 20.0
+_CHECK_AGENTS_WAIT_S = 60.0
 
 # Tools whose result is a whole-page read. On a long shopping run these are most
 # of the history, and only the newest pages can still be acted on.
@@ -10277,10 +10277,17 @@ class AgentExecutor:
         # Hold the answer until a helper finishes or a short time passes. Polled
         # at full speed, a parent spent 16 model turns in 45 s, each resending
         # its whole context, to learn nothing had changed.
+        # 1.0.5 build 11: every managed call costs at least a cent, so the hold
+        # is long (60 s); it still ends the moment any helper finishes or the
+        # task is stopped, so nothing is answered later than before.
         running = [asyncio.ensure_future(done.wait()) for done in (getattr(self, "_live_helpers", None) or {}).values()]
         if running:
-            await asyncio.wait(running, timeout=_CHECK_AGENTS_WAIT_S, return_when=asyncio.FIRST_COMPLETED)
-            for wait in running:
+            cancel_event = getattr(self, "_cancel_event", None)
+            waits = list(running)
+            if isinstance(cancel_event, asyncio.Event):
+                waits.append(asyncio.ensure_future(cancel_event.wait()))
+            await asyncio.wait(waits, timeout=_CHECK_AGENTS_WAIT_S, return_when=asyncio.FIRST_COMPLETED)
+            for wait in waits:
                 wait.cancel()
 
         user_id = self._get_effective_user_id()

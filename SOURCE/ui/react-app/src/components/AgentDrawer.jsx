@@ -33,7 +33,7 @@ function visibleAgentRows(active, recentCompleted, streamStates, now) {
       return;
     }
     seen.add(agent.agent_id);
-    rows.push({ agent: { ...agent, status }, thinkingText: streamState.thinkingText || '' });
+    rows.push({ agent: { ...agent, status }, activityText: streamState.activityText || '' });
   });
 
   recentCompleted.forEach((agent) => {
@@ -45,7 +45,7 @@ function visibleAgentRows(active, recentCompleted, streamStates, now) {
       return;
     }
     seen.add(agent.agent_id);
-    rows.push({ agent: { ...agent, status }, thinkingText: streamState.thinkingText || '' });
+    rows.push({ agent: { ...agent, status }, activityText: streamState.activityText || '' });
   });
 
   return rows.slice(0, MAX_VISIBLE_AGENTS);
@@ -139,11 +139,11 @@ export default function AgentDrawer({
               alignItems: 'stretch',
             }}
           >
-            {rows.map(({ agent, thinkingText }) => (
+            {rows.map(({ agent, activityText }) => (
               <AgentCard
                 key={agent.agent_id}
                 agent={agent}
-                thinkingText={thinkingText}
+                activityText={activityText}
                 onCancel={(agentId) => { void Promise.resolve(onCancel(agentId)).catch(() => {}); }}
               />
             ))}
