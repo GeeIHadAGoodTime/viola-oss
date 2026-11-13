@@ -568,6 +568,7 @@ class VoiceOrchestrator:
         if not self._wake_processor.check_already_listening():
             return
 
-        self._wake_processor.handle_wake_accepted()
+        # Duck before the chime (handle_wake_accepted plays it): the music dips first.
         self._wake_processor.handle_audio_ducking()
+        self._wake_processor.handle_wake_accepted()
         self._wake_processor.schedule_voice_command()

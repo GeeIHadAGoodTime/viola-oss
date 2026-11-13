@@ -77,13 +77,6 @@ class WakeCallbackManager:
 
             IMPORTANT: This runs on the wake detector thread, NOT the main event loop.
             """
-            # Emit heartbeat if supervisor is available
-            if self.pipeline._supervisor:
-                try:
-                    self.pipeline._emit_wake_heartbeat()
-                except (AttributeError, RuntimeError) as exc:
-                    logger.debug("Wake heartbeat emission failed: %s", exc)
-
             # Validate callback is still callable (not corrupted by runtime mutation)
             callback = object.__getattribute__(self.pipeline, "_wake_callback_immutable")
             if callback is None:
@@ -114,6 +107,15 @@ class WakeCallbackManager:
                         exc,
                         error.user_friendly_message(),
                     )
+
+            # The duck goes first on this path (1.0.5 build-10 laptop, J9: the
+            # music dipped after the chime); the heartbeat waits until it is out.
+            # Emit heartbeat if supervisor is available
+            if self.pipeline._supervisor:
+                try:
+                    self.pipeline._emit_wake_heartbeat()
+                except (AttributeError, RuntimeError) as exc:
+                    logger.debug("Wake heartbeat emission failed: %s", exc)
 
             # Wake feedback is the chime alone (played by the wake processor in
             # the callback below, right after this duck), never a spoken "Yes?".

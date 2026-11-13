@@ -364,6 +364,14 @@ def register_transcription_routes(context: ApiContext) -> None:
                 ),
             )
 
+    @router.post("/v1/voice/nothing-heard", tags=["api", "audio"], dependencies=[Depends(require_auth)])
+    async def push_to_talk_heard_nothing(request: Request):
+        """Push-to-talk heard nothing: the same tone and notice as a wake that heard nothing."""
+        from core.voice_command_handler import signal_nothing_heard
+
+        message = await signal_nothing_heard(_request_user_id(request), "push_to_talk")
+        return success_response({"message": message})
+
     @router.post(
         "/v1/transcribe",
         tags=["api", "transcription"],

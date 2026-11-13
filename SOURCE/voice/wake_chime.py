@@ -137,29 +137,12 @@ def play_wake_chime() -> bool:
         return False
     samples = (_chime_samples() * min(1.0, volume)).astype(np.float32)
     threading.Thread(
-        target=_play_after_duck,
+        target=_play_blocking,
         args=(samples, CHIME_SAMPLE_RATE),
         daemon=True,
         name="wake-chime",
     ).start()
     return True
-
-
-# Longest the wake chime waits for the music to dip first.
-_DUCK_FIRST_MAX_WAIT_S = 0.3
-
-
-def _play_after_duck(samples: np.ndarray, sample_rate: int) -> bool:
-    """Play the wake chime once the music has been turned down (the duck runs on its own thread)."""
-    try:
-        from utils.audio_ducking import get_global_ducker
-
-        ducker = get_global_ducker()
-        if ducker is not None:
-            ducker.wait_for_duck_down(_DUCK_FIRST_MAX_WAIT_S)
-    except Exception as exc:  # noqa: BLE001, RUF100 - the chime plays regardless
-        logger.debug("Duck wait before the wake chime failed: %s", exc)
-    return _play_blocking(samples, sample_rate)
 
 
 # The wake's notes falling: "I stopped listening and heard nothing". Played

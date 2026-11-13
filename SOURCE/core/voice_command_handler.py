@@ -453,6 +453,47 @@ def _request_after_wake(after: list[str], reply: str, *, empty: BargeInDecision)
     return BargeInDecision("command", "wake_word_command", " ".join(after))
 
 
+NOTHING_HEARD_MESSAGE = "I didn't hear anything after the chime. Try again: say {wake_word}, then your request."
+
+
+async def signal_nothing_heard(user_id: str | None, reason: str) -> str:
+    """The nothing-heard tone and notice, the same for a wake and for push-to-talk. Never raises.
+
+    1.0.5 build-10 laptop (J5): holding the mic button showed a different
+    "check your settings" warning than the wake path; Jay wants both the same.
+    Returns the notice text.
+    """
+    logger.info("Heard no command (%s): playing the nothing-heard tone", reason)
+    message = NOTHING_HEARD_MESSAGE.format(wake_word="Viola")
+    try:
+        from voice.wake_chime import play_nothing_heard_tone
+
+        play_nothing_heard_tone()
+    except Exception as exc:  # noqa: BLE001, RUF100 - feedback must never break the turn
+        logger.debug("Nothing-heard tone unavailable: %s", exc)
+    try:
+        from ui.websocket.event_hub import get_event_hub
+        from voice.wake_detector.active_word import wake_word_name
+
+        message = NOTHING_HEARD_MESSAGE.format(wake_word=wake_word_name())
+        hub = get_event_hub()
+        if hub is not None and user_id:
+            await hub.broadcast(
+                "error",
+                {"code": "wake_no_command", "user_message": message, "level": "info"},
+                user_id=user_id,
+                force=True,
+            )
+    except Exception as exc:  # noqa: BLE001, RUF100 - feedback must never break the turn
+        logger.debug("Nothing-heard notice not sent: %s", exc)
+    return message
+
+
+def _needs_confirmation(decision: BargeInDecision) -> bool:
+    """A request heard by the transcript check stops her only once a second look agrees."""
+    return decision.kind == "command" or decision.reason == "request_mixed_with_her_words"
+
+
 def _log_barge_in_heard(route: str, transcript: str, decision: BargeInDecision) -> None:
     """One line per barge-in: what was heard over her reply and what it was taken to mean."""
     logger.info(
@@ -1677,7 +1718,7 @@ class VoiceCommandHandler:
         return result
 
     # What the user reads when a wake heard no command (the tone says it too).
-    NOTHING_HEARD_MESSAGE = "I didn't hear anything after the chime. Try again: say {wake_word}, then your request."
+    NOTHING_HEARD_MESSAGE = NOTHING_HEARD_MESSAGE
 
     async def _signal_nothing_heard(self, ctx: CommandContext, reason: str) -> None:
         """Tell the user the wake ended without a command (a soft tone and a toast).
@@ -1686,31 +1727,7 @@ class VoiceCommandHandler:
         and then spoke got nothing back and no sign that Viola had stopped
         listening (laptop report A0.6). Never raises.
         """
-        logger.info("Wake heard no command (%s): playing the nothing-heard tone", reason)
-        try:
-            from voice.wake_chime import play_nothing_heard_tone
-
-            play_nothing_heard_tone()
-        except Exception as exc:  # noqa: BLE001, RUF100 - feedback must never break the turn
-            logger.debug("Nothing-heard tone unavailable: %s", exc)
-        try:
-            from ui.websocket.event_hub import get_event_hub
-            from voice.wake_detector.active_word import wake_word_name
-
-            hub = get_event_hub()
-            if hub is not None and ctx.user_id:
-                await hub.broadcast(
-                    "error",
-                    {
-                        "code": "wake_no_command",
-                        "user_message": self.NOTHING_HEARD_MESSAGE.format(wake_word=wake_word_name()),
-                        "level": "info",
-                    },
-                    user_id=ctx.user_id,
-                    force=True,
-                )
-        except Exception as exc:  # noqa: BLE001, RUF100 - feedback must never break the turn
-            logger.debug("Nothing-heard notice not sent: %s", exc)
+        await signal_nothing_heard(ctx.user_id, reason)
 
     async def _play_follow_up_cue(self) -> None:
         """Play a brief audio cue to signal Viola is listening for follow-up.
@@ -2096,6 +2113,9 @@ class VoiceCommandHandler:
                         # own cut in half, or the user still talking. Look again.
                         checks += 1
                         decision = await self._check_barge_in(capture, message, tts_task)
+                    if not wake_heard and _needs_confirmation(decision):
+                        checks += 1
+                        decision = await self._confirm_barge_in(capture, message, tts_task, decision)
                     if wake_heard:  # the wake loop got there during the check
                         decision = BargeInDecision("listen", "wake_word_over_speech")
                 if decision.interrupts:
@@ -2193,6 +2213,40 @@ class VoiceCommandHandler:
         # Read the reply text now, not when speaking started: a streamed reply
         # grows while it is spoken, and the heard words may be its newest ones.
         return classify_barge_in_transcript(transcript, self._reply_text(message))
+
+    async def _confirm_barge_in(
+        self,
+        capture: Any,
+        message: str | StreamedReply,
+        tts_task: asyncio.Future,
+        first: BargeInDecision,
+    ) -> BargeInDecision:
+        """Look again, while she keeps talking, before a heard request stops her (Jay, build 11: option A).
+
+        1.0.5 build-10 laptop, 08:30:02: one check heard a wake-like word and
+        words in her own voice and stopped her at once; the confirming
+        transcription, taken only after she had stopped, disagreed. Now the
+        second look comes first: she stops only for "stop" or for a request both
+        looks agree on. Otherwise she keeps talking.
+        """
+        try:
+            await asyncio.wait_for(asyncio.shield(tts_task), timeout=_BARGE_IN_SETTLE_SEC)
+        except (TimeoutError, asyncio.CancelledError, Exception):  # noqa: BLE001, RUF100 - only a pause
+            pass
+        window_end = getattr(self, "_barge_in_window_end", None) or time.monotonic()
+        seconds = min(_BARGE_IN_WINDOW_SEC + (time.monotonic() - window_end), 30.0)
+        transcript = await self._transcribe_recent(capture, seconds)
+        second = classify_barge_in_transcript(transcript or "", self._reply_text(message))
+        _log_barge_in_heard("second look", transcript or "", second)
+        if second.kind == "stop":
+            return second
+        if second.kind == "command":
+            if first.kind != "command":
+                return second
+            a, b = _echo_words(first.command), _echo_words(second.command)
+            if _extends(a, b) or _extends(b, a):
+                return second
+        return BargeInDecision("ignore", "request_not_confirmed")
 
     @staticmethod
     def _reply_text(message: str | StreamedReply) -> str:

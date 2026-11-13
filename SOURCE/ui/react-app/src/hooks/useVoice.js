@@ -6,6 +6,21 @@ import { authFetch } from './useViolaApi';
 // whose loudest frame stays below it was silence from the device.
 const SILENT_MIC_PEAK_RMS = 0.003;
 
+// Push-to-talk that heard nothing gets the same tone and notice as a wake that
+// heard nothing (1.0.5 build-10 laptop, J5: Jay saw a different "check your
+// settings" warning when holding the mic button). The server plays the tone and
+// sends the same notice the wake path sends; this text is only the fallback.
+const HEARD_NOTHING_FALLBACK = "I didn't hear anything after the chime. Try again: say Viola, then your request.";
+
+async function reportHeardNothing(setError) {
+  try {
+    const response = await authFetch('/v1/voice/nothing-heard', { method: 'POST' });
+    const body = await response.json();
+    if (body?.ok) { setError(null); return; }
+  } catch { /* fall back to the same words on screen */ }
+  setError(HEARD_NOTHING_FALLBACK);
+}
+
 function getSupportedMimeType() {
   const candidates = [
     'audio/webm;codecs=opus',
@@ -337,7 +352,7 @@ export function useVoice(onCommandResult, { existingStream, executeCommand = tru
         // silence. Sending it would only come back as "I didn't catch that".
         if (analyserMeasuredRef.current && peakRms < SILENT_MIC_PEAK_RMS && takeSeconds >= 1) {
           try { await authFetch('/v1/audio/unduck', { method: 'POST' }); } catch { /* best effort */ }
-          setError("Viola didn't hear anything from the microphone. Check the microphone in Settings > Voice, then try again.");
+          await reportHeardNothing(setError);
           setIsProcessing(false);
           resolve(null);
           return;
@@ -428,7 +443,11 @@ export function useVoice(onCommandResult, { existingStream, executeCommand = tru
               and only falls back to the no-speech wording for the one case it
               actually describes: a well-formed success with no words in it.
             */
-            setError(describeError(result?.error ?? result, ERROR_CODE_MESSAGES.no_speech_detected));
+            if (result?.ok) {
+              await reportHeardNothing(setError); // a clean take with no words in it
+            } else {
+              setError(describeError(result?.error ?? result, ERROR_CODE_MESSAGES.no_speech_detected));
+            }
             setIsProcessing(false);
             resolve(null);
           }
