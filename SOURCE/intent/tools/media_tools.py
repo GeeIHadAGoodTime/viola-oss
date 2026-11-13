@@ -629,6 +629,9 @@ def _candidate_was_unplayable(play_result: ToolResult) -> bool:
 _SPOTIFY_URI_ID_RE = re.compile(r"(?:spotify:track:|open\.spotify\.com/track/)([A-Za-z0-9]{22})")
 
 
+_DISLIKE_WIDEN_LIMIT = 20
+
+
 def _candidate_rating_ids(track: dict[str, Any]) -> set[str]:
     """Every id a rating of this candidate could have been saved under."""
     ids: set[str] = set()
@@ -739,7 +742,24 @@ async def _handle_search_play_mode(
                         _notify_spotify_no_match(query, user_id)
 
     searched = time.monotonic()
-    tracks, skipped_disliked = _without_disliked(tracks, await _disliked_track_ids(user_id))
+    disliked_ids = await _disliked_track_ids(user_id)
+    if tracks and disliked_ids and all(_candidate_rating_ids(track) & disliked_ids for track in tracks):
+        # The 1.0.5 build-10 laptop log: "jazz" came back with ONE candidate
+        # (a routine asked for limit=1; the search cache held one), and it was
+        # the disliked track, so passing over it left nothing else to play.
+        # Ask once for a wider list before falling back to the disliked one.
+        wider = await _handle_search_mode(query, provider, max(limit, _DISLIKE_WIDEN_LIMIT), user_id)
+        if wider.ok and isinstance(wider.data, dict):
+            wider_tracks = [track for track in wider.data.get("tracks", []) if isinstance(track, dict)]
+            if any(not (_candidate_rating_ids(track) & disliked_ids) for track in wider_tracks):
+                logger.info(
+                    "media search_play: every result for %r was disliked; widened the search to %d results",
+                    query,
+                    len(wider_tracks),
+                )
+                data = dict(wider.data)
+                tracks = wider_tracks
+    tracks, skipped_disliked = _without_disliked(tracks, disliked_ids)
     filtered = time.monotonic()
     if skipped_disliked:
         data["tracks"] = tracks
