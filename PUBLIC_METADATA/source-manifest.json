@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "e82eb19055c2338aa847fcf83b95339cb80f4ccc",
-  "sha256": "bf99dcf5aaf1bf3aa659b562c082b58f4e59cde471e44d32db3602f97d4603c2",
+  "revision": "986488d7947526972673414620d08c23c866005b",
+  "sha256": "35556fb30c775f7f1620c0af746d51e4c0793eab17aff2e84aadea80412c3f47",
   "files": [
     {
       "path": ".env.example",
@@ -4585,8 +4585,8 @@
     },
     {
       "path": "services/llm/cost_circuit_breaker.py",
-      "sha256": "4b90226fe443c035390d4a48bfc323314c4b6b7f201acd36032dcdd323e9e1e4",
-      "bytes": 17946
+      "sha256": "0bd5a3bd16478fd1b4ba3afcf003092c7c263864ce7cdf93060d33c1defb7b4c",
+      "bytes": 18193
     },
     {
       "path": "services/llm/factory.py",
@@ -4740,8 +4740,8 @@
     },
     {
       "path": "services/llm/rate_limiter.py",
-      "sha256": "e072aa0ea33d994d2bbc94ac9d88137aec02b63e246cd88307e80c5dfe4aabab",
-      "bytes": 11195
+      "sha256": "187637a994f5db626b5aaf289154bf0eeda4a1deba28e489d107aba4aa9b5868",
+      "bytes": 11593
     },
     {
       "path": "services/llm/request_policy.py",
