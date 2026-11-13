@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "1de68cf55768e290bde79fdde799674b78bcabf0",
-  "sha256": "4bf776d3cb5b348125c23ef404bc0be92dff89ccf6a0a2d52c09faa8df9790bb",
+  "revision": "39f7142bd9631409e9905dfa09dce86313f132c0",
+  "sha256": "2213998ecf4009e3947aaa07da2fab5206d4750a7ace3c7eccb0f64d68b01f5e",
   "files": [
     {
       "path": ".env.example",
@@ -1695,8 +1695,8 @@
     },
     {
       "path": "intent/context_builder.py",
-      "sha256": "da03d7a716503a9d8c9a389366201ddc37f67220687405742c2ba04f25873613",
-      "bytes": 125698
+      "sha256": "dbb4ef0b2b06ed44f4f4ba168d7a086884b44501c1da26ac0e364fcaa35461fb",
+      "bytes": 127422
     },
     {
       "path": "intent/context_compaction.py",
