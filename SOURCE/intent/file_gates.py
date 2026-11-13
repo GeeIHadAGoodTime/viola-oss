@@ -526,17 +526,28 @@ def _spoken_path(raw_path: str) -> str:
 
 
 def delete_targets(args: Mapping[str, Any] | None) -> list[str]:
-    """Every path one ``file_write`` delete names (``path`` and ``paths``), in order, no repeats."""
+    """Every path one ``file_write`` delete removes, in order, no repeats.
+
+    With ``paths`` given, a folder in ``path`` is only where relative entries
+    are: it is not deleted itself (a file in ``path`` is one more target). Given the
+    folder in ``path`` and two files in ``paths``, the folder was added to the
+    targets and went to the Recycle Bin on "yes" (seen live 2026-11-12).
+    """
     params = args or {}
-    raw: list[Any] = [params.get("path") or params.get("filename")]
+    single = str(params.get("path") or params.get("filename") or "").strip()
     several = params.get("paths")
-    if isinstance(several, (list, tuple)):
-        raw.extend(several)
-    targets: list[str] = []
-    for item in raw:
-        text = str(item or "").strip()
-        if text and text not in targets:
-            targets.append(text)
+    listed = [str(item or "").strip() for item in several] if isinstance(several, (list, tuple)) else []
+    listed = [item for item in listed if item]
+    if not listed:
+        return [single] if single else []
+    base = _resolve(single) if single else None
+    folder = base if base is not None and base.is_dir() else None
+    targets: list[str] = [single] if single and folder is None else []
+    for item in listed:
+        if folder is not None and not Path(item).expanduser().is_absolute():
+            item = str(folder / item)
+        if item not in targets:
+            targets.append(item)
     return targets
 
 
@@ -567,7 +578,7 @@ def describe_file_action(action_class: str, args: Mapping[str, Any] | None) -> s
         listing = ", ".join(named[:-1]) + " and " + named[-1]
         return "delete %d items: %s (they go to the Recycle Bin and can be undone)" % (len(named), listing)
     if action_class == FILE_DELETE:
-        raw_path = raw_path or next(iter(delete_targets(params)), "")
+        raw_path = next(iter(delete_targets(params)), raw_path)
         target = _spoken_path(raw_path) if raw_path else target
         path = _resolve(raw_path) if raw_path else None
         if path is not None and path.is_dir():

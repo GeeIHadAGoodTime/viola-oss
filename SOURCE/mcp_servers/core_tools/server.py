@@ -1558,7 +1558,12 @@ async def file_write(
     ] = 0,
     paths: Annotated[
         list[str],
-        Field(description="delete: every file or folder to delete, in ONE call, so the user is asked once."),
+        Field(
+            description=(
+                "delete: every file or folder to delete, in ONE call, so the user is asked once. "
+                "path is then only their folder and is not deleted."
+            )
+        ),
     ] = [],
 ) -> str:
     """Modify the filesystem.
