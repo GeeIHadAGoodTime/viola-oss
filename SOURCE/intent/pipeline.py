@@ -1762,9 +1762,14 @@ class IntentPipeline:
         if result.data.get("spoken") or result.data.get("already_spoken"):
             return
         try:
+            from config.defaults import TTS_ENABLED_DEFAULT, VOICE_MUTED_DEFAULT
             from ui.settings_manager import get_settings_manager
 
-            if get_settings_manager().get("voice_muted", False, user_id=request_user_key):
+            settings_mgr = get_settings_manager()
+            if settings_mgr.get("voice_muted", VOICE_MUTED_DEFAULT, user_id=request_user_key):
+                return
+            # Settings > "Speak Responses Aloud" off silences replies too.
+            if not settings_mgr.get("tts_enabled", TTS_ENABLED_DEFAULT, user_id=request_user_key):
                 return
         except Exception:  # noqa: BLE001, RUF100 - a settings hiccup must not silently mute Viola
             logger.debug("Could not read voice_muted for queued reply", exc_info=True)
