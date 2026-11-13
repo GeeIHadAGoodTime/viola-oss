@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import contextvars
 import threading
 import time
 import uuid
@@ -38,6 +39,38 @@ logger = get_logger(__name__)
 REPLY_PARTIAL_EVENT = "reply_partial"
 # At most this often: a burst of tokens is one update, not one websocket frame each.
 _MIN_BROADCAST_SECONDS = 0.05
+# A spoken reply's text waits for her voice so they start together (build-10
+# laptop: text led the voice by 1 to 2.5 s, the first sentence's synthesis). The
+# client holds it (hooks/usePacedReply.js) until a reply_partial says
+# voice_started, and never longer than its own limit, so a reply whose voice
+# never starts still shows.
+
+# Set by StreamedReply.speak() for the engine call it awaits; the engine calls
+# notify_first_audio() when the first audio of that reply starts playing.
+_first_audio_callback: contextvars.ContextVar[Callable[[], None] | None] = contextvars.ContextVar(
+    "first_audio_callback", default=None
+)
+
+
+@contextlib.contextmanager
+def first_audio_callback(callback: Callable[[], None]) -> Iterator[None]:
+    token = _first_audio_callback.set(callback)
+    try:
+        yield
+    finally:
+        _first_audio_callback.reset(token)
+
+
+def notify_first_audio() -> None:
+    """The engine started playing this reply's first audio."""
+    callback = _first_audio_callback.get()
+    if callback is None:
+        return
+    _first_audio_callback.set(None)
+    try:
+        callback()
+    except Exception:  # noqa: BLE001, RUF100 - showing text must never affect speech
+        logger.debug("First-audio callback failed", exc_info=True)
 
 
 def _hub_broadcast(user_id: str, payload: dict[str, Any]) -> None:
@@ -70,6 +103,31 @@ class StageReplyRelay:
         self._sent = ""
         self._flush_pending = False
         self._closed = False
+        self._voice_started = False
+
+    def voice_started(self) -> None:
+        """Her voice is audible now: tell the client to start showing the text.
+
+        Sent once, also after the turn's command returned (speech outlives it).
+        """
+        if self._voice_started or not self.spoken:
+            return
+        self._voice_started = True
+        loop = self._loop
+        if loop is not None and threading.get_ident() != self._loop_thread:
+            with contextlib.suppress(RuntimeError):
+                loop.call_soon_threadsafe(self._send_voice_started)
+            return
+        self._send_voice_started()
+
+    def _send_voice_started(self) -> None:
+        try:
+            self._broadcast(
+                self.user_id,
+                {"turn": self.turn, "text": self._sent, "spoken": True, "voice_started": True},
+            )
+        except Exception:  # noqa: BLE001, RUF100 - a live preview must never affect the turn
+            logger.debug("Voice-started broadcast failed", exc_info=True)
 
     def bind_loop(self) -> None:
         self._loop = asyncio.get_running_loop()
@@ -153,4 +211,10 @@ def stage_reply(stream_id: str | None, *, user_id: str) -> Iterator[StageReplyRe
                 logger.debug("Live stage stream cleanup failed", exc_info=True)
 
 
-__all__ = ["REPLY_PARTIAL_EVENT", "StageReplyRelay", "stage_reply"]
+__all__ = [
+    "REPLY_PARTIAL_EVENT",
+    "StageReplyRelay",
+    "first_audio_callback",
+    "notify_first_audio",
+    "stage_reply",
+]

@@ -210,7 +210,17 @@ def _new_streamed_reply(
         def _start(reply: Any) -> Any:
             async def _run() -> None:
                 try:
-                    await asyncio.wait_for(reply.speak(), timeout=_SPEAK_REPLY_TIMEOUT_SECONDS)
+                    task = asyncio.ensure_future(reply.speak())
+                    while True:
+                        done, _pending = await asyncio.wait({task}, timeout=_SPEAK_REPLY_TIMEOUT_SECONDS)
+                        if done:
+                            task.result()
+                            break
+                        # A reading the user asked for (read_aloud) may run longer
+                        # than the backstop; anything else is abandoned as before.
+                        if not reply.gate.read_in_full:
+                            task.cancel()
+                            raise TimeoutError
                 except TimeoutError:
                     log.warning("Spoken reply exceeded %.0fs; abandoning", _SPEAK_REPLY_TIMEOUT_SECONDS)
                 except Exception as exc:  # noqa: BLE001, RUF100 - a reply that cannot be spoken is still a reply
@@ -273,14 +283,43 @@ def _speak_reply_now(
     speak = getattr(engine, "speak", None) if engine is not None else None
     if not callable(speak):
         return
+    timeout = _SPEAK_REPLY_TIMEOUT_SECONDS
+    try:
+        from voice.streamed_reply import play_done_tone, whole_reply_speech
+    except Exception:  # noqa: BLE001, RUF100 - without the long-answer rule the reply is still spoken
+        log.debug("Long-answer rule unavailable; speaking the reply whole", exc_info=True)
+    else:
+        # Long answers say their lead and point at the card; a turn of quick
+        # music actions that all worked gets the done tone, not words.
+        spoken_text = whole_reply_speech(message, engine, streamed_reply)
+        if spoken_text is None:
+            play_done_tone()
+            return
+        message = spoken_text
+        reading = None
+        try:
+            from voice.streamed_reply import full_reading
+
+            reading = full_reading(message, engine, streamed_reply)
+        except Exception:  # noqa: BLE001, RUF100 - a capped reading is still a reading
+            log.debug("Full reading unavailable", exc_info=True)
+        if reading is not None:
+            # "Read it out loud": the whole answer, with no length cap; the
+            # backstop grows with it (about 17 characters a second spoken).
+            full = reading
+
+            def speak(_text: str) -> Any:
+                return full.speak()
+
+            timeout = max(_SPEAK_REPLY_TIMEOUT_SECONDS, len(message) / 8.0)
 
     async def _run() -> None:
         try:
             spoken = speak(message)
             if asyncio.iscoroutine(spoken):
-                await asyncio.wait_for(spoken, timeout=_SPEAK_REPLY_TIMEOUT_SECONDS)
+                await asyncio.wait_for(spoken, timeout=timeout)
         except TimeoutError:
-            log.warning("Spoken reply exceeded %.0fs; abandoning", _SPEAK_REPLY_TIMEOUT_SECONDS)
+            log.warning("Spoken reply exceeded %.0fs; abandoning", timeout)
             return
         # An audio device can fail any way at all, and a reply that cannot be
         # spoken is still a reply.

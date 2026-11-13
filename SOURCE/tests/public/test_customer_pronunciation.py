@@ -135,7 +135,8 @@ class CustomerAdapterTests(unittest.TestCase):
                 with self.subTest(key=key):
                     self.assertEqual(_protect_initialism_a(expansion), expected)
                 checked += 1
-        self.assertEqual(checked, 83)
+        # 82: Spotify left the brand table; the customer lexicon reads it whole.
+        self.assertEqual(checked, 82)
 
     def test_initialism_a_is_customer_scoped_and_not_an_article(self):
         for raw, expected in [

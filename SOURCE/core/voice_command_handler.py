@@ -1895,11 +1895,22 @@ class VoiceCommandHandler:
         takes effect on the next thing Viola would have said, rather than at
         the next restart. Fails open (unmuted) if settings cannot be read: a
         settings hiccup should not silently make Viola stop talking.
+
+        Settings > "Speak Responses Aloud" (``tts_enabled``) counts as muted
+        too. Typed replies (ui/api/routes/command.py ``_should_speak_reply``)
+        and the wake chime already honoured it, but replies to voice commands
+        did not, so turning it off on the laptop still left every spoken turn
+        speaking. Defaults come from ``config.defaults`` for the reason given
+        in ``_should_speak_reply``.
         """
         try:
+            from config.defaults import TTS_ENABLED_DEFAULT, VOICE_MUTED_DEFAULT
             from ui.settings_manager import get_settings_manager
 
-            return bool(get_settings_manager().get("voice_muted", False, user_id=user_id))
+            settings_mgr = get_settings_manager()
+            if bool(settings_mgr.get("voice_muted", VOICE_MUTED_DEFAULT, user_id=user_id)):
+                return True
+            return not bool(settings_mgr.get("tts_enabled", TTS_ENABLED_DEFAULT, user_id=user_id))
         except Exception:  # noqa: BLE001, RUF100 - a settings hiccup must not silently mute Viola
             logger.debug("Could not read voice_muted; assuming not muted", exc_info=True)
             return False
@@ -2002,7 +2013,7 @@ class VoiceCommandHandler:
         # actually about — still speaking. Checked here, on the path that
         # speaks a reply to a voice command, it means what its name says.
         if self._voice_output_muted(user_id):
-            logger.debug("voice_muted is on; skipping spoken reply")
+            logger.info("Voice muted or Speak Responses Aloud off; reply shown, not spoken")
             return
 
         if not tts_enabled and self.tts:
@@ -2013,6 +2024,18 @@ class VoiceCommandHandler:
             return
 
         if self.tts and message and not already_spoken and tts_enabled:
+            # Long answers say their lead and point at the card; a turn of quick
+            # music actions that all worked gets the done tone, not words.
+            from voice.streamed_reply import full_reading, play_done_tone, whole_reply_speech
+
+            spoken = whole_reply_speech(message, self.tts, streamed_reply)
+            if spoken is None:
+                play_done_tone()
+                return
+            message = spoken
+            # "Read it out loud": the whole answer, with no length cap, and a
+            # barge-in or stop still ends it (FullReading.cancel).
+            reading = full_reading(message, self.tts, streamed_reply)
             try:
                 logger.info("Speaking response: %s...", message[:100])
                 self._last_spoken_reply = (message, time.monotonic())
@@ -2022,7 +2045,7 @@ class VoiceCommandHandler:
                 capture = self._get_continuous_capture()
                 if capture is not None and capture.is_running:
                     interrupted = await self._speak_response_interruptible(
-                        message,
+                        reading or message,
                         capture,
                         user_id=user_id,
                     )
@@ -2033,7 +2056,7 @@ class VoiceCommandHandler:
                         return
                 else:
                     # Standard non-interruptible TTS
-                    speak_coro = self.tts.speak(message)
+                    speak_coro = reading.speak() if reading is not None else self.tts.speak(message)
                     if asyncio.iscoroutine(speak_coro):
                         await speak_coro
 

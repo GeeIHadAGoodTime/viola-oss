@@ -380,7 +380,11 @@ def _apply_prosody_hints(text: str, *, english: bool = True) -> str:
 
 
 def _clean_num2words_output(words: object) -> str:
-    return str(words).replace(",", "").replace("-", " ").replace(" and ", " ")
+    # Keep the hyphen in compound tens (thirty-four), as ordinals and years
+    # already do. Without it the pronunciation route reads "thirty" and "four"
+    # as two stressed words, so 1,234.5 was heard as "one thousand two hundred
+    # thirty... four point five" (laptop report, build 10).
+    return str(words).replace(",", "").replace(" and ", " ")
 
 
 def _clean_num2words_ordinal_output(words: object) -> str:
