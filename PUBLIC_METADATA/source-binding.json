@@ -30,10 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "af6a958a606fccf8a91b20879ec97804cb2cb03383499003adf39ee2df582d3b",
-  "source_tree_sha256": "6b0ac3031d79aedf90e76e8ded8131d62c3d267298492a1964ed33315c301fea",
+  "source_manifest_sha256": "b01153dcf3e303bee4aca56a1c5337729a5425e4600448cf4a01fedfae1cd40f",
+  "source_tree_sha256": "a723c39cf395d8ddad8200145612cb5b63534058842ddaf704bff38887254d04",
   "source_file_count": 2811,
-  "source_revision": "6ffe36e8cfa03075d8329ecc09a7bddd409f7251",
+  "source_revision": "6c597f6150c801dd774c0a85d8d3a56deb12a8f2",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "LICENSES/SPEECH_COMPONENT_NOTICES.md",
@@ -155,6 +155,7 @@
     "music/playback_session.py",
     "music/player/core.py",
     "music/player/playback.py",
+    "music/player/playback_state.py",
     "music/player/state.py",
     "music/playlist_manager.py",
     "music/playlists/playlist_player.py",
@@ -337,6 +338,7 @@
     "ui/react-app/src/auth/authProviders.ts",
     "ui/react-app/src/auth/desktopOAuth.test.ts",
     "ui/react-app/src/auth/desktopOAuth.ts",
+    "ui/react-app/src/auth/legalVersions.js",
     "ui/react-app/src/components/AccountTab.cloudPlan.test.jsx",
     "ui/react-app/src/components/AccountTab.jsx",
     "ui/react-app/src/components/AccountTab.signInLayout.test.jsx",
@@ -529,9 +531,11 @@
     "voice/speech_language.py",
     "voice/stage_reply.py",
     "voice/streamed_reply.py",
+    "voice/synthesis/engine.py",
     "voice/synthesis/kokoro_engine.py",
     "voice/synthesis/text_normalizer.py",
     "voice/transcription/whisper.py",
+    "voice/transcription/whisper_model_cache.py",
     "voice/wake_chime.py",
     "voice/wake_detector/active_word.py",
     "voice/wake_detector/aec_delay_tracker.py",
@@ -621,8 +625,8 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "6ffe36e8cfa03075d8329ecc09a7bddd409f7251",
-    "kind": "botcheck"
+    "source_commit": "6c597f6150c801dd774c0a85d8d3a56deb12a8f2",
+    "kind": "spotify tracking"
   },
   "historical_bindings": [
     {

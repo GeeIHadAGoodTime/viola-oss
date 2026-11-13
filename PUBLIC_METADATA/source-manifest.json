@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "6ffe36e8cfa03075d8329ecc09a7bddd409f7251",
-  "sha256": "6b0ac3031d79aedf90e76e8ded8131d62c3d267298492a1964ed33315c301fea",
+  "revision": "6c597f6150c801dd774c0a85d8d3a56deb12a8f2",
+  "sha256": "a723c39cf395d8ddad8200145612cb5b63534058842ddaf704bff38887254d04",
   "files": [
     {
       "path": ".env.example",
@@ -2885,8 +2885,8 @@
     },
     {
       "path": "music/player/playback_state.py",
-      "sha256": "77f1c45a9f44fed48ff96ec9e33f25571d8ce3b26d5e840ea254994ccba0523a",
-      "bytes": 6517
+      "sha256": "f12b440637a7c7d6a3e4c1a97f0f233151b47ff2fc6003fd73d7c85e6b178f94",
+      "bytes": 7474
     },
     {
       "path": "music/player/state.py",
@@ -3295,8 +3295,8 @@
     },
     {
       "path": "music/spotify/cdp_controller.py",
-      "sha256": "00e311cdc729c27e3d96eaa278c88825600fbcd7408fbfcc35ed4e8aabcb5193",
-      "bytes": 171010
+      "sha256": "08975b81598dee50e3c92eb06e670691de53f88e90fd61417ef50e7791696cac",
+      "bytes": 177758
     },
     {
       "path": "music/spotify/connection.py",
@@ -3310,8 +3310,8 @@
     },
     {
       "path": "music/spotify/diagnostic.py",
-      "sha256": "eddd657664d7f427bf46abba12b17ff5932f63bdfda5de70563412c18c50c714",
-      "bytes": 4390
+      "sha256": "037db43615cc467a3a8f95a4d19b0ac440dc308f6d3c29d0bcdbe8ee0832c1f9",
+      "bytes": 6341
     },
     {
       "path": "music/youtube_embed.py",
@@ -3380,8 +3380,8 @@
     },
     {
       "path": "playback/engines/spotify_cdp.py",
-      "sha256": "03ed0e4e453e82fb5ef614db36fab704ee17a4267ee13d15fa71185609179591",
-      "bytes": 34062
+      "sha256": "31f365eca5b8a0a55aff60478fec0e54c542a68aa479fdbb88a4559e0cab26da",
+      "bytes": 44392
     },
     {
       "path": "playback/engines/youtube.py",
@@ -9325,8 +9325,8 @@
     },
     {
       "path": "tools/qualification/spotify_strict_check.py",
-      "sha256": "f8ec5e3c7030a9d8380f1e1ab69f8c7390db0b97b880caf3ca7f845adb9b7961",
-      "bytes": 3534
+      "sha256": "419d06d13a8928d13f012d9623e52ff7db8df611bfb14216cb4b9659556f9894",
+      "bytes": 4594
     },
     {
       "path": "tools/release/create_source_manifest.py",
@@ -13030,8 +13030,8 @@
     },
     {
       "path": "ui/websocket/command_handlers.py",
-      "sha256": "287ebeebf1ec31e5d87967b1d2992c4c653dc922d0656663876e018f892ee721",
-      "bytes": 54144
+      "sha256": "6e5fcfeaada2ba215f84b8386ab89f3e2f8218bdf7c1674e49b051cdb3c1ca47",
+      "bytes": 55446
     },
     {
       "path": "ui/websocket/event_hub.py",
@@ -13115,8 +13115,8 @@
     },
     {
       "path": "utils/audio_ducking.py",
-      "sha256": "1d9a323292defa17409c15b2fa8c766b276fdb95017ed25ef35e0cb3af4b7998",
-      "bytes": 19717
+      "sha256": "5183fc775c793b4a4c88f7d6715d9925963be96310ea5a9a811636f1f8c6c1b7",
+      "bytes": 21046
     },
     {
       "path": "utils/audio_preprocessing.py",
