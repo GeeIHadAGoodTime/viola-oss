@@ -130,7 +130,13 @@ def estimate_phone_carrier_cost_usd(
 
 
 def carrier_bill_with_unbilled_extras_usd(carrier_total_usd: float, billed_seconds: float | None) -> float:
-    """A Telnyx call CDR total plus the streaming and AMD items it does not include."""
+    """A Telnyx call CDR total plus the streaming and AMD items it does not include.
+
+    A call that was never answered (zero total, zero billed seconds) ran no
+    answering-machine detection and streamed no media, so it adds nothing.
+    """
+    if float(carrier_total_usd or 0.0) <= 0 and float(billed_seconds or 0.0) <= 0:
+        return 0.0
     minutes = max(0.0, float(billed_seconds or 0.0)) / 60.0
     extras = minutes * _TELNYX_MEDIA_STREAMING_PER_MINUTE_USD * (1 + _TELNYX_REGULATORY_SURCHARGE)
     return max(0.0, float(carrier_total_usd)) + extras + _TELNYX_AMD_PREMIUM_PER_CALL_USD

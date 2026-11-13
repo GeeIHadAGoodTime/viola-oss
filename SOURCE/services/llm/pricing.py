@@ -46,6 +46,7 @@ LLM_PRICING_CENTS: dict[str, dict[str, float]] = {
         "output": 0,
         "cached": 10000,
         "cache_write": 10000,
+        "web_search": 0.0,
     },
     "gpt-4o-mini": {
         "input": 15,
