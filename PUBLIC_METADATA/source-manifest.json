@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "00d045e28d38a21311c5642f4b56d2f15e3ed879",
-  "sha256": "bc9319821969550ff6d981e5db3a2d62a877c5b87c826bb99117dd6e3ed660ae",
+  "revision": "6a1d21a9689544a9e426cff5277b3a39bf33c4be",
+  "sha256": "ce06835e0f7dcae856ea04bacb2ad66d86024e5a2479a691137dca4514af15f1",
   "files": [
     {
       "path": ".env.example",
@@ -10570,13 +10570,13 @@
     },
     {
       "path": "ui/react-app/src/components/BillingCapacityPanel.jsx",
-      "sha256": "66ffc61e5e7fa5e78f9a729374429f9cdf7919e65c9f3a0e235f4910b3c2dca8",
-      "bytes": 19946
+      "sha256": "c0f117a0a081b6bc005a4970143949fe59b82637283387636f3eddcd04df0397",
+      "bytes": 20146
     },
     {
       "path": "ui/react-app/src/components/BillingCapacityPanel.test.jsx",
-      "sha256": "62a32a3aa58ec06caa3a1c5765726f47c5abd83e04f11b49be45b22346c4e214",
-      "bytes": 20943
+      "sha256": "54cf1d1bdee55dbf9bef7c98d470ce1f711a98a0656408a26531d189ca7d7c8e",
+      "bytes": 22245
     },
     {
       "path": "ui/react-app/src/components/BugReportModal.jsx",
@@ -10830,13 +10830,13 @@
     },
     {
       "path": "ui/react-app/src/components/MonthGiftSummary.jsx",
-      "sha256": "db67ba5151eb752595407387935f19dac7cd8569ce12bbdbc7fa1fa6936fa3ee",
-      "bytes": 3821
+      "sha256": "6817c64cd5122e107bc0f76bfd347adff605f4474c17126b5ffec26cf16bdda1",
+      "bytes": 4192
     },
     {
       "path": "ui/react-app/src/components/MonthGiftSummary.test.jsx",
-      "sha256": "c34d9dc1cafe6a98471f1d707e9157268043d9e061ec349ccbff937ccf2306bf",
-      "bytes": 4900
+      "sha256": "b2c106e55530c2895f83aaaaef197100e0380472af0eff871f71998818a7502e",
+      "bytes": 5769
     },
     {
       "path": "ui/react-app/src/components/MusicServicesTab.jsx",
