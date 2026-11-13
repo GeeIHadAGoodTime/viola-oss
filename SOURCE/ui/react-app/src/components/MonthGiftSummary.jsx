@@ -15,6 +15,23 @@ const baseSummary = (base) => {
   return status && status.toLowerCase() !== plan.toLowerCase() ? `${plan} · ${status}` : plan;
 };
 
+// One string per line of text. A number written as its own JSX node
+// (`{gift.capacity_multiplier}× Pro`) becomes a separate text node, and the
+// laptop's accessibility read of the Account page (1.0.5 build 10) showed
+// "Pro · x Pro managed capacity" and "% used" with the numbers missing, while
+// every line built as one string kept its number.
+const giftLine = (gift) => {
+  const multiplier = Number.isFinite(gift.capacity_multiplier) ? `${gift.capacity_multiplier}× Pro managed capacity` : 'Pro managed capacity';
+  const months = `${gift.duration_months} ${gift.duration_months === 1 ? 'calendar month' : 'calendar months'}`;
+  return `Current gift: ${levelName(gift)} · ${multiplier}, ${months}. From ${date(gift.start_at)} through ${date(gift.end_at)}.`;
+};
+
+// A gifted user with no paid plan read "Base subscription: Free." next to a
+// card saying "Base paid plan: Pro" (1.0.5 build 10). Same fact, said plainly.
+const baseLine = (base, gift) => (gift && planName(base.plan_id) === 'Free'
+  ? `Your own paid plan: none. ${gift.selected_level === 'max' ? 'Max' : 'Pro'} access comes from your gift.`
+  : `Base subscription: ${baseSummary(base)}.`);
+
 export default function MonthGiftSummary({ entitlement }) {
   if (!entitlement || (!entitlement.active_gift && !entitlement.queued_gifts?.length)) return null;
   const base = entitlement.base_subscription;
@@ -26,13 +43,11 @@ export default function MonthGiftSummary({ entitlement }) {
   return <section aria-label="Complimentary month access" data-testid="month-gift-summary"
     style={{ color: colors.textSecondary, fontSize: '14px', lineHeight: 1.5 }}>
     <h4 style={{ color: colors.textPrimary, margin: '0 0 8px' }}>Complimentary access</h4>
-    <p>Base subscription: {baseSummary(base)}.
+    <p>{baseLine(base, gift)}
       {base.funded_paid_through_at && <> Paid through {date(base.funded_paid_through_at)}.</>}</p>
     {base.current_period_start && Date.parse(base.current_period_start) > Date.now()
       && <p>Base paid access is scheduled to begin {date(base.current_period_start)}.</p>}
-    {gift && <p>Current gift: {levelName(gift)} · {gift.capacity_multiplier}× Pro managed capacity,
-      {' '}{gift.duration_months} {gift.duration_months === 1 ? 'calendar month' : 'calendar months'}.
-      {' '}From {date(gift.start_at)} through {date(gift.end_at)}.</p>}
+    {gift && <p>{giftLine(gift)}</p>}
     {(entitlement.queued_gifts || []).map((queued) => <p key={queued.window_id}>
       Scheduled gift: {levelName(queued)}, {date(queued.start_at)} through {date(queued.end_at)}.
     </p>)}

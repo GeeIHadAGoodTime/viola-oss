@@ -3882,7 +3882,8 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                       <input
                         type="text"
-                        placeholder="Name (e.g. Jihad)"
+                        placeholder="Name (e.g. Alex)"
+                        aria-label="Your name"
                         value={localSettings.user_name || ''}
                         onChange={(e) => updateLocal('user_name', e.target.value)}
                         style={{
@@ -3902,7 +3903,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                       <input
                         type="text"
                         placeholder={
-                          localSettings.user_name ? 'How to say it (e.g. Jee hahd)' : 'Set a name first'
+                          localSettings.user_name ? 'How to say it (e.g. AL-ex)' : 'Set a name first'
                         }
                         value={
                           (localSettings.tts_pronunciation_overrides || {})[
@@ -3921,6 +3922,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                           }
                           updateLocal('tts_pronunciation_overrides', next);
                         }}
+                        aria-label="How to say your name"
                         disabled={!localSettings.user_name}
                         style={{
                           flex: '1 1 140px',
@@ -4120,15 +4122,18 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                     }
                   }}
                   disabled={isRefreshingDevices}
+                  aria-label="Refresh audio devices"
+                  data-testid="refresh-audio-devices"
                   style={{
                     alignSelf: 'flex-start',
-                    padding: '8px 14px',
+                    padding: '8px 16px',
                     minHeight: '44px',
                     borderRadius: '8px',
-                    border: `1px solid ${theme.colors.borderLight}`,
-                    backgroundColor: 'transparent',
-                    color: theme.colors.textSecondary,
+                    border: `1px solid ${theme.colors.borderHover}`,
+                    backgroundColor: theme.colors.bgCard,
+                    color: theme.colors.textPrimary,
                     fontSize: '13px',
+                    fontWeight: 600,
                     cursor: isRefreshingDevices ? 'default' : 'pointer',
                     opacity: isRefreshingDevices ? 0.6 : 1,
                   }}

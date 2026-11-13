@@ -20,6 +20,12 @@ describe('AgentCard', () => {
     expect(screen.getByRole('button', { name: /Cancel agent/i })).toBeEnabled();
   });
 
+  // 1.0.5 build 10: the button showed "X" but was named with the whole task.
+  it('names the cancel button "Cancel agent", not the task text', () => {
+    render(<AgentCard agent={baseAgent} thinkingText="" onCancel={vi.fn()} />);
+    expect(screen.getByRole('button', { name: 'Cancel agent' })).toBeInTheDocument();
+  });
+
   it('renders the latest thinking text', () => {
     const thinking = 'Checking constraints, comparing sources, and narrowing the final recommendation.';
 

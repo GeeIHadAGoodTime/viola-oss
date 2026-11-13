@@ -19,7 +19,7 @@
  * for in a saved chat is pending in that chat only, so the answer goes to that
  * chat (`answerCallBriefing`).
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useState } from 'react';
 import { THEME } from '../config';
 
 const theme = THEME;
@@ -105,13 +105,51 @@ const buttonBase = {
 };
 
 /**
- * True when a different chat is on screen from the one this approval belongs to.
- * The approval waits there: only that chat can answer it, so showing the card
- * here invites a "yes" that can't count.
+ * True when a different conversation is on screen from the one this approval
+ * belongs to. The approval waits where it was asked: only that conversation
+ * can answer it, so showing the card elsewhere invites a "yes" that can't count.
+ *
+ * An approval with no chat id was asked in the main conversation (by voice or
+ * on the stage). It used to show over every saved chat as well (1.0.5 build
+ * 10, bug 10); now it waits until the user is back outside a saved chat.
  */
 export function callBriefingBelongsElsewhere(briefing, openChatThreadId) {
-  const threadId = briefing && briefing.chat_thread_id;
-  return Boolean(threadId && openChatThreadId && threadId !== openChatThreadId);
+  if (!briefing || !openChatThreadId) return false;
+  return (briefing.chat_thread_id || null) !== openChatThreadId;
+}
+
+const CARD_EDGE_GAP_PX = 20;
+const CARD_COMPOSER_GAP_PX = 12;
+
+/**
+ * How far from the bottom of the window the card sits. Normally the edge gap;
+ * when the chat composer is on screen, just above it, so the card never
+ * covers the chat's Send button (1.0.5 build 10, bug 10).
+ */
+export function cardBottomOffset(composerRect, viewportHeight) {
+  if (!composerRect || !(composerRect.height > 0) || !(viewportHeight > 0)) return CARD_EDGE_GAP_PX;
+  if (composerRect.top >= viewportHeight || composerRect.bottom <= 0) return CARD_EDGE_GAP_PX;
+  return Math.max(CARD_EDGE_GAP_PX, Math.round(viewportHeight - composerRect.top + CARD_COMPOSER_GAP_PX));
+}
+
+function useBottomClearOfComposer(active) {
+  const [bottom, setBottom] = useState(CARD_EDGE_GAP_PX);
+  useLayoutEffect(() => {
+    if (!active) return undefined;
+    const measure = () => {
+      const composer = document.querySelector('.chat-composer-row');
+      setBottom(cardBottomOffset(composer ? composer.getBoundingClientRect() : null, window.innerHeight));
+    };
+    measure();
+    // The composer grows with a long draft and comes and goes with the chat.
+    const timer = setInterval(measure, 400);
+    window.addEventListener('resize', measure);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('resize', measure);
+    };
+  }, [active]);
+  return bottom;
 }
 
 export default function CallBriefing({ briefing, onDismiss, onApprove, onCancel }) {
@@ -121,6 +159,7 @@ export default function CallBriefing({ briefing, onDismiss, onApprove, onCancel 
   useEffect(() => {
     setSending(null);
   }, [briefing?.phone_number, briefing?.task_id, briefing?.awaiting_confirmation, briefing?.approved]);
+  const bottom = useBottomClearOfComposer(Boolean(briefing));
 
   if (!briefing) return null;
 
@@ -160,9 +199,10 @@ export default function CallBriefing({ briefing, onDismiss, onApprove, onCancel 
       aria-label={isCall ? 'Phone call approval' : 'Action approval'}
       style={{
         position: 'fixed',
-        bottom: 20,
-        right: 20,
+        bottom,
+        right: CARD_EDGE_GAP_PX,
         width: 380,
+        maxWidth: 'calc(100vw - 40px)',
         background: '#1a1a2e',
         border: `1px solid ${accent}`,
         borderRadius: 12,

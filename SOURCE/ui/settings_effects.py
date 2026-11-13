@@ -419,8 +419,13 @@ async def broadcast_settings_changed(settings_mgr: Any, *, user_id: str | None =
     saved and confirmed while the open window stayed light until the user
     reloaded or opened and closed the Settings panel.
 
-    Desktop only, and deliberately so: this repaints the local window, and
-    ``settings_mgr.settings`` is the effective view only for a device user.
+    Desktop only: this repaints the local window. The message carries the
+    settings as ``user_id`` reads them, the same view ``GET /v1/settings``
+    returns. It used to carry ``settings_mgr.settings``, which is only the
+    signed-out install's view: with an account signed in, "turn off dark mode"
+    saved ``theme=light`` to the account and then sent the window the old
+    ``theme=dark`` from settings.json, so nothing changed until Settings was
+    opened (1.0.5 build 10, 09:09:58).
     Returns True when a message went out.
     """
     try:
@@ -437,9 +442,9 @@ async def broadcast_settings_changed(settings_mgr: Any, *, user_id: str | None =
 
         # Reuse the REST path's payload builder so the shape the front end
         # receives is identical, and so secrets go through the same redaction.
-        from ui.settings_api import _settings_response_payload
+        from ui.settings_api import _settings_response_payload, effective_settings_snapshot
 
-        payload = _settings_response_payload(dict(settings_mgr.settings))
+        payload = _settings_response_payload(effective_settings_snapshot(settings_mgr, user_id))
         await hub.broadcast("settings_changed", payload, user_id=user_id, force=True)
     except Exception:  # noqa: BLE001, RUF100 - a repaint hint must never break the write that succeeded
         logger.debug("Could not broadcast settings_changed", exc_info=True)
