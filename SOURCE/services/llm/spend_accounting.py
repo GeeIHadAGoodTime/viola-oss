@@ -102,6 +102,107 @@ def _strip_inline_images(value: Any) -> tuple[Any, int]:
     return value, 0
 
 
+# OpenAI's documented image-input token rules, read 2026-11-13 from
+# https://developers.openai.com/api/docs/guides/images-vision ("Calculating
+# costs"). Patch-based models: fit the image inside the detail level's size
+# limit, count 32 px patches (ceil(w/32) * ceil(h/32)), scale down to the
+# patch budget when there is one, then billable tokens = ceil(patches *
+# multiplier). Tile-based models: fit within 2048 x 2048, scale the shortest
+# side down to 768, count 512 px tiles; tokens = base + per_tile * tiles.
+# Values are for "high" detail (what vision/analyzer.py sends).
+#   model prefix: (max side px or None, patch budget or None, multiplier)
+_IMAGE_PATCH_RULES_HIGH: dict[str, tuple[int | None, int | None, float]] = {
+    "gpt-6-astra": (65_535, 2_500, 1.2),
+    "gpt-5.6-sol": (2_048, 2_500, 1.2),
+    "gpt-5.6-terra": (2_048, 2_500, 1.2),
+    "gpt-5.6-luna": (2_048, 2_500, 1.2),
+    "gpt-5.5": (2_048, 2_500, 1.2),
+    "gpt-5.4": (2_048, 2_500, 1.2),
+    "gpt-5.4-mini": (2_048, 2_500, 1.2),
+    "gpt-5.4-nano": (2_048, 2_500, 1.2),
+    "gpt-5.2": (2_048, 6_144, 1.2),
+    "gpt-4.1-mini": (2_048, 6_144, 1.62),
+    # Listed with a multiplier but no sizing row on the page: budgeted like
+    # gpt-5.4 high (2,500 patches), which is above their older 1,536 cap.
+    "gpt-5-mini": (2_048, 2_500, 1.2),
+    "gpt-5-nano": (2_048, 2_500, 1.5),
+    "gpt-4.1-nano": (2_048, 2_500, 2.46),
+    "o4-mini": (2_048, 2_500, 1.72),
+}
+#   model prefix: (base tokens, tokens per 512 px tile)
+_IMAGE_TILE_RULES_HIGH: dict[str, tuple[int, int]] = {
+    "gpt-5.1": (70, 140),
+    "gpt-5": (70, 140),
+    "gpt-4o": (85, 170),
+    "gpt-4.1": (85, 170),
+    "gpt-4o-mini": (2_833, 5_667),
+    "o1": (75, 150),
+    "o1-pro": (75, 150),
+    "o3": (75, 150),
+}
+
+
+def _image_rule_key(model: str, rules: dict[str, Any]) -> str | None:
+    """Exact model id, or a dated snapshot of it (``gpt-5.4-mini-2026-03-17``)."""
+    name = (model or "").strip().lower()
+    if name in rules:
+        return name
+    for key in sorted(rules, key=len, reverse=True):
+        rest = name[len(key) :]
+        if name.startswith(key) and rest[:2] == "-2" and rest[1:5].isdigit():
+            return key
+    return None
+
+
+def openai_image_input_tokens(model: str, width: int, height: int, *, detail: str = "high") -> int:
+    """Input tokens OpenAI bills for one image of ``width`` x ``height`` pixels.
+
+    Follows the documented rule for ``model`` (see the tables above). A model
+    the page does not list (for example gpt-6-luna on 2026-11-13) gets
+    ``_INLINE_IMAGE_TOKEN_ESTIMATE`` (4,000), which is above every documented
+    high-detail patch result (at most 2,500 patches x 1.5 = 3,750) and every
+    tile result except gpt-4o-mini's. This is the HOLD only; the charge is the
+    usage the provider reports.
+    """
+    width, height = max(1, int(width)), max(1, int(height))
+    if str(detail).lower() == "low":
+        tile_key = _image_rule_key(model, _IMAGE_TILE_RULES_HIGH)
+        if tile_key is not None:
+            return _IMAGE_TILE_RULES_HIGH[tile_key][0]
+    patch_key = _image_rule_key(model, _IMAGE_PATCH_RULES_HIGH)
+    if patch_key is not None:
+        max_side, budget, multiplier = _IMAGE_PATCH_RULES_HIGH[patch_key]
+        w, h = float(width), float(height)
+        if max_side and max(w, h) > max_side:
+            scale = max_side / max(w, h)
+            w, h = w * scale, h * scale
+        patches = math.ceil(w / 32) * math.ceil(h / 32)
+        if budget and patches > budget:
+            # Documented scale-down: shrink to the budget's area, then fit the
+            # width to a whole number of patches.
+            shrink = math.sqrt(budget * 32 * 32 / (w * h))
+            w, h = w * shrink, h * shrink
+            fit = math.floor(w / 32) / (w / 32)
+            w, h = w * fit, h * fit
+            patches = math.ceil(w / 32) * math.ceil(h / 32)
+            while patches > budget:  # guard against float edge cases
+                w, h = w * 0.99, h * 0.99
+                patches = math.ceil(w / 32) * math.ceil(h / 32)
+        return max(1, math.ceil(patches * multiplier))
+    tile_key = _image_rule_key(model, _IMAGE_TILE_RULES_HIGH)
+    if tile_key is not None:
+        base, per_tile = _IMAGE_TILE_RULES_HIGH[tile_key]
+        w, h = float(width), float(height)
+        if max(w, h) > 2048:
+            scale = 2048 / max(w, h)
+            w, h = w * scale, h * scale
+        if min(w, h) > 768:
+            scale = 768 / min(w, h)
+            w, h = w * scale, h * scale
+        return base + per_tile * math.ceil(w / 512) * math.ceil(h / 512)
+    return _INLINE_IMAGE_TOKEN_ESTIMATE
+
+
 def estimate_openai_payload_usage(payload: dict[str, Any], *, default_output_tokens: int) -> LlmTokenUsage:
     requested_output = (
         _coerce_nonnegative_int(payload.get("max_output_tokens"))

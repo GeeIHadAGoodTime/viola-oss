@@ -231,6 +231,50 @@ class VisionAnalyzer:
             logger.exception("Vision analysis failed")
             raise RuntimeError("Vision analysis failed: %s" % exc) from exc
 
+    def spend_model(self) -> str | None:
+        """The model the next analysis is sent to (the router's primary), if known."""
+        try:
+            router = self._get_router()
+        except RuntimeError:
+            return None
+        model = getattr(router, "effective_model", None)
+        return model.strip() if isinstance(model, str) and model.strip() else None
+
+    async def analyze_detailed(self, context: EnrichedContext) -> dict[str, Any]:
+        """Analyse like :meth:`analyze` (non-streaming) and report what it cost.
+
+        Returns ``{"content", "model", "usage", "error", "failed_attempts"}``
+        from the router's ``ask_detailed``. ``usage`` is the provider's own
+        token count (the image included) or None when it reported none; the
+        caller then keeps its estimate.
+        """
+        from vision.privacy_filter import get_privacy_filter
+
+        context = get_privacy_filter().enforce_context(context)
+        router = self._get_router()
+        user_content = self._build_user_message(context)
+        ask_detailed = getattr(router, "ask_detailed", None)
+        try:
+            if ask_detailed is None:
+                answer = await router.ask(
+                    question=user_content,
+                    system_prompt=self.SYSTEM_PROMPT,
+                    include_history=False,
+                    max_tokens=1024,
+                    temperature=0.5,
+                )
+                return {"content": str(answer), "model": None, "usage": None, "error": None, "failed_attempts": []}
+            return await ask_detailed(
+                question=user_content,
+                system_prompt=self.SYSTEM_PROMPT,
+                include_history=False,
+                max_tokens=1024,
+                temperature=0.5,
+            )
+        except Exception as exc:
+            logger.exception("Vision analysis failed")
+            raise RuntimeError("Vision analysis failed: %s" % exc) from exc
+
     # ------------------------------------------------------------------
     # Model selection helper
     # ------------------------------------------------------------------

@@ -1406,8 +1406,35 @@ class ProviderAgnosticRouter:
         max_tokens: int = 200,
         temperature: float = 0.7,
     ) -> str:
+        """Ask a question to the LLM and return the answer text (see ask_detailed)."""
+        result = await self.ask_detailed(
+            question,
+            history=history,
+            system_prompt=system_prompt,
+            include_history=include_history,
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
+        return result["content"]
+
+    async def ask_detailed(
+        self,
+        question: str,
+        history: list[dict[str, Any]] | None = None,
+        system_prompt: str | None = None,
+        include_history: bool = True,
+        max_tokens: int = 200,
+        temperature: float = 0.7,
+    ) -> dict[str, Any]:
         """
-        Ask a question to the LLM.
+        Ask a question to the LLM; return the answer with what it cost.
+
+        Returns ``{"content", "model", "usage", "error", "failed_attempts"}``:
+        ``model`` is the model that answered, ``usage`` the provider's reported
+        token usage (an ``LlmTokenUsage``) or None when it reported none,
+        ``error`` the provider's error text when it answered with one, and
+        ``failed_attempts`` the models of earlier attempts that raised (a
+        timed-out request may still have been billed by the provider).
 
         Strategy:
         1. Try primary provider with timeout protection
@@ -1423,8 +1450,27 @@ class ProviderAgnosticRouter:
             temperature: Sampling temperature
 
         Returns:
-            Answer string
+            Answer dict (see above)
         """
+        failed_attempts: list[str] = []
+
+        def _detailed(result: Any, provider: Any) -> dict[str, Any]:
+            if isinstance(result, dict):
+                return {
+                    "content": result.get("content", ""),
+                    "model": result.get("model") or getattr(getattr(provider, "config", None), "model", None),
+                    "usage": result.get("usage"),
+                    "error": result.get("error"),
+                    "failed_attempts": list(failed_attempts),
+                }
+            return {
+                "content": str(result),
+                "model": getattr(getattr(provider, "config", None), "model", None),
+                "usage": None,
+                "error": None,
+                "failed_attempts": list(failed_attempts),
+            }
+
         primary_provider, fallback_provider, _haiku_provider = await self._snapshot_request_providers()
         self._raise_init_auth_required()
         # Runtime consent check — NOT a duplicate of factory's init-time gate.
@@ -1457,10 +1503,10 @@ class ProviderAgnosticRouter:
                         timeout=ask_timeout,
                         use_circuit_breaker=True,
                     )
-                    content = result.get("content", "") if isinstance(result, dict) else str(result)
                     logger.debug("%s answered question successfully", provider_name)
-                    return content
+                    return _detailed(result, primary_provider)
                 except TimeoutError as exc:
+                    failed_attempts.append(getattr(getattr(primary_provider, "config", None), "model", "") or "")
                     error = LLMTimeoutError(provider_name, ask_timeout, "ask")
                     logger.warning(
                         "%s ask timed out: %s (user message: %s), trying fallback",
@@ -1469,6 +1515,7 @@ class ProviderAgnosticRouter:
                         error.user_friendly_message(),
                     )
                 except (ValueError, RuntimeError) as exc:
+                    failed_attempts.append(getattr(getattr(primary_provider, "config", None), "model", "") or "")
                     logger.warning("%s ask failed: %s, trying fallback", provider_name, exc)
 
         # Try fallback provider with timeout (consent gate applies here too)
@@ -1494,9 +1541,8 @@ class ProviderAgnosticRouter:
                         timeout=fallback_timeout,
                         use_circuit_breaker=True,
                     )
-                    content = result.get("content", "") if isinstance(result, dict) else str(result)
                     logger.debug("%s answered question (fallback)", fallback_name)
-                    return content
+                    return _detailed(result, fallback_provider)
                 except TimeoutError as exc:
                     error = LLMTimeoutError(fallback_name, fallback_timeout, "ask")
                     logger.error(
