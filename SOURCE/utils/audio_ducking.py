@@ -116,6 +116,20 @@ class AudioDucker:
             else:
                 logger.debug("🔉 Nested duck request (count: %s)", self._duck_count)
 
+    def wait_for_duck_down(self, timeout: float) -> bool:
+        """Wait (at most ``timeout`` s) until a duck that is under way has reached the player.
+
+        The wake chime calls this first, so the music dips before the chime
+        rather than after it (1.0.5 build-10 laptop, J9: "Ducking starts after
+        the chime"). Returns True when nothing was pending or it finished.
+        """
+        with self._lock:
+            thread = self._fade_thread if self._duck_applied else None
+        if thread is None or thread.name != "audio-duck-down" or not thread.is_alive():
+            return True
+        thread.join(max(0.0, timeout))
+        return not thread.is_alive()
+
     def user_volume(self) -> int | None:
         """The level the user chose while the player sits at the duck level, else None.
 

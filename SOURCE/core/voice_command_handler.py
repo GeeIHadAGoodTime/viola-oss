@@ -974,6 +974,10 @@ class VoiceCommandHandler:
             if result.get("intent") == "ignore":
                 await self._end_streamed_reply(streamed)
                 exit_reason = "ignore"
+                if turn == 1:
+                    # The wake heard no request (song lyrics, a TV): the same tone
+                    # and notice as an empty recording, not silence.
+                    await self._signal_nothing_heard(ctx, "not_a_request")
                 break
 
             # --- Broadcast response text to WS clients (GAP-1 fix) ---
