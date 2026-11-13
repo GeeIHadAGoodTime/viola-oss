@@ -314,12 +314,18 @@ class ConfirmationDeferred(RuntimeError):
                 "_approval_confirmed": True,
                 "_approval_confirmation_id": self.confirmation_id,
             },
+            # The tool schemas are strict and have no field for the two
+            # confirmation_args, so a model told to add them put them inside a
+            # real argument ("paths": [..., "_approval_confirmed:true"], seen
+            # live 2026-11-12). The call then differed from the one asked about
+            # and the user was asked again (1.0.5 build 10 laptop, bug 9). The
+            # same call, unchanged, is what a "yes" is matched to.
             "message": (
                 "Confirmation is required before I can %s. Ask the user to confirm or cancel. "
-                "If the user confirms, call the same tool again with _approval_confirmed=true "
-                "and _approval_confirmation_id='%s'."
+                "If the user confirms, call the same tool again with exactly the same arguments: "
+                "change nothing and add nothing, not even a confirmation id."
             )
-            % (self.action_description, self.confirmation_id),
+            % self.action_description,
         }
 
 

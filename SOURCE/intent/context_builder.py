@@ -1540,10 +1540,10 @@ class ContextBuilder:
                 ),
                 (
                     "instruction: If the current user confirms this same pending action, call tool_name with "
-                    "tool_args_json plus confirmation_args_json. Any plain yes counts, in any language: yes, ok, "
-                    "sure, go ahead, do it, confirm. If the user cancels or says no, do not call the tool. If the "
-                    "user changes details, call the tool with the updated details and without "
-                    "confirmation_args_json so safety can re-prompt."
+                    "exactly tool_args_json, unchanged: add nothing to any argument (confirmation_args_json is "
+                    "only for tools whose schema has those fields). Any plain yes counts, in any language: yes, "
+                    "ok, sure, go ahead, do it, confirm. If the user cancels or says no, do not call the tool. If "
+                    "the user changes details, call the tool with the updated details so safety can re-prompt."
                 ),
             ]
             frames.append(
