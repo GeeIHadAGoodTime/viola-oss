@@ -5298,11 +5298,16 @@ class CallManager:
 
         try:
             duration = max_duration or self.config.max_call_duration
-            from telephony.cost_tracker import estimate_phone_tts_reservation_cents
+            from telephony.cost_tracker import estimate_phone_call_reservation_cents
+            from telephony.remote_voice import phone_voice_remote_enabled
 
-            estimated_spend_cents = max(
-                1,
-                1 + estimate_phone_tts_reservation_cents(self.config.tts_provider, duration),
+            # Reserve the call's worst case before dialing (carrier, GPU, paid
+            # TTS); the call is refused if the allowance cannot cover it, and
+            # it settles to the actual cost when it ends.
+            estimated_spend_cents = estimate_phone_call_reservation_cents(
+                self.config.tts_provider,
+                duration,
+                gpu_voice=phone_voice_remote_enabled(),
             )
             await billing.record_call_start(
                 effective_user_id,
@@ -6559,11 +6564,14 @@ class CallManager:
                 TTSUsageCollector,
             )
 
+            from telephony.remote_voice import phone_voice_remote_enabled
+
             cost_tracker = CostTracker(
                 call_id=record.call_id,
                 llm_model=self.config.llm_model,
                 phone_number=record.phone_number,
                 tts_provider=self.config.tts_provider,
+                gpu_voice=phone_voice_remote_enabled(),
             )
             cost_metrics_collector = CostMetricsCollector(cost_tracker)
             tts_usage_collector = TTSUsageCollector(cost_tracker)
@@ -8460,11 +8468,7 @@ class CallManager:
         Rough token estimate: ~50 tokens per transcript turn.
         """
         from services.llm.pricing import calculate_cost_usd
-        from telephony.cost_tracker import (
-            _TELNYX_REGULATORY_SURCHARGE,
-            _get_telnyx_rate,
-            estimate_phone_tts_cost_usd,
-        )
+        from telephony.cost_tracker import estimate_phone_tts_cost_usd
 
         if record._cost_tracker is not None:
             breakdown = record._cost_tracker.build_breakdown(record.duration_seconds)
@@ -8482,9 +8486,11 @@ class CallManager:
             )
             return
 
-        minutes = record.duration_seconds / 60.0
-        rate = _get_telnyx_rate(record.phone_number)
-        telnyx_cost = minutes * rate * (1 + _TELNYX_REGULATORY_SURCHARGE)
+        from telephony.cost_tracker import estimate_phone_carrier_cost_usd, estimate_phone_gpu_cost_usd
+        from telephony.remote_voice import phone_voice_remote_enabled
+
+        telnyx_cost = estimate_phone_carrier_cost_usd(record.duration_seconds, record.phone_number)
+        gpu_cost = estimate_phone_gpu_cost_usd(record.duration_seconds) if phone_voice_remote_enabled() else 0.0
 
         # Estimate LLM tokens from transcript
         total_text = " ".join(str(e.get("text", "")) for e in record.transcript if isinstance(e, dict))
@@ -8506,7 +8512,7 @@ class CallManager:
         )
         tts_cost = estimate_phone_tts_cost_usd(self.config.tts_provider, len(assistant_text))
 
-        record.estimated_cost_usd = telnyx_cost + llm_cost + tts_cost
+        record.estimated_cost_usd = telnyx_cost + llm_cost + tts_cost + gpu_cost
 
         logger.info(
             "Call %s cost estimate: $%.4f (telnyx=$%.4f, llm=$%.4f, stt=$0, tts=$%.4f)",

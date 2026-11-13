@@ -38,6 +38,15 @@ LLM_PRICING_CENTS: dict[str, dict[str, float]] = {
         "cache_write": 12.5,
         "web_search": 1.0,
     },
+    # Speech-to-text, priced per audio SECOND: one input "token" = one second.
+    # $0.006/min = $0.0001/s = 10,000 cents per million seconds
+    # (platform.openai.com/docs/pricing, read 2026-11-12).
+    "whisper-1": {
+        "input": 10000,
+        "output": 0,
+        "cached": 10000,
+        "cache_write": 10000,
+    },
     "gpt-4o-mini": {
         "input": 15,
         "output": 60,
@@ -156,6 +165,9 @@ def reset_unknown_model_cost_state() -> None:
     _unknown_models_seen.set(frozenset())
 
 
+_LONG_CONTEXT_PREMIUM_MODELS = frozenset({"gpt-6-luna", "gpt-5.4"})
+
+
 def _pricing_for_spend_tracking(model: str) -> dict[str, float]:
     """Return model pricing, falling back conservatively for unknown models.
 
@@ -196,7 +208,9 @@ def calculate_cost_cents(
     web-search server tool.
     """
     pricing = _pricing_for_spend_tracking(model)
-    if model == "gpt-6-luna" and int(input_tokens) > 272000:
+    # gpt-5.4 has the same long-context premium as gpt-6-luna (OpenAI pricing
+    # page, read 2026-11-12), and gpt-5.4 is the fallback row for unknown models.
+    if (model in _LONG_CONTEXT_PREMIUM_MODELS or model not in LLM_PRICING_CENTS) and int(input_tokens) > 272000:
         # The long-context premium applies to the whole request, not just
         # tokens above the threshold. Tool request prices are unchanged.
         pricing = dict(pricing)
