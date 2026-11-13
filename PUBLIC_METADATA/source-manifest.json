@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "9dbe8e0eedfc4967c480f5ff5e96552496d4c604",
-  "sha256": "9a93d46405e1f529b5187a2cc5449906144644e2cd740a68ba10b4606c002586",
+  "revision": "1fbe85616cbf80e0cd51552cbb065f387f57429d",
+  "sha256": "c958f42e98d761e4db820fc51ae44b22275c462b6f110ae8ae1e92d0b1c8cb20",
   "files": [
     {
       "path": ".env.example",
@@ -1250,13 +1250,13 @@
     },
     {
       "path": "core/voice_command_handler.py",
-      "sha256": "a69afe5567912e6585c4b387e78d2bc4b2ad6010eaa9f5b69ecef1e9d55c3af5",
-      "bytes": 114623
+      "sha256": "97b25b3f6829b176bad357bc56d890119f15b4ff4c8253bd2ce5f7c7e86c9311",
+      "bytes": 117919
     },
     {
       "path": "core/voice_orchestrator.py",
-      "sha256": "9935376b05d9934bd4e98380a8841f77fe00b4966fca326cb639376070e28f6e",
-      "bytes": 23505
+      "sha256": "cddc456e8c2146b990caf674304f28ead8805e775a00a94140f530d94c1c5c6c",
+      "bytes": 23592
     },
     {
       "path": "core/voice_orchestrator_metrics.py",
@@ -1285,8 +1285,8 @@
     },
     {
       "path": "core/voice_wake_processor.py",
-      "sha256": "880c5e5ea8d479427be55fdd215979c6444728ae74e77d5d14af7bf6feb6aa64",
-      "bytes": 10916
+      "sha256": "20a7f869483b2d4cf9f599b54801d8291b397fc2001de8470d1e341b620d8462",
+      "bytes": 11394
     },
     {
       "path": "core/win32_job.py",
@@ -9725,8 +9725,8 @@
     },
     {
       "path": "ui/api/routes/transcription.py",
-      "sha256": "182b723b1d7d747b642323de5cf7fc145f46a10c44e11c8459560c971e32c820",
-      "bytes": 15753
+      "sha256": "cbc4c02844e7552c86cd8766e71771e3348fae7874b2a61066a87a6f1c8e4eeb",
+      "bytes": 16574
     },
     {
       "path": "ui/api/routes/ux.py",
@@ -12245,13 +12245,13 @@
     },
     {
       "path": "ui/react-app/src/hooks/useVoice.holdToTalk.test.js",
-      "sha256": "1b6f917d8b9c96294b722a97eb7f20c295e2279c13690572ec38113e18c90f23",
-      "bytes": 5836
+      "sha256": "e0ca0e2a9818b6fd64ec35f39f5641676853817787735bd4ee5d03d32d8f6f62",
+      "bytes": 7370
     },
     {
       "path": "ui/react-app/src/hooks/useVoice.js",
-      "sha256": "c463bdc7372ee1a4be7412f26f4347e89c462fe6b98de804a3c1d31d147604af",
-      "bytes": 19024
+      "sha256": "ab6211a4b16bf614577936aaa61bc7dede202717ac1491fa6774284dead1d52a",
+      "bytes": 19848
     },
     {
       "path": "ui/react-app/src/hooks/useVoiceNotice.js",
@@ -13115,8 +13115,8 @@
     },
     {
       "path": "utils/audio_ducking.py",
-      "sha256": "504097d72104c7e69ef945a7201f46780160b909ab9d968b976b987b408fcb19",
-      "bytes": 20398
+      "sha256": "505b18718ecfea7c087168ce80206afc04b1e010b31095eb6a0a89ce919fa068",
+      "bytes": 21174
     },
     {
       "path": "utils/audio_preprocessing.py",
@@ -13725,8 +13725,8 @@
     },
     {
       "path": "voice/pipeline_wake_callback.py",
-      "sha256": "99a6e94407855b259758f69c1e5e835886afa614fc26d113409b38974858a6b0",
-      "bytes": 8480
+      "sha256": "c32ed68e3cc10c0623ed79f3d3c60bf58e31adecb48673c4a122de1308790337",
+      "bytes": 8641
     },
     {
       "path": "voice/pronunciation_tables.py",
@@ -13855,8 +13855,8 @@
     },
     {
       "path": "voice/wake_chime.py",
-      "sha256": "36315111a5674d9f81f238a51dcbaed520138dd40fb02dc8d15c2c0856153eec",
-      "bytes": 7595
+      "sha256": "93341b2192f0c38c40e7c6a51c22ac9e1be158ffaa525f8b7881354e4b342f9a",
+      "bytes": 6931
     },
     {
       "path": "voice/wake_detector/__init__.py",
@@ -13880,8 +13880,8 @@
     },
     {
       "path": "voice/wake_detector/aec_delay_tracker.py",
-      "sha256": "055fa00980efed02273504242ddaddc6eee6249ec0f07df70e9595299475e0f0",
-      "bytes": 8237
+      "sha256": "bd3b141cb52c31c5a0a6662735d7ff951d17c2f50ac2c3e159565a23853a058a",
+      "bytes": 8757
     },
     {
       "path": "voice/wake_detector/aec_processor.py",
@@ -13985,8 +13985,8 @@
     },
     {
       "path": "voice/wake_detector/own_speech.py",
-      "sha256": "63bd45049823e40acd3f9cf4412b408ff8a8a06e588f53f63511ebae95ef93a5",
-      "bytes": 9377
+      "sha256": "31ce984bd14349a37261785acd15ecd304a642c76bcbdc01cdb5a609fd3b4da8",
+      "bytes": 10509
     },
     {
       "path": "voice/wake_detector/resampler.py",
