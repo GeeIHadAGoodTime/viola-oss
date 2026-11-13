@@ -22,7 +22,175 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-_DEFAULT_DB_PATH = Path(__file__).parent.parent.parent / ".viola" / "data" / "persistence" / "playlists.sqlite3"
+_DB_FILENAME = "playlists.sqlite3"
+# Where builds up to 1.0.5 build 10 kept voice-made playlists: inside the
+# source tree, which for an installed app is the install folder
+# (...\\current\\_internal\\.viola\\data\\persistence). An update replaces
+# that folder, so every update lost them. Kept only as a place to migrate from.
+_LEGACY_INSTALL_DB_PATH = Path(__file__).parent.parent.parent / ".viola" / "data" / "persistence" / _DB_FILENAME
+_legacy_migration_lock = threading.Lock()
+_legacy_migration_checked: set[str] = set()
+
+
+def default_playlist_db_path() -> Path:
+    """The one playlist database: in the user-data folder, never the install folder.
+
+    It is the file Settings (``PlaylistManager``) already used, so playlists
+    made by voice and playlists saved by link now live in one store.
+    """
+    from core.platform import get_data_dir
+
+    return get_data_dir() / _DB_FILENAME
+
+
+def _legacy_playlist_db_paths(dest: Path) -> list[Path]:
+    from core.platform import get_data_dir
+
+    candidates = [_LEGACY_INSTALL_DB_PATH, get_data_dir() / "data" / "persistence" / _DB_FILENAME]
+    found: list[Path] = []
+    for candidate in candidates:
+        try:
+            if candidate.is_file() and candidate.resolve() != dest.resolve() and candidate not in found:
+                found.append(candidate)
+        except OSError:
+            continue
+    return found
+
+
+def migrate_legacy_playlist_db(legacy_path: Path, dest_path: Path) -> dict[str, int]:
+    """Copy playlists and tracks from an old playlist database into ``dest_path``.
+
+    Row by row, so it is safe when the destination already holds playlists: a
+    playlist that is missing is added with its tracks; a playlist of the same
+    name that already exists keeps its tracks and receives, at the end, every
+    old track it does not already hold. Nothing in the destination is removed or
+    replaced. It runs once per old file (recorded in the destination), so a
+    playlist the user deletes later does not come back. The old file is never
+    changed.
+    """
+    counts = {"playlists": 0, "tracks": 0, "skipped": 0}
+    source_key = str(legacy_path.resolve())
+    dest = sqlite3.connect(str(dest_path))
+    dest.row_factory = sqlite3.Row
+    try:
+        dest.execute(
+            "CREATE TABLE IF NOT EXISTS playlist_store_migrations (source TEXT PRIMARY KEY, migrated_at TEXT NOT NULL)"
+        )
+        if dest.execute("SELECT 1 FROM playlist_store_migrations WHERE source = ?", (source_key,)).fetchone():
+            counts["skipped"] = 1
+            return counts
+        source = sqlite3.connect("file:%s?mode=ro" % legacy_path.as_posix(), uri=True)
+        source.row_factory = sqlite3.Row
+        try:
+            tables = {row[0] for row in source.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+            playlists = source.execute("SELECT * FROM playlists").fetchall() if "playlists" in tables else []
+            for playlist in playlists:
+                keys = playlist.keys()
+                user_id, name = str(playlist["user_id"]), str(playlist["name"])
+                existing = dest.execute(
+                    "SELECT id FROM playlists WHERE user_id = ? AND name = ?", (user_id, name)
+                ).fetchone()
+                if existing is None:
+                    cursor = dest.execute(
+                        "INSERT INTO playlists (user_id, name, created_at, metadata_json) VALUES (?, ?, ?, ?)",
+                        (
+                            user_id,
+                            name,
+                            str(playlist["created_at"]),
+                            (playlist["metadata_json"] if "metadata_json" in keys else None) or "{}",
+                        ),
+                    )
+                    dest_id = cursor.lastrowid
+                    counts["playlists"] += 1
+                else:
+                    dest_id = existing["id"]
+                if "playlist_tracks" not in tables:
+                    continue
+                held = {
+                    (str(row["provider"]), str(row["track_uri"]))
+                    for row in dest.execute(
+                        "SELECT provider, track_uri FROM playlist_tracks WHERE playlist_id = ?", (dest_id,)
+                    )
+                }
+                max_row = dest.execute(
+                    "SELECT MAX(position) AS max_pos FROM playlist_tracks WHERE playlist_id = ?", (dest_id,)
+                ).fetchone()
+                next_position = 0 if max_row["max_pos"] is None else int(max_row["max_pos"]) + 1
+                tracks = [
+                    track
+                    for track in source.execute(
+                        "SELECT * FROM playlist_tracks WHERE playlist_id = ? ORDER BY position, id", (playlist["id"],)
+                    ).fetchall()
+                    if (str(track["provider"]), str(track["track_uri"])) not in held
+                ]
+                for position, track in enumerate(tracks, start=next_position):
+                    dest.execute(
+                        """
+                        INSERT INTO playlist_tracks
+                            (playlist_id, user_id, provider, track_uri, title, artist, position)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            dest_id,
+                            user_id,
+                            track["provider"],
+                            track["track_uri"],
+                            track["title"],
+                            track["artist"],
+                            position,
+                        ),
+                    )
+                    counts["tracks"] += 1
+            if "playlist_user_settings" in tables:
+                for setting in source.execute("SELECT * FROM playlist_user_settings").fetchall():
+                    dest.execute(
+                        """
+                        INSERT OR IGNORE INTO playlist_user_settings (user_id, default_playlist, json_migrated_at)
+                        VALUES (?, ?, ?)
+                        """,
+                        (setting["user_id"], setting["default_playlist"], setting["json_migrated_at"]),
+                    )
+        finally:
+            source.close()
+        dest.execute(
+            "INSERT INTO playlist_store_migrations (source, migrated_at) VALUES (?, ?)",
+            (source_key, datetime.now(UTC).isoformat()),
+        )
+        dest.commit()
+    except Exception:
+        dest.rollback()
+        raise
+    finally:
+        dest.close()
+    return counts
+
+
+def _migrate_legacy_playlist_dbs_once(dest_path: Path) -> None:
+    """Bring playlists from the old locations into the one store, once per process."""
+    try:
+        key = str(dest_path.resolve())
+        if key != str(default_playlist_db_path().resolve()):
+            return
+    except OSError:
+        return
+    with _legacy_migration_lock:
+        if key in _legacy_migration_checked:
+            return
+        _legacy_migration_checked.add(key)
+        for legacy_path in _legacy_playlist_db_paths(dest_path):
+            try:
+                counts = migrate_legacy_playlist_db(legacy_path, dest_path)
+            except (sqlite3.Error, OSError) as exc:
+                logger.warning("Could not migrate playlists from %s to %s: %s", legacy_path, dest_path, exc)
+                continue
+            if not counts["skipped"]:
+                logger.info(
+                    "Migrated playlists from old location %s to %s: %d playlist(s), %d track(s)",
+                    legacy_path,
+                    dest_path,
+                    counts["playlists"],
+                    counts["tracks"],
+                )
 _SYNC_TIMEOUT_SECONDS = 10.0
 _TIMEOUT = object()
 _T = TypeVar("_T")
@@ -220,11 +388,12 @@ class SqlitePlaylistBackend:
     is_postgres = False
 
     def __init__(self, db_path: Path | None = None) -> None:
-        self._db_path = db_path if db_path is not None else _DEFAULT_DB_PATH
+        self._db_path = db_path if db_path is not None else default_playlist_db_path()
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
         self._init_db()
-        logger.info("PlaylistStore initialised at %s", self._db_path)
+        _migrate_legacy_playlist_dbs_once(self._db_path)
+        logger.debug("PlaylistStore initialised at %s", self._db_path)
 
     @property
     def db_path(self) -> Path | None:
@@ -375,7 +544,13 @@ class SqlitePlaylistBackend:
         with self._lock:
             conn = self._connect()
             try:
-                existing_rows = conn.execute("SELECT name FROM playlists WHERE user_id = ?", (user_id,)).fetchall()
+                # Rows with empty metadata are playlists made by voice (a list of
+                # tracks, no link). They share this table with the link playlists
+                # this map describes, and a map that never held them must not
+                # delete them.
+                existing_rows = conn.execute(
+                    "SELECT name FROM playlists WHERE user_id = ? AND metadata_json != '{}'", (user_id,)
+                ).fetchall()
                 existing_names = {str(row["name"]) for row in existing_rows}
                 incoming_names = set(sanitized)
                 for name in existing_names - incoming_names:

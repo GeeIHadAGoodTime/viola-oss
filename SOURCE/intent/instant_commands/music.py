@@ -1348,6 +1348,16 @@ class MusicHandlersMixin:
                         "error": "missing_volume_level",
                     }
                 level = int(level_match.group(1))
+            from intent.tools.music_tools import volume_level_refusal
+
+            refusal = volume_level_refusal(level)
+            if refusal is not None:
+                return {
+                    "ok": False,
+                    "message": refusal,
+                    "data": {"requested_level": level, "volume_changed": False},
+                    "error": "volume_level_out_of_range",
+                }
             level = max(0, min(100, level))
             result = self.controller.music.set_volume(player_level_for_user_volume(level))
             if asyncio.iscoroutine(result):

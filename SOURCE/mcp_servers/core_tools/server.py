@@ -5306,7 +5306,12 @@ async def playback(
     ] = None,
     volume_level: Annotated[
         int | None,
-        Field(description="Target music player volume percent for action='volume_set'."),
+        Field(
+            description=(
+                "Volume percent for action='volume_set', 0 to 100. Pass the number the user said: a number above "
+                "100 is refused and the volume is left alone."
+            )
+        ),
     ] = None,
     volume_step: Annotated[
         int | None,

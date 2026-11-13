@@ -206,6 +206,18 @@ class ProviderRouter:
                 raise
             return self._to_queue_item(metadata_obj, actual_source)
 
+        if source == "spotify_cdp" and self._requested_spotify_can_play():
+            # play_music named Spotify ("play X on Spotify"). The configured
+            # source used to win here, so with YouTube configured the song
+            # played on YouTube and only then was the source switched to
+            # Spotify (1.0.5 build 10). When Spotify is not connected the
+            # request falls through to today's selection and wording.
+            self._logger.info(
+                "Selected music provider=spotify source=spotify_cdp reason=requested_provider query=%s",
+                query[:50],
+            )
+            return self._resolve_via_spotify_cdp(query)
+
         actual_source = self._determine_provider_source(query)
 
         if actual_source == "browser":
@@ -705,6 +717,12 @@ class ProviderRouter:
             track.artist_name,
         )
         return item
+
+    def _requested_spotify_can_play(self) -> bool:
+        """Whether Spotify, named by the request, is connected for this user."""
+        from music.providers.selection import _current_user_id, _spotify_signed_in
+
+        return _spotify_signed_in(_current_user_id())
 
     def _determine_provider_source(self, query: str) -> Source:
         try:

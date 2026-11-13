@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+import time
 from collections.abc import Callable
 from typing import Any
 
@@ -618,6 +619,73 @@ def _candidate_was_unplayable(play_result: ToolResult) -> bool:
     return any(marker in combined for marker in _UNPLAYABLE_CANDIDATE_TEXT)
 
 
+# --- Disliked tracks are not picked again (1.0.5 build 10, bug 7) -------------
+# Only autoplay checked the dislike list. A later "play some jazz", and a
+# routine that ran it, searched again and auto-played the top result, which was
+# the very track the user had thumbed down (RmtUPgS0psw: disliked 07:09, played
+# 07:17, 08:45 and 10:38). ``search_play`` picks the track for the user, so it is
+# the place that has to remember. A track the caller names by ``track_uri``
+# (action='play') is not filtered: that is an explicit choice of that track.
+_SPOTIFY_URI_ID_RE = re.compile(r"(?:spotify:track:|open\.spotify\.com/track/)([A-Za-z0-9]{22})")
+
+
+_DISLIKE_WIDEN_LIMIT = 20
+
+
+def _candidate_rating_ids(track: dict[str, Any]) -> set[str]:
+    """Every id a rating of this candidate could have been saved under."""
+    ids: set[str] = set()
+    for field in ("track_uri", "video_id", "id", "provider_track_id"):
+        value = str(track.get(field) or "").strip()
+        if not value:
+            continue
+        ids.add(value)
+        video_id = extract_video_id(value)
+        if video_id:
+            ids.add(str(video_id))
+        spotify_match = _SPOTIFY_URI_ID_RE.search(value)
+        if spotify_match:
+            ids.add(spotify_match.group(1))
+    return ids
+
+
+async def _disliked_track_ids(user_id: str) -> set[str]:
+    """Track ids this user has thumbed down; empty when the ratings cannot be read."""
+    try:
+        from core.user_context import _is_cloud_surface, get_desktop_local_principals
+        from music.rating_system import get_rating_system_async
+
+        owners = [user_id] if user_id else []
+        if not _is_cloud_surface():
+            # One person per install: a rating lands under the account or the
+            # device id depending on how the request authenticated.
+            try:
+                owners += [principal for principal in get_desktop_local_principals() if principal not in owners]
+            except LookupError:
+                pass
+        rating_system = await get_rating_system_async()
+        disliked: set[str] = set()
+        for owner in owners:
+            disliked |= set(rating_system.get_disliked_video_ids(user_id=owner))
+        return disliked
+    except Exception as exc:
+        logger.warning("media search_play: could not read the dislike list: %s", exc)
+        return set()
+
+
+def _without_disliked(
+    tracks: list[dict[str, Any]], disliked: set[str]
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Split candidates into (kept, disliked). Keeps everything when all are disliked."""
+    if not disliked:
+        return tracks, []
+    kept = [track for track in tracks if not (_candidate_rating_ids(track) & disliked)]
+    skipped = [track for track in tracks if _candidate_rating_ids(track) & disliked]
+    if not kept:
+        return tracks, []
+    return kept, skipped
+
+
 async def _handle_search_play_mode(
     query: str,
     provider: str,
@@ -627,6 +695,7 @@ async def _handle_search_play_mode(
     *,
     generic_request: bool = False,
 ) -> ToolResult:
+    started = time.monotonic()
     search_result = await _handle_search_mode(query, provider, limit, user_id)
     if not search_result.ok:
         return search_result
@@ -671,6 +740,39 @@ async def _handle_search_play_mode(
                             }
                         )
                         _notify_spotify_no_match(query, user_id)
+
+    searched = time.monotonic()
+    disliked_ids = await _disliked_track_ids(user_id)
+    if tracks and disliked_ids and all(_candidate_rating_ids(track) & disliked_ids for track in tracks):
+        # The 1.0.5 build-10 laptop log: "jazz" came back with ONE candidate
+        # (a routine asked for limit=1; the search cache held one), and it was
+        # the disliked track, so passing over it left nothing else to play.
+        # Ask once for a wider list before falling back to the disliked one.
+        wider = await _handle_search_mode(query, provider, max(limit, _DISLIKE_WIDEN_LIMIT), user_id)
+        if wider.ok and isinstance(wider.data, dict):
+            wider_tracks = [track for track in wider.data.get("tracks", []) if isinstance(track, dict)]
+            if any(not (_candidate_rating_ids(track) & disliked_ids) for track in wider_tracks):
+                logger.info(
+                    "media search_play: every result for %r was disliked; widened the search to %d results",
+                    query,
+                    len(wider_tracks),
+                )
+                data = dict(wider.data)
+                tracks = wider_tracks
+    tracks, skipped_disliked = _without_disliked(tracks, disliked_ids)
+    filtered = time.monotonic()
+    if skipped_disliked:
+        data["tracks"] = tracks
+        data["skipped_disliked"] = [
+            {"title": track.get("title"), "artist": track.get("artist"), "track_uri": track.get("track_uri")}
+            for track in skipped_disliked
+        ]
+        logger.info(
+            "media search_play: passed over %d disliked track(s) for %r: %s",
+            len(skipped_disliked),
+            query,
+            ", ".join(str(track.get("track_uri") or "") for track in skipped_disliked),
+        )
 
     data.update(
         {
@@ -749,6 +851,19 @@ async def _handle_search_play_mode(
         )
     if unplayable:
         data["unplayable_candidates"] = unplayable
+    finished = time.monotonic()
+    # Build 10's first play after launch took 6 s (target 4 to 5) and no log
+    # said which stage was slow. Search, dislike list and play (which includes
+    # the player's own start, see PLAY_CONFIRM) are timed here.
+    logger.info(
+        "media search_play timing: search=%.0fms dislikes=%.0fms play=%.0fms total=%.0fms tried=%d ok=%s",
+        (searched - started) * 1000.0,
+        (filtered - searched) * 1000.0,
+        (finished - filtered) * 1000.0,
+        (finished - started) * 1000.0,
+        len(unplayable) + 1,
+        play_result.ok,
+    )
     play_data = dict(play_result.data or {}) if isinstance(play_result.data, dict) else play_result.data
     data.update(
         {
