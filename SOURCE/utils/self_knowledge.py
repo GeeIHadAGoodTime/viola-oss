@@ -90,7 +90,18 @@ class SelfKnowledgeBuilder:
     """
 
     _CACHE_TTL: float = 2.0
-    _MAX_OUTPUT_CHARS: int = 800
+    # The permission-level lines alone run to about 1,000 characters at Solo.
+    # At 800, cut mid-sentence, the Ensemble half of "Not available at this
+    # level" never reached the model, so a Solo refusal for a website named
+    # Symphony (1.0.5 builds 9 and 10, laptop G02).
+    _MAX_OUTPUT_CHARS: int = 1600
+    # Lines never dropped to fit the budget: what this level cannot do and
+    # where the user changes it.
+    _KEEP_LINE_PREFIXES: tuple[str, ...] = (
+        "Tool-permission level",
+        "Not available at this level",
+        "Agent Mode is off",
+    )
 
     def __init__(self) -> None:
         self._cached_output: dict[str, str] = {}
@@ -148,9 +159,7 @@ class SelfKnowledgeBuilder:
         self._add_user_preferences(lines)
         self._add_capability_context(lines)
 
-        output = "\n".join(lines)
-        if len(output) > self._MAX_OUTPUT_CHARS:
-            output = output[: self._MAX_OUTPUT_CHARS]
+        output = self._fit_to_budget(lines)
 
         self._current_player_state = None
         self._current_user_name = ""
@@ -343,6 +352,19 @@ class SelfKnowledgeBuilder:
             )
         except Exception as exc:
             logger.debug("Self-knowledge: archive notice formatting failed: %s", exc)
+
+    def _fit_to_budget(self, lines: list[str]) -> str:
+        """Join the lines within ``_MAX_OUTPUT_CHARS`` by dropping whole lines, never cutting one.
+
+        Lines go from the end first; the permission-level lines always stay.
+        """
+        kept = list(lines)
+        index = len(kept) - 1
+        while len("\n".join(kept)) > self._MAX_OUTPUT_CHARS and index >= 0:
+            if not kept[index].startswith(self._KEEP_LINE_PREFIXES):
+                del kept[index]
+            index -= 1
+        return "\n".join(kept)
 
     def _add_capability_context(self, lines: list[str]) -> None:
         """Inject current autonomy tier and saved shortcuts for this user."""

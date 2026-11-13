@@ -31,6 +31,19 @@ from core.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+# Where the user connects Home Assistant, and the one sentence every "not
+# connected" answer uses. Viola used to say "Settings -> Connections -> Home
+# Assistant", a section that did not exist (1.0.5 build 10, blocker 9). The
+# setup lives under the Smart Home heading of the Connections tab.
+HOME_ASSISTANT_SETUP_PATH = "Settings > Connections > Smart Home"
+HOME_ASSISTANT_NOT_CONNECTED = (
+    "Home Assistant is not connected yet, so nothing was changed. The user connects it in "
+    + HOME_ASSISTANT_SETUP_PATH
+    + ": press Connect Home Assistant, enter the Home Assistant address and a long-lived access token "
+    "(created in Home Assistant under the profile's Security page), then press Test connection and Save setup. "
+    "Give the user exactly this path."
+)
+
 _LOCK = threading.Lock()
 _SINGLETON: HomeAssistantClient | None = None
 
@@ -486,7 +499,7 @@ async def smart_home_list_handler(domain: str = "") -> Any:
         return ToolResult(
             ok=False,
             data=None,
-            error=("Home Assistant is not configured. Set home_assistant_url and " "home_assistant_token in Settings."),
+            error=HOME_ASSISTANT_NOT_CONNECTED,
         )
 
     entities = await client.list_entities(domain=domain or None)
@@ -533,7 +546,7 @@ async def smart_home_control_handler(
         return ToolResult(
             ok=False,
             data=None,
-            error="Home Assistant is not configured.",
+            error=HOME_ASSISTANT_NOT_CONNECTED,
         )
 
     # Parse params
@@ -576,7 +589,7 @@ async def smart_home_state_handler(entity_id: str) -> Any:
         return ToolResult(
             ok=False,
             data=None,
-            error="Home Assistant is not configured.",
+            error=HOME_ASSISTANT_NOT_CONNECTED,
         )
 
     state = await client.get_state(entity_id)
@@ -626,7 +639,7 @@ async def smart_home_scene_handler(scene_name: str) -> Any:
         return ToolResult(
             ok=False,
             data=None,
-            error="Home Assistant is not configured.",
+            error=HOME_ASSISTANT_NOT_CONNECTED,
         )
 
     result = await client.activate_scene(scene_name)

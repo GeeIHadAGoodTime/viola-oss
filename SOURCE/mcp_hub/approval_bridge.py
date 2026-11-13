@@ -1139,6 +1139,12 @@ class ApprovalBridge:
                 return "register an MCP server which runs: %s" % full_cmd
             return "perform mcp_servers action '%s'" % (action or "list")
 
+        if tool_name == "playlist" and str(args.get("action") or "").strip().lower() == "delete":
+            # "perform playlist action 'delete'" reached the user and did not
+            # say which playlist (seen live 2026-11-12).
+            name = str(args.get("name") or "").strip()
+            return "delete the playlist '%s'" % name if name else "delete a playlist"
+
         if tool_name == "computer":
             # Plain words that name what is acted on, so a "yes" covers this
             # app/window/text and not any later action of the same kind. The

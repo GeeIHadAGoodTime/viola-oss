@@ -74,6 +74,8 @@ const HASetupForm = React.memo(({
   initialToken = '',
   onSave = noop,
   onCancel = null,
+  title = 'Set up local control',
+  hint = 'Enter the local bridge URL and access token used by your smart-home hub.',
 }) => {
   const prefilledUrl = useMemo(
     () => initialUrl || getDeviceEndpoint(device),
@@ -229,7 +231,7 @@ const HASetupForm = React.memo(({
         fontWeight: 600,
         marginBottom: '4px',
       }}>
-        Set up local control
+        {title}
       </div>
       <div style={{
         color: theme.colors.textMuted,
@@ -237,7 +239,7 @@ const HASetupForm = React.memo(({
         lineHeight: 1.4,
         marginBottom: '14px',
       }}>
-        Enter the local bridge URL and access token used by your smart-home hub.
+        {hint}
       </div>
 
       <div style={{ display: 'grid', gap: '12px' }}>
@@ -366,6 +368,8 @@ HASetupForm.propTypes = {
   initialToken: PropTypes.string,
   onSave: PropTypes.func,
   onCancel: PropTypes.func,
+  title: PropTypes.string,
+  hint: PropTypes.string,
 };
 
 export default HASetupForm;

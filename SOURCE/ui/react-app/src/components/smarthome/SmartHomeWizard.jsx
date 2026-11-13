@@ -49,6 +49,10 @@ const SmartHomeWizard = React.memo(({
   const [savingDiscovery, setSavingDiscovery] = useState(false);
   const [error, setError] = useState('');
   const [activeSetupDevice, setActiveSetupDevice] = useState(null);
+  // Home Assistant setup opened by hand. Before this the form only appeared
+  // after a network scan found a hub, so with discovery off (the default) there
+  // was no way to enter the address and token at all (1.0.5 build 10, blocker 9).
+  const [manualSetupOpen, setManualSetupOpen] = useState(false);
 
   // #4226: `/v1/smarthome/*` is the COMPANION_REQUIRED `smarthome` route group
   // (backend/cloud_route_manifest.py) — discovery scans the user's own LAN and
@@ -213,6 +217,7 @@ const SmartHomeWizard = React.memo(({
   const handleSetupSaved = useCallback(({ settings: savedSettings, response }) => {
     mergeSettings(savedSettings, response?.settings);
     setActiveSetupDevice(null);
+    setManualSetupOpen(false);
   }, [mergeSettings]);
 
   const renderDiscoveryState = () => {
@@ -243,7 +248,10 @@ const SmartHomeWizard = React.memo(({
               key={`${device.service_type || 'device'}-${device.ip || 'unknown'}-${device.port || 'none'}-${index}`}
               device={device}
               isConnected={hasConfiguredHub}
-              onSetup={setActiveSetupDevice}
+              onSetup={(device) => {
+                setManualSetupOpen(false);
+                setActiveSetupDevice(device);
+              }}
             />
           ))}
         </ul>
@@ -277,6 +285,40 @@ const SmartHomeWizard = React.memo(({
   return (
     <Section title="Smart Home">
       <ConnectedHubsList settings={localSettings} hubs={configuredHubs} />
+
+      <div style={{ padding: '4px 0 0' }}>
+        <SettingRow
+          title="Home Assistant"
+          description={hasConfiguredHub
+            ? 'Connected with your Home Assistant address and access token.'
+            : 'Control lights, switches, locks and more. Needs your Home Assistant address and a long-lived access token.'}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              setActiveSetupDevice(null);
+              setManualSetupOpen((open) => !open);
+            }}
+            disabled={loadingSettings}
+            aria-expanded={manualSetupOpen}
+            aria-label={hasConfiguredHub ? 'Change Home Assistant connection' : 'Connect Home Assistant'}
+            style={buttonStyle(loadingSettings)}
+          >
+            {hasConfiguredHub ? 'Change' : 'Connect Home Assistant'}
+          </button>
+        </SettingRow>
+      </div>
+
+      {manualSetupOpen && !activeSetupDevice && (
+        <HASetupForm
+          title="Connect Home Assistant"
+          hint="Enter your Home Assistant address (for example http://homeassistant.local:8123) and a long-lived access token. Create the token in Home Assistant under your profile, Security, Long-lived access tokens."
+          initialUrl={localSettings.home_assistant_url || ''}
+          initialToken={localSettings.home_assistant_token || ''}
+          onSave={handleSetupSaved}
+          onCancel={() => setManualSetupOpen(false)}
+        />
+      )}
 
       <div style={{ padding: '4px 0 0' }}>
         <SettingRow

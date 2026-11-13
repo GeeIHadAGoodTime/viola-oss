@@ -86,4 +86,42 @@ describe('SmartHomeWizard', () => {
     expect(screen.getByText('http://192.168.1.20:8123')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Set up smart-home hub/i })).toBeInTheDocument();
   });
+
+  // 1.0.5 build 10 laptop, blocker 9: with discovery off (the default) the
+  // address and token form could not be opened at all.
+  it('connects Home Assistant by hand with discovery off', async () => {
+    const fetchMock = mockFetch({ settings: { network_discovery_enabled: false } });
+    const base = fetchMock.getMockImplementation();
+    fetchMock.mockImplementation(async (input, init = {}) => {
+      const url = typeof input === 'string' ? input : input?.url || '';
+      if (url.endsWith('/v1/smarthome/test-connection')) {
+        return okResponse({ connected: true, message: 'Connected to Home Assistant.' });
+      }
+      return base(input, init);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { user } = render(<SmartHomeWizard />);
+
+    const connect = await screen.findByRole('button', { name: 'Connect Home Assistant' });
+    await waitFor(() => expect(connect).toBeEnabled());
+    await user.click(connect);
+
+    await user.type(screen.getByLabelText('Smart-home hub URL'), 'http://homeassistant.local:8123');
+    await user.type(screen.getByLabelText('Smart-home hub access token'), 'abc.def.ghi');
+    await user.click(screen.getByRole('button', { name: 'Test connection' }));
+    expect(await screen.findByText('Connected to Home Assistant.')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Save setup' }));
+    await waitFor(() => {
+      const patch = fetchMock.mock.calls.find(([, init]) => init?.method === 'PATCH');
+      expect(patch).toBeTruthy();
+      expect(JSON.parse(patch[1].body).settings).toEqual({
+        home_assistant_url: 'http://homeassistant.local:8123',
+        home_assistant_token: 'abc.def.ghi',
+      });
+    });
+    const tested = fetchMock.mock.calls.find(([input]) => String(input).endsWith('/v1/smarthome/test-connection'));
+    expect(tested[1].method).toBe('POST');
+  });
 });

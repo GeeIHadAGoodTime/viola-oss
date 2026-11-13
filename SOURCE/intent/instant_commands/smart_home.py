@@ -296,10 +296,10 @@ class SmartHomeHandlersMixin:
         return {
             "ok": True,
             "message": (
-                "To connect %s, I'll need your Home Assistant URL and a long-lived access token. "
-                "You can create a token in your Home Assistant dashboard under "
-                "Profile > Long-Lived Access Tokens. Once you have it, just tell me the URL "
-                "and token and I'll connect." % display_name
+                "To connect %s, open Settings > Connections > Smart Home and press Connect Home Assistant. "
+                "Enter your Home Assistant address and a long-lived access token, which you create in "
+                "Home Assistant under your profile's Security page, then press Test connection and Save setup."
+                % display_name
             ),
             "data": {
                 "domain_id": "smart_home",

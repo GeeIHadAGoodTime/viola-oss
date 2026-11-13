@@ -594,7 +594,7 @@ def _register_all_domains(
             provider_type=ProviderType.MCP,
             config_keys=[],
             setup_guide=SetupGuide(
-                orthodox_path="Connect to a smart home system on your network or cloud account",
+                orthodox_path="Connect Home Assistant in Settings > Connections > Smart Home (address and access token)",
                 auto_setup_possible=True,
                 requirements=["A smart home system (Home Assistant, Hue, SmartThings, etc.)"],
                 estimated_effort="5 minutes",

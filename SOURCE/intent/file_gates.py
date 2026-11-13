@@ -525,6 +525,35 @@ def _spoken_path(raw_path: str) -> str:
     return raw_path
 
 
+def delete_targets(args: Mapping[str, Any] | None) -> list[str]:
+    """Every path one ``file_write`` delete names (``path`` and ``paths``), in order, no repeats."""
+    params = args or {}
+    raw: list[Any] = [params.get("path") or params.get("filename")]
+    several = params.get("paths")
+    if isinstance(several, (list, tuple)):
+        raw.extend(several)
+    targets: list[str] = []
+    for item in raw:
+        text = str(item or "").strip()
+        if text and text not in targets:
+            targets.append(text)
+    return targets
+
+
+def _describe_one_delete(raw_path: str) -> tuple[str, bool]:
+    """(what to call it, is a folder) for one delete target."""
+    target = _spoken_path(raw_path)
+    path = _resolve(raw_path)
+    if path is not None and path.is_dir():
+        count = _folder_file_count(path)
+        if count > BULK_FILE_THRESHOLD:
+            inside = "more than %d files" % BULK_FILE_THRESHOLD
+        else:
+            inside = "1 file" if count == 1 else "%d files" % count
+        return "the folder %s and the %s in it" % (target, inside), True
+    return target, False
+
+
 def describe_file_action(action_class: str, args: Mapping[str, Any] | None) -> str | None:
     """Plain-words description for the confirm prompt, or None if not a file class."""
     params = args or {}
@@ -532,7 +561,13 @@ def describe_file_action(action_class: str, args: Mapping[str, Any] | None) -> s
     target = raw_path or "the file"
     action = _action_of(params)
     destination = str(params.get("destination") or "").strip()
+    if action_class == FILE_DELETE and len(delete_targets(params)) > 1:
+        # One question for the whole request, naming every item.
+        named = [_describe_one_delete(item)[0] for item in delete_targets(params)]
+        listing = ", ".join(named[:-1]) + " and " + named[-1]
+        return "delete %d items: %s (they go to the Recycle Bin and can be undone)" % (len(named), listing)
     if action_class == FILE_DELETE:
+        raw_path = raw_path or next(iter(delete_targets(params)), "")
         target = _spoken_path(raw_path) if raw_path else target
         path = _resolve(raw_path) if raw_path else None
         if path is not None and path.is_dir():
@@ -578,6 +613,7 @@ __all__ = [
     "active_file_gate_context",
     "base_file_write_class",
     "bind_file_gate_context",
+    "delete_targets",
     "describe_file_action",
     "file_write_action_class",
     "is_autostart_location",
