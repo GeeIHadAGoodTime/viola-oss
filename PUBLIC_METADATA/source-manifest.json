@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "6ffe36e8cfa03075d8329ecc09a7bddd409f7251",
-  "sha256": "6b0ac3031d79aedf90e76e8ded8131d62c3d267298492a1964ed33315c301fea",
+  "revision": "70f3647d5f81d7cb1bc7a45b2325df26270980c5",
+  "sha256": "8c727a2616ce7419a980925113e8530e1c0de132ac155e254799acc3a5105c42",
   "files": [
     {
       "path": ".env.example",
@@ -1250,8 +1250,8 @@
     },
     {
       "path": "core/voice_command_handler.py",
-      "sha256": "a737fec2a79792cd067a2179e8338e62980365144db7dfd0812d753df8fc1454",
-      "bytes": 111395
+      "sha256": "45f331a5c4bb1adce4deab5ecc0d22d9fbf3eb5693838dc29bbe3c81a2f3f890",
+      "bytes": 112552
     },
     {
       "path": "core/voice_orchestrator.py",
@@ -1645,8 +1645,8 @@
     },
     {
       "path": "intent/command_executor.py",
-      "sha256": "7a3e293499c671876bdf16e7424c089429a506a2c6cc666b81b8c1f9ee168646",
-      "bytes": 118897
+      "sha256": "f83c120c061c9e9096879c6f799f7206b75251d795ef8d677c363d38fd0d9f3f",
+      "bytes": 119210
     },
     {
       "path": "intent/commands/__init__.py",
@@ -1905,8 +1905,8 @@
     },
     {
       "path": "intent/pipeline.py",
-      "sha256": "48765f21f838714ad369b0b5df753b78b6e439f93f010cedc05f794abf39a06c",
-      "bytes": 111144
+      "sha256": "c3d8b0a0443d13b941e0d9b7269d53b11a6eaf1a203e8761892613bdfd1134ca",
+      "bytes": 111953
     },
     {
       "path": "intent/pipeline_contracts.py",
@@ -2265,13 +2265,13 @@
     },
     {
       "path": "mcp_hub/approval_bridge.py",
-      "sha256": "a70a04cfd2ea038316e5450796c1a7b3637d98243b7a4a040ea929418cf7a84c",
-      "bytes": 69114
+      "sha256": "1b18b2f896153d5bfd1c54ad9200aefc2711faae28fe92bcd09861b4cc3ebef5",
+      "bytes": 69148
     },
     {
       "path": "mcp_hub/client_hub.py",
-      "sha256": "2b581e4d2f1abc883d0d6309f81f8817e21e02b2e006a98dabcba17c41043219",
-      "bytes": 132566
+      "sha256": "b2ea779dee0a5957b7aa0daadf11c12a3f9e0ff142630134b772c9015d30f9c9",
+      "bytes": 132592
     },
     {
       "path": "mcp_hub/compound_tools.py",
@@ -2390,8 +2390,8 @@
     },
     {
       "path": "mcp_servers/core_tools/server.py",
-      "sha256": "4bc1107fa801ccd66c9f188eb8e56e0be254354a101d5d180cbbf08e5de5f195",
-      "bytes": 265713
+      "sha256": "fe1623d7b16a6d48e282646f57869fc4da96689b495b8ae1e7f28ad2ac6e6875",
+      "bytes": 266259
     },
     {
       "path": "mcp_servers/phone_tool_descriptions.py",
@@ -4565,8 +4565,8 @@
     },
     {
       "path": "services/llm/answer_stream.py",
-      "sha256": "e17bacaefa8832657d32d9d21781201db3f3046a8a36dd094c8d82595b30cc2d",
-      "bytes": 22264
+      "sha256": "7fd247a077a108b54fcb196abde1eaa95ef9685c91bd78a445913f3e79cd8e5c",
+      "bytes": 28399
     },
     {
       "path": "services/llm/anthropic_cache.py",
@@ -6175,8 +6175,8 @@
     },
     {
       "path": "tests/public/test_customer_pronunciation.py",
-      "sha256": "c57648844d261d99a7ee50b5a545d460a7e278f862a5491158147a1460d823e7",
-      "bytes": 20890
+      "sha256": "340cdce8b81be38c7fa8aa9a75b7ccab1c1980b23b774b4c4a236d0e608b8d8b",
+      "bytes": 20971
     },
     {
       "path": "tests/public/test_customer_romance_composition.py",
@@ -6230,7 +6230,7 @@
     },
     {
       "path": "tests/public/test_english_decimal_normalization.py",
-      "sha256": "9ca65b838701fd4565ca36bda91289a057ad465e6de55df1bd9fd4cbfe839629",
+      "sha256": "21e2c5b0c76d53adc5ce0425c42e3bda1e7797ac017ddc904b22af3e8b72bce7",
       "bytes": 14188
     },
     {
@@ -9505,8 +9505,8 @@
     },
     {
       "path": "ui/api/routes/command.py",
-      "sha256": "3fd20ca50fd9a57b060a0662dd8db72bf401e8d9a22ae32ca31202f7e7795ffe",
-      "bytes": 31513
+      "sha256": "08ad62eb6b5e447a297a6ac4ef9264312493c8a6258e1e5a0f46b7da1bf2b3cd",
+      "bytes": 32134
     },
     {
       "path": "ui/api/routes/common.py",
@@ -10145,8 +10145,13 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "f52296da749a3e7b30f10e966189168f9195a216d8abfe1a226f9c68a00d5d99",
-      "bytes": 202931
+      "sha256": "69cf2ffacde96de93e0f51c4b9f1fa07f275a9cac87b7d4b3aa35f9aeb1909b2",
+      "bytes": 203981
+    },
+    {
+      "path": "ui/react-app/src/SmartDisplay.longAnswer.test.jsx",
+      "sha256": "c8bde6ff050591ea235bf65f4ce993fc531223be7555236de1bea4907ce831c7",
+      "bytes": 1240
     },
     {
       "path": "ui/react-app/src/SmartDisplay.overlayLifecycle.test.jsx",
@@ -11890,8 +11895,8 @@
     },
     {
       "path": "ui/react-app/src/components/voice/BottomRow.jsx",
-      "sha256": "7700ab49c28a004275a2c48ae97282c2d1ff2830d80d7821c60a893608df5367",
-      "bytes": 10422
+      "sha256": "6b3887d1784c495894e0259bb3701c52d04415ec3253e67755c6376925ba6f23",
+      "bytes": 10509
     },
     {
       "path": "ui/react-app/src/components/voice/BottomRow.liveReply.test.jsx",
@@ -12140,13 +12145,13 @@
     },
     {
       "path": "ui/react-app/src/hooks/usePacedReply.js",
-      "sha256": "887187d380fd55dae6696c214c78711e5ae2daba5bff14b043c29422d4c21aaf",
-      "bytes": 4800
+      "sha256": "7bc3552adb2b22d222f03e57fc13ef9d1c35bb080f4099c09c0e6d67aa225b30",
+      "bytes": 5998
     },
     {
       "path": "ui/react-app/src/hooks/usePacedReply.test.jsx",
-      "sha256": "9493d19d1e4cc6b57908e0a1c249171ef9cc5016fbe1379061f842feb1e0e5c8",
-      "bytes": 4727
+      "sha256": "5fb8a7333040a3c9a492c6e915141219bd2e26f57b97d64e369e8b2c03bb0166",
+      "bytes": 6039
     },
     {
       "path": "ui/react-app/src/hooks/usePlayerState.errorFrame.test.js",
@@ -13730,8 +13735,8 @@
     },
     {
       "path": "voice/pronunciation_tables.py",
-      "sha256": "9a2ae21c6bf5d795ee87a35a5529f3d99586fabe782ee80e4812780e398eff23",
-      "bytes": 2309
+      "sha256": "0bf72a51baefe4de06b7b0762592d0aebd50f0993ca26a831360ed8ef357ccc6",
+      "bytes": 2279
     },
     {
       "path": "voice/speech_language.py",
@@ -13745,13 +13750,13 @@
     },
     {
       "path": "voice/stage_reply.py",
-      "sha256": "a92cf2d81c9a2d0aa534b7a11410a4ce5a32dd4f02f6139227165c59558f53b1",
-      "bytes": 5603
+      "sha256": "de39c7456f375512e59f165465c729dbe780c6af2146858011741574897c78e8",
+      "bytes": 7971
     },
     {
       "path": "voice/streamed_reply.py",
-      "sha256": "53038a254904d7ef5cdebe498b2b43b28f2a1bb8977013babdeba40df8824e4e",
-      "bytes": 9882
+      "sha256": "29efb40b5e7629bda68b7fba5af1eb19c4557a0f327c1617580b213b7e15487b",
+      "bytes": 11402
     },
     {
       "path": "voice/synthesis/__init__.py",
@@ -13775,8 +13780,8 @@
     },
     {
       "path": "voice/synthesis/kokoro_engine.py",
-      "sha256": "46b0581c4db5966fbf60a34983658c83f1d71761bddcea655c8b67bfd74c1455",
-      "bytes": 95638
+      "sha256": "d94c1ad29b75849915bbe3eed82f5c5aea825f9a895100fbfa0e4302dec562a0",
+      "bytes": 96758
     },
     {
       "path": "voice/synthesis/lazy_engine.py",
@@ -13795,8 +13800,8 @@
     },
     {
       "path": "voice/synthesis/text_normalizer.py",
-      "sha256": "78c921d7a616b796eef1e0638b4b848ae2fff9840f3fc9e394146cbccaffccd0",
-      "bytes": 50598
+      "sha256": "688f507060635ea987a14e6ce3a89cd67827841e5614a0f52bffedeaf1c3ffa8",
+      "bytes": 50874
     },
     {
       "path": "voice/synthesis/tts_wire.py",
@@ -13855,8 +13860,8 @@
     },
     {
       "path": "voice/wake_chime.py",
-      "sha256": "93341b2192f0c38c40e7c6a51c22ac9e1be158ffaa525f8b7881354e4b342f9a",
-      "bytes": 6931
+      "sha256": "0e8bdd87330f4e644e689e6649a0e2ddf281b0fcfdb1b412f245ccf19e4714ea",
+      "bytes": 7999
     },
     {
       "path": "voice/wake_detector/__init__.py",

@@ -30,10 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "af6a958a606fccf8a91b20879ec97804cb2cb03383499003adf39ee2df582d3b",
-  "source_tree_sha256": "6b0ac3031d79aedf90e76e8ded8131d62c3d267298492a1964ed33315c301fea",
-  "source_file_count": 2811,
-  "source_revision": "6ffe36e8cfa03075d8329ecc09a7bddd409f7251",
+  "source_manifest_sha256": "33c0e61e408a3cb2fae2b94d03305ea1c383dc2b3c09151b6781a93866b5b9d4",
+  "source_tree_sha256": "8c727a2616ce7419a980925113e8530e1c0de132ac155e254799acc3a5105c42",
+  "source_file_count": 2812,
+  "source_revision": "70f3647d5f81d7cb1bc7a45b2325df26270980c5",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "LICENSES/SPEECH_COMPONENT_NOTICES.md",
@@ -323,6 +323,7 @@
     "ui/react-app/scripts/audit-gate.mjs",
     "ui/react-app/src/SmartDisplay.agentBrowser.test.jsx",
     "ui/react-app/src/SmartDisplay.jsx",
+    "ui/react-app/src/SmartDisplay.longAnswer.test.jsx",
     "ui/react-app/src/SmartDisplay.overlayLifecycle.test.jsx",
     "ui/react-app/src/SmartDisplay.stageInputHistory.test.jsx",
     "ui/react-app/src/SmartDisplay.stageRouting.test.jsx",
@@ -337,6 +338,7 @@
     "ui/react-app/src/auth/authProviders.ts",
     "ui/react-app/src/auth/desktopOAuth.test.ts",
     "ui/react-app/src/auth/desktopOAuth.ts",
+    "ui/react-app/src/auth/legalVersions.js",
     "ui/react-app/src/components/AccountTab.cloudPlan.test.jsx",
     "ui/react-app/src/components/AccountTab.jsx",
     "ui/react-app/src/components/AccountTab.signInLayout.test.jsx",
@@ -526,12 +528,15 @@
     "voice/customer_voice_routing.py",
     "voice/pipeline.py",
     "voice/pipeline_wake_callback.py",
+    "voice/pronunciation_tables.py",
     "voice/speech_language.py",
     "voice/stage_reply.py",
     "voice/streamed_reply.py",
+    "voice/synthesis/engine.py",
     "voice/synthesis/kokoro_engine.py",
     "voice/synthesis/text_normalizer.py",
     "voice/transcription/whisper.py",
+    "voice/transcription/whisper_model_cache.py",
     "voice/wake_chime.py",
     "voice/wake_detector/active_word.py",
     "voice/wake_detector/aec_delay_tracker.py",
@@ -621,8 +626,8 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "6ffe36e8cfa03075d8329ecc09a7bddd409f7251",
-    "kind": "botcheck"
+    "source_commit": "70f3647d5f81d7cb1bc7a45b2325df26270980c5",
+    "kind": "speech r11"
   },
   "historical_bindings": [
     {
