@@ -76,6 +76,7 @@ from intent.log_redaction import (
     redact_card_field,
     redact_pii,
     redact_tool_arguments_for_log,
+    redact_tool_error_for_log,
     redact_tool_result_for_log,
 )
 from intent.post_answer_teardown import (
@@ -9861,14 +9862,17 @@ class AgentExecutor:
         try:
             from diagnostics.failure_envelope import emit_failure
 
+            # The envelope is logged, counted and kept in the error registry. An
+            # address tool's arguments are masked because of the tool, and its
+            # error is cleared of them: a failed save printed the street (build 10).
             emit_failure(
                 code="tool_execution_failed",
                 component="agent.tool.%s" % tool_name,
-                message=result.error or "Tool returned error",
+                message=redact_tool_error_for_log(tool_name, tool_args, result.error or "Tool returned error"),
                 severity="WARNING",
                 retryable=result.retryable,
                 tool_name=tool_name,
-                tool_args_summary=str(tool_args)[:200],
+                tool_args_summary=str(redact_tool_arguments_for_log(tool_name, tool_args))[:200],
                 error_category=result.error_category or "UNKNOWN",
             )
         except Exception:

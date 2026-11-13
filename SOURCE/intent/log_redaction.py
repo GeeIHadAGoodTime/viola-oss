@@ -707,6 +707,22 @@ def redact_tool_result_for_log(tool_name: Any, result_text: Any) -> Any:
     return result_text
 
 
+def redact_tool_error_for_log(tool_name: Any, tool_args: Any, error_text: Any) -> str:
+    """An address tool's error with every argument value taken out.
+
+    The error stays readable ("The address could not be saved."), but an
+    exception or a validation message can quote an argument back.
+    """
+    text = str(error_text or "")
+    if not is_address_argument_tool(tool_name) or not text:
+        return text
+    values = tool_args.values() if isinstance(tool_args, Mapping) else [tool_args]
+    for value in sorted({str(v).strip() for v in values if v not in (None, "")}, key=len, reverse=True):
+        if len(value) >= 3:  # a two-letter state code alone says nothing, and would mangle words
+            text = text.replace(value, _REDACTED_ADDRESS)
+    return text
+
+
 def redact_diagnostic_payload(blob: Any) -> Any:
     """Redact secrets, card data, and low-ambiguity PII for logs/traces."""
 
