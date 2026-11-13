@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "6c597f6150c801dd774c0a85d8d3a56deb12a8f2",
-  "sha256": "a723c39cf395d8ddad8200145612cb5b63534058842ddaf704bff38887254d04",
+  "revision": "3a2b3527ae76444d7a39271f7df97d63a20e1507",
+  "sha256": "7a8b2516a93712e940d9529b8c3fbae7b8befab8deda712e4605c6efc40edb5f",
   "files": [
     {
       "path": ".env.example",
@@ -3220,8 +3220,8 @@
     },
     {
       "path": "music/runtime/control_surface.py",
-      "sha256": "9f8fe0985e8acb385c3fec9f305463230ec191ebd85bcadf43d2b95cec2880c2",
-      "bytes": 45065
+      "sha256": "28235ec5ab660abe4d5a6051abaf6bb961b6114e8ad5b19cb6079424680f5048",
+      "bytes": 46640
     },
     {
       "path": "music/runtime/embedded_playback.py",
