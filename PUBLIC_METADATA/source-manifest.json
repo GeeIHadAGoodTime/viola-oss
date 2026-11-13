@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "17be9297df207c36d4230ec3506717113bb97643",
-  "sha256": "e5513e31f2acf1457fcf2c7ac8d05b7cf974c0969431ef3556deb321ba3f3658",
+  "revision": "cc76e1387ae38b404b46bc0955c1ce5578ab2c95",
+  "sha256": "18d7b2862367ede1a01f1ca18dd7c606097105867b2321a3668cfde8cd2a7997",
   "files": [
     {
       "path": ".env.example",
@@ -4760,8 +4760,8 @@
     },
     {
       "path": "services/llm/spend_accounting.py",
-      "sha256": "f03940b5c5d25d253df590d680e462d5a13779ef24f8976430597941b0ff7566",
-      "bytes": 19204
+      "sha256": "e7d8d8ea72e9ca2f65425470114f08a7eb5eefb1cef479a60de7f4180dd4df4d",
+      "bytes": 19480
     },
     {
       "path": "services/llm/stream_bus.py",
@@ -5765,8 +5765,8 @@
     },
     {
       "path": "telephony/call_manager.py",
-      "sha256": "d5d1c2a1a5f194c5aa7a52446800cedff9df628e4b068f2fe56a69e62b5c7b7a",
-      "bytes": 390612
+      "sha256": "3729e79478b054ed510272bedbffa806c2cff9b1d09b7d5bffc26bd320e4e940",
+      "bytes": 390793
     },
     {
       "path": "telephony/call_queue.py",
