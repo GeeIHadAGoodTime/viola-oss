@@ -84,18 +84,56 @@ def _first_failure(report: dict[str, Any]) -> str:
     audio = report.get("audio") or {}
     if not audio.get("session_found") or not audio.get("peak"):
         return "no_browser_audio"
+    player = report.get("player")
+    if isinstance(player, dict) and player.get("known"):
+        # Sound from Spotify is not enough: build 10 passed here on the laptop
+        # while Viola's own player said nothing was playing, so it never ducked
+        # and the stage stayed blank.
+        if not player.get("is_playing") or not player.get("has_track"):
+            return "player_not_tracking"
+        if not player.get("provider_is_spotify"):
+            return "player_shows_another_source"
     return "none"
+
+
+def player_view() -> dict[str, Any]:
+    """What Viola's own player says right now (what ducking and the stage read)."""
+    try:
+        from playback.engine_manager import _get_player_for_emit
+
+        player = _get_player_for_emit()
+        if player is None:
+            return {"known": False, "detail": "no player"}
+        state = player.state()
+        now = getattr(state, "now_playing", None)
+        phase = getattr(getattr(player, "_playback_sm", None), "phase", None)
+        return {
+            "known": True,
+            "is_playing": bool(getattr(state, "is_playing", False)),
+            "phase": getattr(phase, "name", None),
+            "has_track": now is not None,
+            "provider_is_spotify": str(getattr(now, "provider", "") or "").lower() in ("spotify", "spotify_cdp"),
+            "has_title": bool(getattr(now, "title", None)),
+            "has_artwork": bool(getattr(now, "artwork_url", None)),
+            "position_s": int(getattr(state, "position", 0) or 0),
+            "duration_s": int(getattr(state, "duration", 0) or 0),
+        }
+    except Exception as exc:  # a diagnostic must never raise
+        return {"known": False, "detail": type(exc).__name__}
 
 
 def log_diagnostic(controller: Any, *, reason: str) -> dict[str, Any]:
     """Run the check, write it to the log and return it."""
     report = controller.diagnose()
     report["audio"] = browser_audio_peak(report.get("browser_pid")) if report.get("expected_to_play") else {}
+    report["player"] = player_view() if report.get("expected_to_play") else {}
     report["reason"] = reason
     report["first_failure"] = _first_failure(report)
     for key in sorted(report):
         logger.info("SPOTIFY_DIAG %s=%s", key, report[key])
     if report.get("expected_to_play") and report["first_failure"] == "none":
+        # The player's side is in the SPOTIFY_DIAG player= line; this line only
+        # appears when the player follows the song too (player_not_tracking).
         logger.info(
             "SPOTIFY_PROOF provider=spotify track_id=%s position_moved_s=%s browser_audio_peak=%s",
             report.get("track_id"),
@@ -106,4 +144,4 @@ def log_diagnostic(controller: Any, *, reason: str) -> dict[str, Any]:
     return report
 
 
-__all__ = ["browser_audio_peak", "log_diagnostic"]
+__all__ = ["browser_audio_peak", "log_diagnostic", "player_view"]

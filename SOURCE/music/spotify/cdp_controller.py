@@ -231,10 +231,30 @@ _NOW_PLAYING_ADD_STATE_JS = (
         href = (v2Link && v2Link.getAttribute('href')) || '';
     }
     const button = widget.querySelector('button[data-testid="add-button"]') || widget.querySelector('button[aria-checked]');
+    let onTarget = !!trackId && href.indexOf(trackId) >= 0;
+    let via = onTarget ? 'link' : 'none';
+    if (!onTarget && !href && trackId) {
+        // The footer has no track link (2026 layout with the Now Playing view
+        // closed). A direct play stays on the song's own page: when this page
+        // is /track/<trackId> and its heading is the footer's title, the
+        // footer is showing that track.
+        const shown = Array.from(widget.querySelectorAll('a[href]'))
+            .find(a => !/\/artist\//.test(a.getAttribute('href') || ''));
+        const shownTitle = shown ? (shown.textContent || '').trim() : '';
+        const heading = document.querySelector('main h1');
+        const onPage = (window.location.pathname || '').indexOf('/track/' + trackId) === 0;
+        if (onPage && shownTitle && heading && (heading.textContent || '').trim() === shownTitle) {
+            onTarget = true;
+            via = 'track_page';
+        }
+    }
     return {
         present: !!button,
-        on_target: !!trackId && href.indexOf(trackId) >= 0,
+        on_target: onTarget,
         checked: button ? button.getAttribute('aria-checked') === 'true' : null,
+        widget: widget.getAttribute('data-testid'),
+        link_found: !!href,
+        via: via,
     };
 })
 """
@@ -916,6 +936,76 @@ _NOW_PLAYING_JS = (
     } else {
         result.is_playing = false;
     }
+
+    // Where each value came from, for the SPOTIFY_STATE log line. The widget
+    // above is one page layout; the two sources below do not depend on it.
+    const widgetV1 = document.querySelector('[data-testid="now-playing-widget"]');
+    result.widget = widgetV1 ? 'v1' : (widgetV2 ? 'v2' : 'none');
+    result.button_playing = result.is_playing;
+    result.track_source = result.track ? 'widget' : 'none';
+    result.artist_source = result.artist ? 'widget' : 'none';
+    result.artwork_source = result.artwork_url ? 'widget' : 'none';
+    result.position_source = /\d+:\d+/.test(result.position || '') ? 'widget' : 'none';
+    result.duration_source = /\d+:\d+/.test(result.duration || '') ? 'widget' : 'none';
+    result.visibility = document.visibilityState;
+
+    // The media element: it is what makes the sound, so a running one is
+    // playback whatever the footer shows. Spotify does not always keep it in
+    // the document, so its absence proves nothing.
+    const fmt = (s) => {
+        s = Math.max(0, Math.floor(s));
+        const m = Math.floor(s / 60), r = String(s % 60).padStart(2, '0');
+        return m >= 60 ? Math.floor(m / 60) + ':' + String(m % 60).padStart(2, '0') + ':' + r : m + ':' + r;
+    };
+    // Muted elements are looping visuals, not the song.
+    const elements = Array.from(document.querySelectorAll('audio, video')).filter(el => !el.muted);
+    const running = elements.find(el => !el.paused && !el.ended && Number(el.currentTime) > 0);
+    result.media_elements = elements.length;
+    result.media_playing = !!running;
+    const media = running || elements.find(el => Number(el.currentTime) > 0) || null;
+    result.media_time = media ? Number(media.currentTime) || 0 : null;
+    if (media && result.position_source === 'none') {
+        result.position = fmt(media.currentTime);
+        result.position_source = 'media';
+    }
+    if (media && result.duration_source === 'none' && Number.isFinite(media.duration) && media.duration > 0) {
+        result.duration = fmt(media.duration);
+        result.duration_source = 'media';
+    }
+
+    // The Media Session: what the page itself tells the operating system is
+    // playing (title, artist, cover). Used only for what the widget did not give.
+    let session = null;
+    try { session = navigator.mediaSession || null; } catch (e) { session = null; }
+    const meta = session && session.metadata ? session.metadata : null;
+    result.media_session = !!meta;
+    result.media_session_state = session ? (session.playbackState || 'none') : 'none';
+    if (meta) {
+        if (!result.track && meta.title) { result.track = String(meta.title).trim() || null; if (result.track) result.track_source = 'media_session'; }
+        if (!result.artist && meta.artist) { result.artist = String(meta.artist).trim() || null; if (result.artist) result.artist_source = 'media_session'; }
+        if (!result.artwork_url && meta.artwork && meta.artwork.length) {
+            let best = null, bestSize = -1;
+            for (const art of meta.artwork) {
+                const size = parseInt(String(art.sizes || '').split('x')[0], 10) || 0;
+                if (art.src && size > bestSize) { best = art.src; bestSize = size; }
+            }
+            if (best && /^https:\/\//.test(best)) { result.artwork_url = best; result.artwork_source = 'media_session'; }
+        }
+    }
+    // is_playing stays the play button's answer: pause and resume act on it.
+    // media_playing and media_session_state are reported beside it.
+
+    // No track link in the footer: when this is the song's own page, the page
+    // names the track (a direct play stays on /track/<id>).
+    if (!result.track_id && result.track) {
+        const page = (window.location.pathname || '').match(/^\/track\/([A-Za-z0-9]{22})/);
+        const heading = document.querySelector('main h1');
+        if (page && heading && (heading.textContent || '').trim() === result.track) {
+            result.track_id = page[1];
+            result.track_id_source = 'track_page';
+        }
+    }
+    if (result.track_id && !result.track_id_source) result.track_id_source = 'link';
 
     return JSON.stringify(result);
 })();
@@ -2638,6 +2728,7 @@ class SpotifyCDPController:
 
     def _set_saved_via_web_api(self, track_id: str, saved: bool) -> dict[str, Any] | None:
         token = self._web_player_bearer()
+        self._last_like_api = "no_player_token"
         for attempt in range(2):
             if not token:
                 return None
@@ -2646,7 +2737,9 @@ class SpotifyCDPController:
                 state = self._track_saved_state(track_id, token)
                 if state is not None and state != saved:
                     logger.warning("Spotify library call returned %s but the saved state did not change", status)
+                    self._last_like_api = "http_%s_state_unchanged" % status
                     return None
+                self._last_like_api = "ok"
                 return {"track_id": track_id, "saved": saved, "verified": state is not None, "method": "web_api"}
             if status == 401 and attempt == 0:
                 self._web_bearer = None
@@ -2656,11 +2749,31 @@ class SpotifyCDPController:
                 self._page.wait_for_timeout(2000)
                 continue
             logger.warning("Spotify library %s returned HTTP %s", "save" if saved else "remove", status)
+            self._last_like_api = "http_%s" % status
             return None
         return None
 
+    def _log_like_fallback(self, action: str, state: Any) -> None:
+        """Why the library call was not used, and what the footer button offers instead.
+
+        Build 10 on the laptop: "like" failed three times with nothing in the
+        log saying whether Spotify refused the call or the footer had no link.
+        """
+        seen = state if isinstance(state, dict) else {}
+        logger.info(
+            "SPOTIFY_LIKE action=%s library_call=%s button_present=%s on_target=%s via=%s widget=%s link_found=%s",
+            action,
+            getattr(self, "_last_like_api", "not_tried"),
+            seen.get("present"),
+            seen.get("on_target"),
+            seen.get("via"),
+            seen.get("widget"),
+            seen.get("link_found"),
+        )
+
     def _save_via_add_button(self, track_id: str) -> dict[str, Any]:
         state = self._page.evaluate(_NOW_PLAYING_ADD_STATE_JS, track_id)
+        self._log_like_fallback("add", state)
         if not isinstance(state, dict) or not state.get("present") or not state.get("on_target"):
             raise SpotifyCDPError("Couldn't confirm the song on Spotify's player to like it. Try again in a moment.")
         if state.get("checked"):
@@ -2680,6 +2793,7 @@ class SpotifyCDPController:
             "Couldn't reach Spotify to remove the song from your Liked Songs. Try again in a moment."
         )
         state = self._page.evaluate(_NOW_PLAYING_ADD_STATE_JS, track_id)
+        self._log_like_fallback("remove", state)
         if not isinstance(state, dict) or not state.get("present") or not state.get("on_target"):
             raise failure
         if state.get("checked") is False:
@@ -3554,6 +3668,22 @@ class SpotifyCDPController:
         report["expected_to_play"] = bool(payload.get("is_playing"))
         report["track_id"] = payload.get("track_id")
         report["track_title_known"] = bool(payload.get("track"))
+        # Which part of the page each value came from (see SPOTIFY_STATE).
+        for key in (
+            "widget",
+            "track_source",
+            "artist_source",
+            "artwork_source",
+            "position_source",
+            "duration_source",
+            "track_id_source",
+            "button_playing",
+            "media_playing",
+            "media_elements",
+            "media_session",
+            "media_session_state",
+        ):
+            report["page_" + key] = payload.get(key)
         report["position_moved_s"] = round(moved, 2)
         report["position_moving"] = moved >= 0.5
         report["media_element_present"] = isinstance(second_media, (int, float))
