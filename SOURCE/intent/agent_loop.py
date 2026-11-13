@@ -2007,7 +2007,8 @@ async def run_agent_loop(
 
         try:
             if reservation is not None:
-                await reservation.settle(failed=True)
+                # Refused before sending: nothing reached the provider.
+                await reservation.settle(failed=True, sent=False)
         except Exception as settle_exc:
             if _handle_agent_loop_billing_failure(settle_exc):
                 raise _AgentLoopBillingStop() from settle_exc
@@ -2156,16 +2157,18 @@ async def run_agent_loop(
         except LLMQuotaExceededError as exc:
             last_gate = getattr(reservation, "_last_gate", None)
             if last_gate is None or last_gate.allowed:
-                await _settle_agent_turn_spend_failed(reservation)
+                await _settle_agent_turn_spend_failed(reservation, sent=False)
                 raise
             await _handle_spend_reservation_denial(reservation, exc)
         return reservation, estimated_usage
 
-    async def _settle_agent_turn_spend_failed(reservation: Any | None) -> None:
+    async def _settle_agent_turn_spend_failed(reservation: Any | None, *, sent: bool = True) -> None:
+        # sent=True (a provider call raised) still charges what the provider
+        # could have billed; sent=False only when nothing was sent.
         if reservation is None:
             return
         try:
-            await reservation.settle(failed=True)
+            await reservation.settle(failed=True, sent=sent)
         except Exception as settle_exc:
             if _handle_agent_loop_billing_failure(settle_exc):
                 raise _AgentLoopBillingStop() from settle_exc
@@ -2179,7 +2182,7 @@ async def run_agent_loop(
     ) -> None:
         nonlocal outcome
         if isinstance(response, dict) and response.get("_policy_denial"):
-            await _settle_agent_turn_spend_failed(reservation)
+            await _settle_agent_turn_spend_failed(reservation, sent=False)
             _set_final_response(
                 executor,
                 str(response.get("answer") or "This request is temporarily unavailable."),

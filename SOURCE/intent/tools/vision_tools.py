@@ -1040,14 +1040,18 @@ async def _call_vision_llm(prompt: str, image_bytes: bytes) -> str:
         # settle(failed=True) is then a no-op; on any error path (partial
         # reserve, client construction, the network call) the finally releases
         # the hold.
+        sent = False
         try:
             await reservation.reserve()
             client = openai.AsyncOpenAI(api_key=api_key, base_url=OPENAI_DEFAULT_BASE_URL)
+            sent = True
             response = await client.responses.create(**_api_kwargs)
             await reservation.settle(usage_from_openai_response(response, estimated_usage))
             return extract_message_text_from_response(response) or _VISION_EMPTY_ANSWER
         finally:
-            await reservation.settle(failed=True)
+            # Once the request is sent, a timeout or cancel is still billed by
+            # the provider, so it is still charged (no subsidy).
+            await reservation.settle(failed=True, sent=sent)
 
     except VisionAnalysisUnavailable:
         raise

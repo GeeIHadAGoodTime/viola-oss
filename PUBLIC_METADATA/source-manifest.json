@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "6ffe36e8cfa03075d8329ecc09a7bddd409f7251",
-  "sha256": "6b0ac3031d79aedf90e76e8ded8131d62c3d267298492a1964ed33315c301fea",
+  "revision": "c7c7b024186517753e41e80f1a0f4616b5140f4e",
+  "sha256": "9150bccca894e456dc2014deee0aa105e0949672ecb1bcd7bbbc7ef983249ba8",
   "files": [
     {
       "path": ".env.example",
@@ -830,8 +830,8 @@
     },
     {
       "path": "chat/service.py",
-      "sha256": "c35922398d092d7ce328650909cd3c6010ec1eaed70c0331587aed0e4f9183e2",
-      "bytes": 21883
+      "sha256": "e6886c7ad2938cc866f35a8e54ebff21145b718849e6e822b35507ecbc95dfa3",
+      "bytes": 21981
     },
     {
       "path": "config/__init__.py",
@@ -1595,13 +1595,13 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "3785784b3a8f8cc92398bd4a52dc5674316bed21d52b0fa4054badcc2c6882d6",
-      "bytes": 640058
+      "sha256": "087f1f3ab1ec50d1443eda1584202a108cabc49cd01f2e2b17bdd5fc89fcc880",
+      "bytes": 640765
     },
     {
       "path": "intent/agent_loop.py",
-      "sha256": "ebd36ad5d7a06c02b0cfab3d8eb78ac1353d1f0e009796e6660bb0ab0624aec6",
-      "bytes": 272837
+      "sha256": "08f122660ff68fa0d9f9cc7ea930a4f8f14dfa072b414cb6b8f4e6ce4178b0ef",
+      "bytes": 273123
     },
     {
       "path": "intent/agent_message_manager.py",
@@ -2215,8 +2215,8 @@
     },
     {
       "path": "intent/tools/vision_tools.py",
-      "sha256": "178b1a7277d4e1d3e7ce99d5d5c1d7f79d1a901a10df99245f363aee1105af42",
-      "bytes": 44065
+      "sha256": "f630bac76b526785b4de0bf5330dfb77c3d563df6838c1cf215be318fea660fb",
+      "bytes": 44265
     },
     {
       "path": "intent/tools/weather_tool.py",
@@ -4590,8 +4590,8 @@
     },
     {
       "path": "services/llm/factory.py",
-      "sha256": "4d4345cae38d524bed96513e52839badba493504d86e9e3fadeda3547e397aff",
-      "bytes": 60335
+      "sha256": "c04f0abf6ca5815ffe7cb069a3c1b1230073f94b2f5ba6ee81f9ec5f271b4022",
+      "bytes": 60988
     },
     {
       "path": "services/llm/hook_llm.py",
@@ -4645,8 +4645,8 @@
     },
     {
       "path": "services/llm/pricing.py",
-      "sha256": "07e1fc1f13ba1406bd09fcad5a419a822826919e5fd78b416b02fa082ffab311",
-      "bytes": 9686
+      "sha256": "d42fcbc7123fa94d3fa55d1656d12b391e8b25e2d0d8e8eabfcfb0e3f201b661",
+      "bytes": 11261
     },
     {
       "path": "services/llm/prompts/__init__.py",
@@ -4730,8 +4730,8 @@
     },
     {
       "path": "services/llm/providers/openai_compatible.py",
-      "sha256": "9de1224ded76fe0fbd22c8403745b7b864fd4551e31edc357d1d948dc369d4f0",
-      "bytes": 191532
+      "sha256": "b5ca513aeeba673d1c84a0b83a55953e360697550ef8476b85fd99da78541cf2",
+      "bytes": 195647
     },
     {
       "path": "services/llm/quota_repository.py",
@@ -4760,8 +4760,8 @@
     },
     {
       "path": "services/llm/spend_accounting.py",
-      "sha256": "82a4e3f2f3e218dfa36523bfa19acbe5f73506fcb5428e3b0c06528efddddfa1",
-      "bytes": 15817
+      "sha256": "e7d8d8ea72e9ca2f65425470114f08a7eb5eefb1cef479a60de7f4180dd4df4d",
+      "bytes": 19480
     },
     {
       "path": "services/llm/stream_bus.py",
@@ -5765,8 +5765,8 @@
     },
     {
       "path": "telephony/call_manager.py",
-      "sha256": "791057fa0fdd180a66c23a5e524b044294b4f4e2130243c506e8e323006636a5",
-      "bytes": 389172
+      "sha256": "4cfd673f8dbbf58ba87fc54d4dab0e39a406b26ad826b75b23b422b9a8d50ea5",
+      "bytes": 391385
     },
     {
       "path": "telephony/call_queue.py",
@@ -5805,8 +5805,8 @@
     },
     {
       "path": "telephony/cost_tracker.py",
-      "sha256": "0a86207a6bcb323a5611a0a8e107535214ba1fb0a6af695ba46d98df306e0512",
-      "bytes": 16391
+      "sha256": "5116d37c29afae3777cc3c94d60ceebd54d30b7c5f148539f0432545c1a936a8",
+      "bytes": 20880
     },
     {
       "path": "telephony/disclosure_playback_marker.py",
@@ -5990,8 +5990,8 @@
     },
     {
       "path": "telephony/remote_voice.py",
-      "sha256": "db48010e49d5ef1dcd8cff352b06e801582a57d3e2bb8f4c0b644649a6efdeac",
-      "bytes": 41622
+      "sha256": "492421884830fce5b471cccffd487b5661e789e6ebad6a4e0072ff392ddaa6c2",
+      "bytes": 42319
     },
     {
       "path": "telephony/routes.py",

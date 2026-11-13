@@ -261,7 +261,8 @@ async def _call_llm(
             )
             if resp.status_code != 200:
                 logger.warning("LLM API returned %d", resp.status_code)
-                await reservation.settle(failed=True)
+                # The provider rejected the request with an error status: not billed.
+                await reservation.settle(failed=True, sent=False)
                 return None
             data = resp.json()
             await reservation.settle(usage_from_chat_completion_payload(data, estimated_usage))

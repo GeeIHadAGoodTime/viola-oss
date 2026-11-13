@@ -132,7 +132,29 @@ def phone_voice_remote_enabled() -> bool:
             # The marked artifact qualifies local speech. This common gate
             # also covers pre-call warmup and keep-alive TTS inference.
             return False
-    return _env("VIOLA_PHONE_VOICE_REMOTE_ENABLED").lower() in _TRUE_VALUES
+    if _env("VIOLA_PHONE_VOICE_REMOTE_ENABLED").lower() not in _TRUE_VALUES:
+        return False
+    # No service we do not know the cost of (Jay, 2026-11-12): an unpriced
+    # GPU path is refused, and every call falls back to local speech.
+    from telephony.cost_tracker import phone_gpu_usd_per_second
+
+    if phone_gpu_usd_per_second() <= 0:
+        _log_unpriced_gpu_once()
+        return False
+    return True
+
+
+_UNPRICED_GPU_LOGGED = False
+
+
+def _log_unpriced_gpu_once() -> None:
+    global _UNPRICED_GPU_LOGGED
+    if not _UNPRICED_GPU_LOGGED:
+        _UNPRICED_GPU_LOGGED = True
+        logger.error(
+            "Phone GPU voice is enabled but unpriced (VIOLA_PHONE_GPU_USD_PER_SECOND); "
+            "the GPU path is refused and calls use local speech"
+        )
 
 
 def phone_voice_remote_url() -> str:
@@ -270,7 +292,7 @@ class _EndpointHealth:
                 budget = _HARD_FAILURE_BUDGET
                 if count < budget:
                     logger.debug(
-                        "Remote phone voice: hard failure %d/%d (%s) -- still AVAILABLE, " "one more trips the breaker",
+                        "Remote phone voice: hard failure %d/%d (%s) -- still AVAILABLE, one more trips the breaker",
                         count,
                         budget,
                         reason,
