@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "4a5c109d5321c05ff18db5b1b8c0d74cd9c7036a",
-  "sha256": "8a7a3dead789d5f7fb4143a77212aab5ec75fdf01a1478d6e96f115cd26b019c",
+  "revision": "08294ec32d0ab989ddcff1c93799223289111cbf",
+  "sha256": "799190ba50bb836d16377e8280343a01b87ca37068e13cd4f1df1eae01dbce03",
   "files": [
     {
       "path": ".env.example",
@@ -1635,8 +1635,8 @@
     },
     {
       "path": "intent/approval.py",
-      "sha256": "1ec9cb1ff971b96347a675ee23be17bd02dc26c80c94878fb36aa57fd377d480",
-      "bytes": 65557
+      "sha256": "c79601a43973b2241c24b0d84ecad0648595b9160f6fbf81bff128fd69a4213e",
+      "bytes": 66808
     },
     {
       "path": "intent/capability_resolver.py",
@@ -5195,8 +5195,8 @@
     },
     {
       "path": "services/scheduler/service.py",
-      "sha256": "d57950ea11cd41022213c2c221836fcbabcacf99b16741d5fb1295ab5b366fe1",
-      "bytes": 52343
+      "sha256": "3e5a5446ee779c55f87191a59d577b0957c321cbe86288c060fe2cad99da7bba",
+      "bytes": 52486
     },
     {
       "path": "services/scheduler/store.py",
