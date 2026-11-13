@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "6ffe36e8cfa03075d8329ecc09a7bddd409f7251",
-  "sha256": "6b0ac3031d79aedf90e76e8ded8131d62c3d267298492a1964ed33315c301fea",
+  "revision": "fd7684258d1d12d9a765dace044caf3a646ccb4c",
+  "sha256": "e2b067e24dcce53880d30ac2c73a8a84af1df25a7eaf245eeef28e9cb6ff3366",
   "files": [
     {
       "path": ".env.example",
@@ -1595,8 +1595,8 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "3785784b3a8f8cc92398bd4a52dc5674316bed21d52b0fa4054badcc2c6882d6",
-      "bytes": 640058
+      "sha256": "e77baddf10bb2148c708e17f42aaf3c85ff7d79bec3b93598936ee6e2322034e",
+      "bytes": 641687
     },
     {
       "path": "intent/agent_loop.py",
@@ -1610,8 +1610,8 @@
     },
     {
       "path": "intent/agent_middleware.py",
-      "sha256": "e08992e11e01506d0080c5fbcecfbac60452d19161d250768ec47b8455f3173a",
-      "bytes": 29274
+      "sha256": "93c4baa991317fb63dd21b6769fce57ecce1052d78f568e114f017318efd21ad",
+      "bytes": 29585
     },
     {
       "path": "intent/agent_subagent_types.py",
@@ -1690,8 +1690,8 @@
     },
     {
       "path": "intent/content_sanitizer.py",
-      "sha256": "2f8b9138f1a73c3a1152e5522d911376d25be5e845b104433e35cc257b06c1dc",
-      "bytes": 62439
+      "sha256": "f6d29d49223c6c4248bd84e9ef05ed71e61be3bc06452de55570d304255c5197",
+      "bytes": 63538
     },
     {
       "path": "intent/context_builder.py",
@@ -1785,8 +1785,8 @@
     },
     {
       "path": "intent/hooks/step_logger.py",
-      "sha256": "23721141e6299cac4150fe0b2c2d8361f0526eeaf23310b6cb23dee91db11396",
-      "bytes": 4510
+      "sha256": "f8b600538f98c7a544fb9ef4226335b853e168f37a1db149772dc2eee2be29d7",
+      "bytes": 4655
     },
     {
       "path": "intent/hooks/token_tracker.py",
@@ -1885,8 +1885,8 @@
     },
     {
       "path": "intent/log_redaction.py",
-      "sha256": "ecdac36e0df4b21f02261fcc6aecfae0c0ae57e65554e05efb00e16324d327f2",
-      "bytes": 24910
+      "sha256": "f74be8695e46ff41f48c179c4b7bbff49e4f05de3b037ed41a5ce77356cbad0a",
+      "bytes": 26943
     },
     {
       "path": "intent/permissions/policy.py",
@@ -2120,8 +2120,8 @@
     },
     {
       "path": "intent/tools/memory.py",
-      "sha256": "f762cf18d486f8d6e1ecc92c3421581796f51a558de6bce4f8fc469646851e14",
-      "bytes": 12010
+      "sha256": "8dc69875a5f01a4186b6a9b7495422cfef96353c9b94e743bc8719aba2c4011d",
+      "bytes": 12739
     },
     {
       "path": "intent/tools/music_connect.py",
@@ -2170,8 +2170,8 @@
     },
     {
       "path": "intent/tools/settings_tools.py",
-      "sha256": "13d9cf2a5d70f73689a82e4a2842cf9ac125f694ee0e04817f6e54238f446054",
-      "bytes": 27646
+      "sha256": "fc0b58264fa0e2dcf18739ea1a80ac507b826843932a2c553c63331cf4619a95",
+      "bytes": 28008
     },
     {
       "path": "intent/tools/shell.py",
@@ -4810,18 +4810,18 @@
     },
     {
       "path": "services/memory/dir.py",
-      "sha256": "b5c90e985d80cf7d2fa998a2e676fb14e73028ebb103b10a9be32761c12d0dae",
-      "bytes": 102986
+      "sha256": "f2f88c10338974bc983e18cd5e516f09096762360b7b7bdfc552d244f05bcdb7",
+      "bytes": 106984
     },
     {
       "path": "services/memory/extract_memories.py",
-      "sha256": "13c8fcc00504b8ad7fbd3cf16b728cabbf775a614bb771b26112bfa10b529ad8",
-      "bytes": 21133
+      "sha256": "931bac2e97855380f71326861aa9ab0befb4d272e665972290a69fc377024dc9",
+      "bytes": 21008
     },
     {
       "path": "services/memory/hygiene.py",
-      "sha256": "dbd12e4d396362d3e34f76a2ba21c7a0f39336f5649b09dc48ab6d499044736b",
-      "bytes": 8701
+      "sha256": "dafeb636d30d1c875ef1f958cb39d0cafa63ef8dca7393801f6c07a707d7aa3e",
+      "bytes": 12838
     },
     {
       "path": "services/memory/key_provider.py",
@@ -4835,8 +4835,8 @@
     },
     {
       "path": "services/memory/store.py",
-      "sha256": "91f69e0c769146070cb5e861ca28d7c839ac43d14da24af620f40ae5374f264f",
-      "bytes": 40157
+      "sha256": "d0a67738dd7f1e1df564b3d0ca58f87f59061a27ac7b678a46298c5a4437a17e",
+      "bytes": 40173
     },
     {
       "path": "services/meta_analysis/__init__.py",
