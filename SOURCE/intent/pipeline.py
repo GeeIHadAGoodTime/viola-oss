@@ -191,6 +191,18 @@ _HELP_SHORTCUTS = (
 )
 
 
+def _session_lane_kind() -> str:
+    """Whether the command taking the session lane is a scheduled routine or the user's."""
+    try:
+        from services.scheduler.service import current_scheduled_action_denied_tools
+
+        if current_scheduled_action_denied_tools():
+            return "scheduled routine"
+    except Exception:  # noqa: BLE001, RUF100 - a log label must never break a command
+        return "command"
+    return "user command"
+
+
 class IntentPipeline:
     """
     Unified intent processing pipeline.
@@ -321,6 +333,10 @@ class IntentPipeline:
         # C2: Session lane queuing — one lock per session key
         self._session_locks: dict[str, asyncio.Lock] = {}
         self._session_lock_guard = asyncio.Lock()  # protects the dict itself
+        # What holds each session lane right now: (kind, monotonic start).
+        # Only read for the log line of a command that had to queue (1.0.5
+        # build 10: "close the browser" waited 70 s behind something).
+        self._session_lane_holders: dict[str, tuple[str, float]] = {}
         # A command that arrives while the same user's previous command still
         # holds the lock: instant transport commands (pause, next, stop...)
         # run right away without the lock; anything else waits its turn in
@@ -1550,13 +1566,22 @@ class IntentPipeline:
                     session_lock=session_lock,
                 )
             logger.info(
-                "Session busy for key=%s; queuing command behind the running one",
+                "Session busy for key=%s; queuing command behind the running one (%s)",
                 session_key,
+                self._describe_session_lane_holder(session_key),
             )
+            queued_at = time.monotonic()
+            holder_when_queued = self._describe_session_lane_holder(session_key)
             try:
                 acquired = await asyncio.wait_for(
                     session_lock.acquire(),
                     timeout=self._session_queue_timeout,
+                )
+                logger.info(
+                    "Queued command for key=%s waited %.1fs for the session lane (%s)",
+                    session_key,
+                    time.monotonic() - queued_at,
+                    holder_when_queued,
                 )
             except TimeoutError:
                 logger.warning(
@@ -1572,6 +1597,8 @@ class IntentPipeline:
             logger.debug("Session lock acquisition failed for key=%s", session_key, exc_info=True)
             return _session_busy_result("command_lock_unavailable")
 
+        if acquired:
+            self._session_lane_holders[session_key] = (_session_lane_kind(), time.monotonic())
         try:
             # CHAN-R7: publish the caller's channel via a contextvar so
             # ``AIController._channel`` and ``TTSSpeaker._channel``
@@ -1591,7 +1618,16 @@ class IntentPipeline:
             return result
         finally:
             if acquired:
+                self._session_lane_holders.pop(session_key, None)
                 session_lock.release()
+
+    def _describe_session_lane_holder(self, session_key: str) -> str:
+        """Plain words for what holds ``session_key``'s lane, for log lines only."""
+        holder = self._session_lane_holders.get(session_key)
+        if holder is None:
+            return "held by: unknown"
+        kind, started = holder
+        return "held by: %s for %.1fs" % (kind, time.monotonic() - started)
 
     async def _run_instant_while_busy(
         self,
@@ -1652,7 +1688,11 @@ class IntentPipeline:
     ) -> PipelineResult:
         """Run a voice command after the busy session frees up; acknowledge it now."""
 
-        logger.info("Session busy for key=%s; queued voice command to run next", request_user_key)
+        logger.info(
+            "Session busy for key=%s; queued voice command to run next (%s)",
+            request_user_key,
+            self._describe_session_lane_holder(request_user_key),
+        )
         task = asyncio.create_task(
             self._run_queued_voice_command(
                 text=text,

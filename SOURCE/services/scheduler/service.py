@@ -21,7 +21,7 @@ import inspect
 import re
 import threading
 import time
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -58,6 +58,19 @@ _ERROR_BACKOFF_SECONDS = TIMEOUT_5_MINUTES  # 300s backoff after error/timeout
 # actions keep their policy: fire once when due, no catch-up burst.
 ONE_SHOT_STALE_AFTER_SECONDS = 24 * 60 * 60
 ONE_SHOT_STALE_ERROR = "Skipped: it was more than 24 hours late when Viola could run it."
+
+
+def _parse_due_time(value: Any) -> datetime | None:
+    """A schedule's ``next_run_at`` as an aware UTC datetime, or None."""
+    if not value:
+        return None
+    try:
+        due = datetime.fromisoformat(str(value))
+    except (TypeError, ValueError):
+        return None
+    if due.tzinfo is None:
+        due = due.replace(tzinfo=UTC)
+    return due
 MIN_SCHEDULE_INTERVAL_SECONDS = TIMEOUT_5_MINUTES
 _CRON_FREQUENCY_SAMPLE_COUNT = 64
 _DANGEROUS_FREQUENCY_PATTERNS = frozenset(
@@ -262,6 +275,12 @@ class SchedulerService:
         # the cloud-lifespan ordering where the loop is established after
         # service registration.
         self._stop_event: asyncio.Event | None = None
+        # Set when a schedule is added or changed, so the check loop re-plans
+        # its next wake-up instead of finishing a 30 s sleep (1.0.5 build 10:
+        # a reminder fired about 30 s late). ``_loop`` is the loop that owns
+        # it; ``add``/``update`` can be called from worker threads.
+        self._wake_event: asyncio.Event | None = None
+        self._loop: asyncio.AbstractEventLoop | None = None
         self._semaphore = asyncio.Semaphore(_MAX_CONCURRENT_SUBAGENTS)
         self._inflight_tasks: set[asyncio.Task[None]] = set()
         # F-015: per-schedule in-flight guard so a slow subagent does not
@@ -354,6 +373,7 @@ class SchedulerService:
         )
 
         self._record_timer_feature()
+        self._wake_check_loop()
         return schedule_id
 
     async def add_async(
@@ -375,6 +395,7 @@ class SchedulerService:
             one_shot_at=next_run if one_shot_at else None,
         )
         self._record_timer_feature()
+        self._wake_check_loop()
         return schedule_id
 
     def list_schedules(self, user_id: str, enabled_only: bool = True) -> list[Schedule]:
@@ -424,7 +445,7 @@ class SchedulerService:
                 raise ValueError("Invalid cron expression %r: %s" % (cron_expr, detail))
             next_run_at = compute_next_run(cron_expr, timezone_name=_configured_scheduler_timezone_name())
 
-        return self._store.update(
+        updated = self._store.update(
             user_id,
             schedule_id,
             label=label,
@@ -433,6 +454,8 @@ class SchedulerService:
             enabled=enabled,
             next_run_at=next_run_at,
         )
+        self._wake_check_loop()
+        return updated
 
     async def update_async(
         self,
@@ -452,7 +475,7 @@ class SchedulerService:
                 raise ValueError("Invalid cron expression %r: %s" % (cron_expr, detail))
             next_run_at = compute_next_run(cron_expr, timezone_name=_configured_scheduler_timezone_name())
 
-        return await self._store.update_async(
+        updated = await self._store.update_async(
             user_id,
             schedule_id,
             label=label,
@@ -461,6 +484,8 @@ class SchedulerService:
             enabled=enabled,
             next_run_at=next_run_at,
         )
+        self._wake_check_loop()
+        return updated
 
     def delete(self, user_id: str, schedule_id: int) -> bool:
         """Delete a schedule permanently."""
@@ -521,6 +546,8 @@ class SchedulerService:
         # service can be restarted across event-loop boundaries (e.g. in tests
         # that tear down and recreate the loop between cases).
         self._stop_event = asyncio.Event()
+        self._wake_event = asyncio.Event()
+        self._loop = asyncio.get_running_loop()
         self._check_task = asyncio.create_task(self._check_loop())
         logger.info("Scheduler started with %d enabled schedule(s)", count)
 
@@ -531,6 +558,8 @@ class SchedulerService:
         # against None stop_event (matches the lazy-init __init__ choice).
         if self._stop_event is not None:
             self._stop_event.set()
+        if self._wake_event is not None:
+            self._wake_event.set()
 
         if self._check_task is not None:
             self._check_task.cancel()
@@ -540,6 +569,8 @@ class SchedulerService:
                 pass
             self._check_task = None
         self._stop_event = None
+        self._wake_event = None
+        self._loop = None
 
         # Wait for in-flight sub-agents with grace period
         if self._inflight_tasks:
@@ -576,23 +607,77 @@ class SchedulerService:
             except Exception as exc:
                 logger.exception("Scheduler check loop error: %s", exc)
 
-            await self._wait_for_next_tick()
+            await self._wait_for_next_tick(await self._seconds_until_next_due())
 
-    async def _wait_for_next_tick(self) -> None:
-        """Stop-aware sleep between check loops.
-
-        Returns either when ``_stop_event`` is set (allowing immediate shutdown)
-        or after _CHECK_INTERVAL elapses. Defensive None-check supports the
-        lazy-init pattern in __init__.
-        """
-        stop_event = self._stop_event
-        if stop_event is None:
-            await asyncio.sleep(_CHECK_INTERVAL)
+    def _wake_check_loop(self) -> None:
+        """Make the check loop re-plan now (a schedule was added or changed)."""
+        loop = self._loop
+        event = self._wake_event
+        if loop is None or event is None or loop.is_closed():
             return
         try:
-            await asyncio.wait_for(stop_event.wait(), timeout=_CHECK_INTERVAL)
+            running = asyncio.get_running_loop()
+        except RuntimeError:
+            running = None
+        try:
+            if running is loop:
+                event.set()
+            else:
+                loop.call_soon_threadsafe(event.set)
+        except RuntimeError:
+            logger.debug("Scheduler wake-up skipped: loop is closing")
+
+    async def _seconds_until_next_due(self) -> float:
+        """Seconds until the next schedule is due, at most ``_CHECK_INTERVAL``.
+
+        1.0.5 build 10: a reminder fired about 30 s late because the loop always
+        slept the full 30 s between checks. Rows that are already due but were
+        held back (in flight, error backoff, model down) keep the normal
+        cadence, so they never turn this into a busy loop.
+        """
+        now = datetime.now(UTC)
+        horizon = (now + timedelta(seconds=_CHECK_INTERVAL)).isoformat()
+        try:
+            upcoming = await self._store.get_due_schedules_for_all_users_async(horizon)
+        except Exception as exc:
+            logger.debug("Scheduler next-due lookup failed: %s", exc)
+            return float(_CHECK_INTERVAL)
+        soonest = float(_CHECK_INTERVAL)
+        for schedule in upcoming or []:
+            due = _parse_due_time(schedule.next_run_at)
+            if due is None:
+                continue
+            seconds = (due - now).total_seconds()
+            if seconds > 0:
+                soonest = min(soonest, seconds)
+        return soonest
+
+    async def _wait_for_next_tick(self, timeout: float = _CHECK_INTERVAL) -> None:
+        """Stop-aware sleep between check loops.
+
+        Returns when ``_stop_event`` is set (allowing immediate shutdown), when
+        a schedule was added or changed (``_wake_event``), or after ``timeout``
+        seconds. Defensive None-check supports the lazy-init pattern in
+        __init__.
+        """
+        timeout = max(0.0, min(float(_CHECK_INTERVAL), float(timeout)))
+        stop_event = self._stop_event
+        if stop_event is None:
+            await asyncio.sleep(timeout)
+            return
+        wake_event = self._wake_event
+        if wake_event is None:
+            try:
+                await asyncio.wait_for(stop_event.wait(), timeout=timeout)
+            except TimeoutError:
+                return
+            return
+        try:
+            await asyncio.wait_for(wake_event.wait(), timeout=timeout)
         except TimeoutError:
             return
+        finally:
+            wake_event.clear()
 
     async def _check_and_fire(self) -> None:
         """Check for due schedules and spawn sub-agents.
@@ -650,6 +735,13 @@ class SchedulerService:
                 )
                 continue
 
+            due_at = _parse_due_time(schedule.next_run_at)
+            if due_at is not None:
+                logger.info(
+                    "Schedule id=%d firing %.1fs after its due time",
+                    schedule.id,
+                    max(0.0, (now - due_at).total_seconds()),
+                )
             self._inflight_ids.add(schedule.id)
             task = asyncio.create_task(
                 self._guarded_execute(schedule),
