@@ -1115,7 +1115,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   }, [historyPrincipalKey]);
   const [lastResponse, setLastResponse] = useState(IDLE_RESPONSE_LINE);
   // The reply as it is written, paced with the voice (hooks/usePacedReply.js).
-  const { liveReply, onPartial: onReplyPartial, onFinal: onReplyFinal } = usePacedReply({
+  const { liveReply, replyPending, onPartial: onReplyPartial, onFinal: onReplyFinal } = usePacedReply({
     speechRate: Number(userSettings?.tts_rate) > 5 ? Number(userSettings.tts_rate) / 150 : 1,
   });
   // Managed-AI usage cap (C-077). Non-null for as long as the plan allowance is
@@ -2058,10 +2058,10 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   // before she has said a word of it (1.0.5 build 9). Unspoken replies have
   // nothing to wait for, so theirs comes at once.
   useEffect(() => {
-    if (!pendingLongAnswer || liveReply) return;
+    if (!pendingLongAnswer || liveReply || replyPending) return;
     setActiveCard(longAnswerCard(pendingLongAnswer, videoPlayingRef.current));
     setPendingLongAnswer(null);
-  }, [pendingLongAnswer, liveReply]);
+  }, [pendingLongAnswer, liveReply, replyPending]);
 
   useEffect(() => {
     if (!setReplyPartialCallback) return undefined;
@@ -4143,6 +4143,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
               // so it is not on screen twice. Once the card goes it shows whole.
               lastResponse={activeCard?.long_answer ? `"${truncateForResponseLine(activeCard.body)}"` : lastResponse}
               liveReply={liveReply}
+              replyPending={replyPending}
               voice={voice}
               processingTooLong={processingTooLong}
               capDenial={capDenial}

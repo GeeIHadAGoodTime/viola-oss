@@ -19,6 +19,11 @@ export const SPOKEN_BUDGET_CHARS = 200;
 export const PACE_TICK_MS = 50;
 // A turn that never reports its end must not hold the line forever.
 export const LIVE_REPLY_IDLE_MS = 60000;
+// A spoken reply's text waits until her voice starts (a reply_partial with
+// voice_started, sent when the first audio plays) so text and voice start
+// together; build 10 showed text 1 to 2.5 s ahead of the voice. Never longer
+// than this, so a reply whose voice never starts still shows.
+export const VOICE_WAIT_MS = 3000;
 
 // The end of the word that holds character `position`.
 export function wordEnd(text, position) {
@@ -28,7 +33,9 @@ export function wordEnd(text, position) {
 }
 
 function freshTurn() {
-  return { turn: null, target: '', spoken: false, done: false, budget: 0, lastActivity: 0 };
+  return {
+    turn: null, target: '', spoken: false, done: false, budget: 0, lastActivity: 0, voiceStarted: false, firstTextAt: 0,
+  };
 }
 
 // One line of text that was still being written when it appeared: reveal it at
@@ -52,6 +59,8 @@ export function usePacedLine(text, live) {
 
 export function usePacedReply({ speechRate = 1 } = {}) {
   const [liveReply, setLiveReply] = useState('');
+  // Text is here but held for the voice: the stage shows "working", not the reply.
+  const [replyPending, setReplyPending] = useState(false);
   const state = useRef(freshTurn());
   const timer = useRef(null);
   const rate = useRef(speechRate);
@@ -68,10 +77,20 @@ export function usePacedReply({ speechRate = 1 } = {}) {
     stop();
     state.current = freshTurn();
     setLiveReply('');
+    setReplyPending(false);
   }, [stop]);
 
   const tick = useCallback(() => {
     const current = state.current;
+    if (current.spoken && !current.voiceStarted && current.target) {
+      if (!current.firstTextAt) current.firstTextAt = Date.now();
+      if (Date.now() - current.firstTextAt < VOICE_WAIT_MS) {
+        setReplyPending(true);
+        return;
+      }
+      current.voiceStarted = true;
+    }
+    setReplyPending(false);
     const perSecond = current.spoken ? SPOKEN_CHARS_PER_SECOND * rate.current : SHOWN_CHARS_PER_SECOND;
     current.budget += (perSecond * PACE_TICK_MS) / 1000;
     const shownTo = current.budget >= SPOKEN_BUDGET_CHARS ? current.target.length : wordEnd(current.target, Math.floor(current.budget));
@@ -91,9 +110,17 @@ export function usePacedReply({ speechRate = 1 } = {}) {
   }, [tick]);
 
   // One `reply_partial` event: the answer so far for this turn.
-  const onPartial = useCallback(({ turn, text, spoken }) => {
+  const onPartial = useCallback(({ turn, text, spoken, voice_started: voiceStarted }) => {
     const current = state.current;
     if (!turn) return;
+    if (voiceStarted) {
+      // Her voice is audible: reveal from here, at her pace.
+      if (current.turn === turn) {
+        current.voiceStarted = true;
+        start();
+      }
+      return;
+    }
     if (current.turn !== turn) {
       stop();
       state.current = { ...freshTurn(), turn, spoken: Boolean(spoken) };
@@ -124,5 +151,5 @@ export function usePacedReply({ speechRate = 1 } = {}) {
 
   useEffect(() => stop, [stop]);
 
-  return { liveReply, onPartial, onFinal };
+  return { liveReply, replyPending, onPartial, onFinal };
 }

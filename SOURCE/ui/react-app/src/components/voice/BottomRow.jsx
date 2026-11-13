@@ -48,6 +48,7 @@ const BottomRow = ({
   isCommandLoading,
   lastResponse,
   liveReply,
+  replyPending,
   voice,
   processingTooLong,
   // Managed-AI usage cap (C-077): when the turn was denied for hitting the
@@ -120,7 +121,7 @@ const BottomRow = ({
               {liveReply ? (
                 /* Ahead of every "working" state: the answer has started. */
                 <span data-testid="live-reply">{renderStageMarkdown(`"${liveReply}"`)}</span>
-              ) : isCommandLoading ? (
+              ) : isCommandLoading || replyPending ? (
                 <span className={styles.loadingIndicator} style={{ color: `${THEME.colors.statusYellow}CC` }}>
                   <span
                     className={styles.loadingSpinner}
@@ -248,6 +249,7 @@ BottomRow.propTypes = {
   isCommandLoading: PropTypes.bool.isRequired,
   lastResponse: PropTypes.string.isRequired,
   liveReply: PropTypes.string,
+  replyPending: PropTypes.bool,
   voice: PropTypes.object.isRequired,
   processingTooLong: PropTypes.bool,
   capDenial: PropTypes.shape({
@@ -265,6 +267,7 @@ BottomRow.propTypes = {
 
 BottomRow.defaultProps = {
   liveReply: '',
+  replyPending: false,
   capDenial: null,
   onUpgradeFromCap: () => {},
 };

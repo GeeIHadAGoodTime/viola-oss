@@ -1946,6 +1946,12 @@ class KokoroTTSEngine:
                         if not ttfb_logged:
                             ttfb_ms = (time.perf_counter() - t_start) * 1000
                             ttfb_logged = True
+                            try:
+                                from voice.stage_reply import notify_first_audio
+
+                                notify_first_audio()
+                            except Exception as exc:  # noqa: BLE001, RUF100 - must never break speech
+                                logger.debug("First-audio notice failed: %s", exc)
                             if ttfb_ms > 500:
                                 logger.warning(
                                     "LLM-streaming TTS TTFB %.0f ms (> 500 ms)",

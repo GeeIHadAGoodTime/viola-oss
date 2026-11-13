@@ -34,7 +34,7 @@ from services.llm.stream_bus import (
     remove_stream,
     remove_stream_listener,
 )
-from voice.stage_reply import StageReplyRelay
+from voice.stage_reply import StageReplyRelay, first_audio_callback
 
 logger = get_logger(__name__)
 
@@ -212,7 +212,9 @@ class StreamedReply:
 
     async def speak(self) -> None:
         """Speak every queued and future sentence through the TTS engine."""
-        await self._tts.speak_streaming(self.sentences())
+        # The stage shows the text when the voice starts, not a second before it.
+        with first_audio_callback(self._stage.voice_started):
+            await self._tts.speak_streaming(self.sentences())
 
     # -- end of turn ------------------------------------------------------
     def finish(self, final_message: str | None, *, already_spoken: bool = False) -> str:
