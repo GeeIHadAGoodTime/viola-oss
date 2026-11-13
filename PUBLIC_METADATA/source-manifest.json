@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "6ffe36e8cfa03075d8329ecc09a7bddd409f7251",
-  "sha256": "6b0ac3031d79aedf90e76e8ded8131d62c3d267298492a1964ed33315c301fea",
+  "revision": "00d045e28d38a21311c5642f4b56d2f15e3ed879",
+  "sha256": "bc9319821969550ff6d981e5db3a2d62a877c5b87c826bb99117dd6e3ed660ae",
   "files": [
     {
       "path": ".env.example",
@@ -1250,8 +1250,8 @@
     },
     {
       "path": "core/voice_command_handler.py",
-      "sha256": "a737fec2a79792cd067a2179e8338e62980365144db7dfd0812d753df8fc1454",
-      "bytes": 111395
+      "sha256": "66846131f86f8249f2eed0d76ea1574f58c3c29a569907b079557a7012d8c072",
+      "bytes": 111863
     },
     {
       "path": "core/voice_orchestrator.py",
@@ -10545,13 +10545,13 @@
     },
     {
       "path": "ui/react-app/src/components/AgentCard.jsx",
-      "sha256": "df0227ed6eb8bdb1db51b57ff4b3618baef455b192a074e6076f734f9338da02",
-      "bytes": 6411
+      "sha256": "e7299b4b0254c39562d60f7411a7fc8c792a326d1062e833ff5538346d32f716",
+      "bytes": 6406
     },
     {
       "path": "ui/react-app/src/components/AgentCard.test.jsx",
-      "sha256": "f98ecc5cda7b3c3145924338864ccb90e6473455ce151ac8011020f4d8faf253",
-      "bytes": 3371
+      "sha256": "4c39e979e5fb1185938f83a5efa889bf79adb8edb6c08ec45b449521c0d4c3e5",
+      "bytes": 3696
     },
     {
       "path": "ui/react-app/src/components/AgentDrawer.jsx",
@@ -10570,13 +10570,13 @@
     },
     {
       "path": "ui/react-app/src/components/BillingCapacityPanel.jsx",
-      "sha256": "ea5139d99adf605c4144acd54d4103283d5fbc461f8adc057aaff82bba4c543e",
-      "bytes": 19704
+      "sha256": "66ffc61e5e7fa5e78f9a729374429f9cdf7919e65c9f3a0e235f4910b3c2dca8",
+      "bytes": 19946
     },
     {
       "path": "ui/react-app/src/components/BillingCapacityPanel.test.jsx",
-      "sha256": "db937c37a8cb7decf034d7ab5b51b4ca792719717e4052e47ba5743f56a0b787",
-      "bytes": 20063
+      "sha256": "62a32a3aa58ec06caa3a1c5765726f47c5abd83e04f11b49be45b22346c4e214",
+      "bytes": 20943
     },
     {
       "path": "ui/react-app/src/components/BugReportModal.jsx",
@@ -10605,13 +10605,13 @@
     },
     {
       "path": "ui/react-app/src/components/CallBriefing.jsx",
-      "sha256": "4b97a9f778f59778fde5b654734c4522de8ef009138934da7b3ecc9ca6431e5b",
-      "bytes": 9877
+      "sha256": "a36eb0ccfd93a5249416c297fe3a68141dec05c75cf5ffa92b863924f8449dc1",
+      "bytes": 11609
     },
     {
       "path": "ui/react-app/src/components/CallBriefing.test.jsx",
-      "sha256": "f406fe29ac142eab4a29cff6640e106be2272c2c018726de85807b54ba563641",
-      "bytes": 10290
+      "sha256": "864be821214a22ac867ed761ad3f8b823ed77a96794776922a822365a841304c",
+      "bytes": 11770
     },
     {
       "path": "ui/react-app/src/components/CallConsultation.jsx",
@@ -10805,13 +10805,13 @@
     },
     {
       "path": "ui/react-app/src/components/MemoryPanel.jsx",
-      "sha256": "aff4fe793a81b4f547025122ab3e2ae11e520250c87562a00a43bda66fa234a8",
-      "bytes": 50532
+      "sha256": "9199284225ca87a90efcfa22ededa1dc667da8f7b1413466f42c5e4d8bc495b1",
+      "bytes": 51540
     },
     {
       "path": "ui/react-app/src/components/MemoryPanel.test.jsx",
-      "sha256": "59c227b6f85affc1977c1f6e14a2ca0ffda14ccb1bd6b09cbf19e6a0318cf53e",
-      "bytes": 6669
+      "sha256": "988ac5a87fa5da24206ff9f0e6547603dd0cba9c6ed307f225d585a4d98b7882",
+      "bytes": 7026
     },
     {
       "path": "ui/react-app/src/components/MemoryPanel.workbench.test.jsx",
@@ -10830,13 +10830,13 @@
     },
     {
       "path": "ui/react-app/src/components/MonthGiftSummary.jsx",
-      "sha256": "0b9056e054051ef00b686dd75ccde079175d500441030bb5f4f40d9995a0aa7f",
-      "bytes": 3280
+      "sha256": "db67ba5151eb752595407387935f19dac7cd8569ce12bbdbc7fa1fa6936fa3ee",
+      "bytes": 3821
     },
     {
       "path": "ui/react-app/src/components/MonthGiftSummary.test.jsx",
-      "sha256": "cc710c7740fae72003d27299b5e774aafdce547c84c74bb8b8bc0c8853f6aea1",
-      "bytes": 3891
+      "sha256": "c34d9dc1cafe6a98471f1d707e9157268043d9e061ec349ccbff937ccf2306bf",
+      "bytes": 4900
     },
     {
       "path": "ui/react-app/src/components/MusicServicesTab.jsx",
@@ -10985,8 +10985,8 @@
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.jsx",
-      "sha256": "a5f81da32a224423b82381fe5e14f9a98cee47177e06461cfa99ac0a1c27013a",
-      "bytes": 224574
+      "sha256": "6706a3e9bc2b40f1d7a28db3bd9a58c0b52f386cadeedcb84db69a712287b753",
+      "bytes": 224828
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.localDiscovery.test.jsx",
@@ -11075,13 +11075,13 @@
     },
     {
       "path": "ui/react-app/src/components/ViolaDialog.jsx",
-      "sha256": "137313e367c71b61d7942a26d5197fa6f44e539c25dd496121bc15597b12251c",
-      "bytes": 8301
+      "sha256": "2b9829e6afda8ddd54f05bc36cfb9c7afae7681cc72c061145959f1b4ae42169",
+      "bytes": 9465
     },
     {
       "path": "ui/react-app/src/components/ViolaDialog.test.jsx",
-      "sha256": "bdb3f8bd67788f7f20fa6bd4087aab6e5c101a0a447802f016b5c41604126f8c",
-      "bytes": 3552
+      "sha256": "7249620010160c103b5f40e43c0f80d0a3e76d4a6480f1d2148519b3ed6339de",
+      "bytes": 4591
     },
     {
       "path": "ui/react-app/src/components/VoicePreviewButton.jsx",
@@ -12940,18 +12940,18 @@
     },
     {
       "path": "ui/settings_api.py",
-      "sha256": "655c554c21fe3312e10dfb5973c73ab3cb5c72919612f4a4ecb58e40cdb749b8",
-      "bytes": 89437
+      "sha256": "80a5fc1aac256464691d8a93042f7939bd10e6d6c770ad7d7a570e8819d53c59",
+      "bytes": 89842
     },
     {
       "path": "ui/settings_effects.py",
-      "sha256": "73dd6456bcbec67da2484eda6dffd73e80abc3f4e63850560fb3bbf169844ffa",
-      "bytes": 21861
+      "sha256": "5a241af13d0a1149dc94557013ab5c352fe465294901d5e68d4efa9dbfaf5288",
+      "bytes": 22255
     },
     {
       "path": "ui/settings_manager.py",
-      "sha256": "d3fef0537d8a5d0a8ae13c2a3a856cc45aba42fcf06fc3bd1adf8ca615dda1d2",
-      "bytes": 176805
+      "sha256": "115cf43be354dc09c26ffba4c46dcdec8af9c6eab2258fc7043879d380b99fe1",
+      "bytes": 177044
     },
     {
       "path": "ui/settings_schema.py",
