@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+import time
 from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass, field
@@ -1102,6 +1103,13 @@ def make_conference_user_handler(
             if leg_control_id:
                 call_record._conference_leg_call_control_id = leg_control_id
                 call_record._conference_leg_hangup_dispatched = False
+            # The owner leg is billed by the carrier like the primary call; the
+            # call's spend hold is charged for it at settle (no subsidy, build 11).
+            with suppress(AttributeError, TypeError):
+                from telephony.cost_tracker import _get_telnyx_rate
+
+                call_record._conference_leg_dialed_at = time.monotonic()
+                call_record._conference_leg_rate_per_minute = float(_get_telnyx_rate(founder_phone))
         except Exception as exc:
             logger.warning(
                 "conference_in_user Telnyx conference setup failed for call %s: %s",

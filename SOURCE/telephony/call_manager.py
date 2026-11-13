@@ -1743,17 +1743,45 @@ def _billed_duration_seconds(record: CallRecord) -> float:
     return max(0.0, float(record.duration_seconds or 0.0))
 
 
+def _conference_leg_cost_usd(record: Any, *, now: float | None = None) -> float:
+    """Carrier cost estimate for the owner-takeover leg, or 0.0 without one.
+
+    The leg is a second outbound Telnyx call. Its own CDR is not routed to this
+    call, so without this it was charged to nobody (no-subsidy audit row 4).
+    Measured from its dial to its hangup (or now), at the owner's number's rate
+    plus the regulatory surcharge, like the primary estimate.
+    """
+    carrier_cost = getattr(record, "_conference_leg_carrier_cost_usd", None)
+    if carrier_cost is not None:
+        return max(0.0, float(carrier_cost))
+    dialed_at = getattr(record, "_conference_leg_dialed_at", None)
+    if dialed_at is None:
+        return 0.0
+    from telephony.cost_tracker import _TELNYX_REGULATORY_SURCHARGE
+
+    ended_at = getattr(record, "_conference_leg_ended_at", None)
+    if ended_at is None:
+        ended_at = time.monotonic() if now is None else now
+    seconds = max(0.0, float(ended_at) - float(dialed_at))
+    rate = max(0.0, float(getattr(record, "_conference_leg_rate_per_minute", 0.0) or 0.0))
+    return seconds / 60.0 * rate * (1 + _TELNYX_REGULATORY_SURCHARGE)
+
+
 def _billed_cost_usd(record: CallRecord) -> float:
     """Return the billable cost USD for a CallRecord.
 
     A delivered carrier CDR is authoritative, including a legitimate zero.
     Until that record arrives, retain the nonnegative measured estimate;
     an unsuccessful outcome alone does not establish a carrier setup fee.
+    The primary call's CDR covers only the primary leg, so an owner-takeover
+    leg is added on top of either figure.
     """
     carrier_cost = record.carrier_total_cost_usd
     if carrier_cost is not None:
-        return max(0.0, float(carrier_cost))
-    return max(0.0, float(record.estimated_cost_usd or 0.0))
+        base = max(0.0, float(carrier_cost))
+    else:
+        base = max(0.0, float(record.estimated_cost_usd or 0.0))
+    return base + _conference_leg_cost_usd(record)
 
 
 def _recipient_state(record: Any) -> str:
@@ -3744,6 +3772,13 @@ class CallRecord:
     # control id here so every primary-call teardown path hangs it up in lockstep.
     _conference_leg_call_control_id: str | None = field(default=None, repr=False)
     _conference_leg_hangup_dispatched: bool = field(default=False, repr=False)
+    # Owner-leg billing (build 11, no subsidy): monotonic dial time, the carrier
+    # rate for the owner's number, and the monotonic time the leg was hung up.
+    _conference_leg_dialed_at: float | None = field(default=None, repr=False)
+    _conference_leg_rate_per_minute: float = field(default=0.0, repr=False)
+    _conference_leg_ended_at: float | None = field(default=None, repr=False)
+    # The owner leg's own carrier bill, once its call.cost arrives.
+    _conference_leg_carrier_cost_usd: float | None = field(default=None, repr=False)
     # Holds a telephony.cost_tracker.CostTracker so _estimate_cost can
     # read real token counts from Pipecat metrics (PHONE-14).
     _cost_tracker: Any = field(default=None, repr=False)
@@ -5854,10 +5889,18 @@ class CallManager:
         Standalone source installations do not retain a carrier CDR projection,
         so an unowned cost callback remains unhandled and retryable.
         """
+        leg_record = self._record_for_conference_leg(call_control_id)
+        if leg_record is not None:
+            # The owner-takeover leg's own bill: charge it to the call it joined.
+            if total_cost_usd is None:
+                return False
+            leg_record._conference_leg_carrier_cost_usd = max(0.0, float(total_cost_usd))
+            await self._charge_conference_leg_floor(leg_record)
+            return True
         record = await self._resolve_carrier_event_record(call_control_id)
         if record is None or self._carrier_event_adapter is None:
             return False
-        return await self._apply_durable_carrier_event(
+        applied = await self._apply_durable_carrier_event(
             record,
             CarrierEvent(
                 call_control_id=call_control_id,
@@ -5867,6 +5910,37 @@ class CallManager:
                 total_cost_usd=total_cost_usd,
             ),
         )
+        if applied:
+            # The primary CDR replaces the settled charge with the primary leg's
+            # bill alone; put the owner leg back on top.
+            await self._charge_conference_leg_floor(record)
+        return applied
+
+    def _record_for_conference_leg(self, call_control_id: str) -> CallRecord | None:
+        control_id = str(call_control_id or "")
+        if not control_id:
+            return None
+        for record in (*self._active_calls.values(), *self._call_records.values()):
+            if getattr(record, "_conference_leg_call_control_id", None) == control_id:
+                return record
+        return None
+
+    async def _charge_conference_leg_floor(self, record: CallRecord) -> None:
+        """Keep a settled call with an owner leg charged at least both legs. Never lowers.
+
+        No-subsidy audit row 4. Uses the billing gate's carrier-cost floor; a gate
+        without it (an older private build) is left as it is.
+        """
+        if _conference_leg_cost_usd(record) <= 0 or not _is_terminal_call_status(record.status):
+            return
+        billing = get_phone_billing()
+        charge_floor = getattr(billing, "charge_carrier_cost_floor", None)
+        if not callable(charge_floor) or not record.user_id:
+            return
+        try:
+            await charge_floor(record.user_id, record.call_id, _billed_cost_usd(record))
+        except Exception:  # noqa: BLE001, RUF100 - a failed top-up must not fail the carrier callback
+            logger.exception("Call %s: owner-leg charge top-up failed", record.call_id)
 
     async def handle_local_carrier_hangup(
         self,
@@ -7688,6 +7762,7 @@ class CallManager:
                 try:
                     if await _async_post_telnyx_hangup(self.config.api_key, conference_leg_id):
                         record._conference_leg_hangup_dispatched = True
+                        record._conference_leg_ended_at = time.monotonic()
                         logger.info(
                             "Call %s: conference owner-leg hangup dispatched on primary-call teardown",
                             record.call_id,
