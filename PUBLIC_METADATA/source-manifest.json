@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "0e50a70c57753b493d8a5e27d79a1adaa84fa5e1",
-  "sha256": "66b3cad5afccbff140236f062758970c3df9a99f7dd5153a908f7d6369e83c99",
+  "revision": "2e8d30debf1a48db4dbc265edbfd4b3df8c88836",
+  "sha256": "5d7d6dbea2d31b855b2624e35ef09ab093f0f1bfad1abd0e8052280c10e47467",
   "files": [
     {
       "path": ".env.example",
@@ -11095,8 +11095,8 @@
     },
     {
       "path": "ui/react-app/src/components/WakeWordSection.jsx",
-      "sha256": "6447ad1b1ad9a4d4d55e34fafbfb3a4ca6d39b753dd3ff9774f76c8067c8de98",
-      "bytes": 32208
+      "sha256": "5395fb1cb18fc75eef2fd7186f15478001c8010ee1f76933dc60b009466b0b88",
+      "bytes": 32727
     },
     {
       "path": "ui/react-app/src/components/WakeWordSection.status.test.jsx",
@@ -11105,8 +11105,8 @@
     },
     {
       "path": "ui/react-app/src/components/WakeWordSection.test.jsx",
-      "sha256": "8c1e80bc8dc024b7c76cf9a6e7ab37607bc8a0cc239eee149c76d37aaf5ac17e",
-      "bytes": 8093
+      "sha256": "a758dab5a44fcc2a955338de9ea2685a52d61a4adc8a0af0f6a2cc66024cee78",
+      "bytes": 8963
     },
     {
       "path": "ui/react-app/src/components/WeatherDetailIcons.jsx",
@@ -14020,8 +14020,8 @@
     },
     {
       "path": "voice/wake_detector/violawake_listener.py",
-      "sha256": "f1be309c652be4541cb4c8bb1044d7428cb7685ffb3c0743ecb20e6bed07c3db",
-      "bytes": 192963
+      "sha256": "269d1faaef6030e7c06a85fd613c62dbe7dac45831320d64fbb0cfbf6e1f71c5",
+      "bytes": 196371
     },
     {
       "path": "voice/wake_detector/wake/__init__.py",
