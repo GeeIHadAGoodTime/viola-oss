@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "f0c6fd18f746acb5e59293b900a2b3b94dd2c650",
-  "sha256": "363193b8ef8f822d8bf0ac4fd6b325c1698ff852c4be64a89a2445492411a420",
+  "revision": "9aac42c57599334126f41c369f0158eb117f4010",
+  "sha256": "e7b4a1897eeab6fcf20e29c716f503d38710ff336bcd4b7f850c7255a4b76d45",
   "files": [
     {
       "path": ".env.example",
@@ -6355,8 +6355,8 @@
     },
     {
       "path": "tests/public/test_phone_spoken_goodbye_recovery.py",
-      "sha256": "29f7b6dbc9ea03780af852ded7718716559f9ed57fe84eb7746d43e7bd503eef",
-      "bytes": 23564
+      "sha256": "b198dd9c02644ae8219d7f9e93e82d0c8b4e8c756c787d596542c2a8b9fb92e3",
+      "bytes": 23606
     },
     {
       "path": "tests/public/test_pipecat_runner_security.py",
