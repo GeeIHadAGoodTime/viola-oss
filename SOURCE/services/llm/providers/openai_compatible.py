@@ -24,6 +24,7 @@ import time
 from contextlib import suppress
 from pathlib import Path
 from types import ModuleType
+from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
@@ -284,6 +285,67 @@ def _responses_incomplete_reason(response: Any) -> str | None:
 
 
 _RESPONSES_TOOL_COUNT_WARN_THRESHOLD = 80
+# A streamed turn whose stream has not opened and sent its first event in this
+# long is stuck, not thinking: the provider sends ``response.created`` at once,
+# before any reasoning. 1.0.5 build 10 (cloud log 2026-11-08 14:52:44 and
+# 14:54:33): two turns sent nothing for the whole 60 s attempt timeout, then
+# the retry answered in 3-4 s, so the user waited 65 s for "close the browser".
+_STREAM_FIRST_EVENT_TIMEOUT_S = 15.0
+
+
+class _StreamWithFirstEvent:
+    """An opened provider stream whose first event was already read."""
+
+    def __init__(self, first: Any, rest: Any) -> None:
+        self._first: list[Any] = [first]
+        self._rest = rest
+
+    def __aiter__(self) -> _StreamWithFirstEvent:
+        return self
+
+    async def __anext__(self) -> Any:
+        if self._first:
+            return self._first.pop()
+        return await self._rest.__anext__()
+
+
+async def _open_stream_within_deadline(
+    open_stream: Callable[[], Awaitable[Any]],
+    timeout_s: float | None = None,
+) -> Any:
+    """Open a provider stream and read its first event, or raise TimeoutError.
+
+    The timeout covers only the stream's start; once the first event is in,
+    the turn runs as long as it needs (the request policy's own limits apply).
+    A TimeoutError here is retried by the request policy like any timeout.
+    """
+    deadline = _STREAM_FIRST_EVENT_TIMEOUT_S if timeout_s is None else timeout_s
+
+    async def _start() -> Any:
+        stream = await open_stream()
+        iterator = stream.__aiter__()
+        try:
+            first = await iterator.__anext__()
+        except StopAsyncIteration:
+            return _EmptyStream()
+        return _StreamWithFirstEvent(first, iterator)
+
+    try:
+        return await asyncio.wait_for(_start(), timeout=deadline)
+    except TimeoutError as exc:
+        logger.warning("Provider stream sent nothing in %.0fs; abandoning this attempt so it is retried", deadline)
+        raise TimeoutError("Provider stream sent no event in %.0fs" % deadline) from exc
+
+
+class _EmptyStream:
+    """A stream that ended before its first event."""
+
+    def __aiter__(self) -> _EmptyStream:
+        return self
+
+    async def __anext__(self) -> Any:
+        raise StopAsyncIteration
+
 _RESPONSES_TOOL_JSON_BYTES_WARN_THRESHOLD = 70_000
 _RESPONSES_INSTRUCTIONS_BYTES_WARN_THRESHOLD = 20_000
 _RESPONSES_TOOL_DESCRIPTION_MAX_CHARS = 300
@@ -3111,10 +3173,12 @@ class OpenAICompatibleProvider(BaseLLMProvider):
                         # services/llm/answer_stream.py): which text is the
                         # answer and which is a preamble to a tool call.
                         answer_attempt = AnswerAttempt.begin(command_stream_id)
-                        stream = await _responses_create_with_storage_consent(
-                            self._client,
-                            self.config,
-                            stream_kwargs,
+                        stream = await _open_stream_within_deadline(
+                            lambda: _responses_create_with_storage_consent(
+                                self._client,
+                                self.config,
+                                stream_kwargs,
+                            ),
                         )
                         async for event in stream:
                             capture_openai_responses_stream_event(stream_capture, event)
