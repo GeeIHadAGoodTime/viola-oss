@@ -1449,7 +1449,8 @@ class ViolaWakeListener:
             return processed
         self._aec_louder_chunks += 1
         now = time.monotonic()
-        if now - self._aec_louder_logged_at >= 60.0:
+        # Every 10 minutes, not every minute: during music this is routine (1.0.5 log-noise list).
+        if now - self._aec_louder_logged_at >= 600.0:
             self._aec_louder_logged_at = now
             logger.info(
                 "[AEC_HEALTH] echo canceller output above the microphone on %d chunks; using the microphone there",
