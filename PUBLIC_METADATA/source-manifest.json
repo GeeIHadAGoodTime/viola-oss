@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "6e967b53f1363a1fc7391dcb96eb7153c7aab5bc",
-  "sha256": "fec1062f029bbe9bd9501201a111817a5414c6a3d54c6f317df96c83168a810e",
+  "revision": "b01fd8be616e42383a5d6c1425a2d5f6d42dc493",
+  "sha256": "979e0b39e018cf456d75cb6b9d2471ca131282573b1c6bf354f1eaae293b3f0e",
   "files": [
     {
       "path": ".env.example",
@@ -1065,8 +1065,8 @@
     },
     {
       "path": "core/feature_switches.py",
-      "sha256": "d2974bc34d69a098d6c7ea9b099849f0310c731fad6d9934ddb8d19fd495cc5d",
-      "bytes": 13556
+      "sha256": "0972a33f48c65dc236be4be5b4b868b040ce4fc337a52a3222dc770126b5ce19",
+      "bytes": 14385
     },
     {
       "path": "core/http_ssl.py",

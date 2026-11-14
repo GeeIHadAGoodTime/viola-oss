@@ -30,10 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "5419e4748d3b37bd838119f1704f89b87015576e0ca88d5b8212d5061cfdba49",
-  "source_tree_sha256": "fec1062f029bbe9bd9501201a111817a5414c6a3d54c6f317df96c83168a810e",
+  "source_manifest_sha256": "98ebc278fc25a1529f36651bee94332ce6d0ee608f5697e4d5abd0701fcf2c76",
+  "source_tree_sha256": "979e0b39e018cf456d75cb6b9d2471ca131282573b1c6bf354f1eaae293b3f0e",
   "source_file_count": 2817,
-  "source_revision": "6e967b53f1363a1fc7391dcb96eb7153c7aab5bc",
+  "source_revision": "b01fd8be616e42383a5d6c1425a2d5f6d42dc493",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "LICENSES/SPEECH_COMPONENT_NOTICES.md",
@@ -660,7 +660,7 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "6e967b53f1363a1fc7391dcb96eb7153c7aab5bc",
+    "source_commit": "b01fd8be616e42383a5d6c1425a2d5f6d42dc493",
     "kind": "coming soon switches"
   },
   "historical_bindings": [
