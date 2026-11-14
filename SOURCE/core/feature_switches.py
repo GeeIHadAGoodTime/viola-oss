@@ -56,6 +56,8 @@ class SwitchableFeature:
 # The one registry. Tool names are the registered MCP tool names
 # (mcp_servers/core_tools, mcp_servers/browser, mcp_servers/computer_use).
 FEATURES: tuple[SwitchableFeature, ...] = (
+    # Phone calls only: sms_send / setup_sms_provider (texting) are a separate
+    # feature with their own Settings row and stay on.
     SwitchableFeature(
         key="phone",
         label="Phone calls",
@@ -68,12 +70,18 @@ FEATURES: tuple[SwitchableFeature, ...] = (
         settings_options=("account.payment_methods",),
         tools=("payment", "fill_payment_details", "resume_payment_gate", "transmit_payment_to_call"),
     ),
+    # gmail is the user's own Gmail (reply, send_draft, and also read/search);
+    # the Google Workspace compound tool registers under the same name.
+    # share_response is the outbound email tool, and it is also "send it to me"
+    # by text message or saved to a file, so those go with it while email is off.
     SwitchableFeature(
         key="email_sending",
         label="Sending email",
         settings_options=("ai_agents.capability.email",),
-        tools=("share_response",),
+        tools=("gmail", "share_response"),
     ),
+    # Mouse/keyboard control of the desktop. desktop_volume and view_screen
+    # (volume, looking at the screen) and file/shell tools are not this.
     SwitchableFeature(
         key="desktop_control",
         label="Desktop control",
@@ -128,6 +136,9 @@ FEATURES: tuple[SwitchableFeature, ...] = (
         settings_options=("connections.smart_home",),
         tools=("smart_home",),
     ),
+    # start_agent starts one; send_message resumes a stopped one in the
+    # background. check_agents / cancel_agent stay so running ones can be seen
+    # and stopped. spawn_subtask(s) run inside the turn and are not this.
     SwitchableFeature(
         key="background_agents",
         label="Background agents",
