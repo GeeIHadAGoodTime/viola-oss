@@ -30,10 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "917aafb2047f1c4a32a4220cdee35c3fd60076b4c7a7e89d2efe8e254dce8b91",
-  "source_tree_sha256": "9a5e30ec97ea8cd31a63595e5a35021a66626e5177f8b9173acb78654a030b16",
-  "source_file_count": 2813,
-  "source_revision": "42349dc5f7c175deda7e2ab115964cbe9887e910",
+  "source_manifest_sha256": "98ebc278fc25a1529f36651bee94332ce6d0ee608f5697e4d5abd0701fcf2c76",
+  "source_tree_sha256": "979e0b39e018cf456d75cb6b9d2471ca131282573b1c6bf354f1eaae293b3f0e",
+  "source_file_count": 2817,
+  "source_revision": "b01fd8be616e42383a5d6c1425a2d5f6d42dc493",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "LICENSES/SPEECH_COMPONENT_NOTICES.md",
@@ -50,6 +50,7 @@
     "auth/middleware.py",
     "backend/fastapi_app.py",
     "backend/ip_rate_limiter.py",
+    "backend/launch_kill_switches.py",
     "backend/music_adapter.py",
     "backend/weather_fetch.py",
     "bootstrap/factory.py",
@@ -63,6 +64,7 @@
     "contracts/fastapi.py",
     "core/constants.py",
     "core/crash_forensics.py",
+    "core/feature_switches.py",
     "core/hub_state_authority.py",
     "core/lan_exposure.py",
     "core/live_call_state.py",
@@ -399,6 +401,7 @@
     "ui/react-app/src/components/PhoneToSModal.test.jsx",
     "ui/react-app/src/components/QueueModal.jsx",
     "ui/react-app/src/components/RoomGroupsModal.jsx",
+    "ui/react-app/src/components/SettingsModal.comingSoon.test.jsx",
     "ui/react-app/src/components/SettingsModal.customerSpeech.test.jsx",
     "ui/react-app/src/components/SettingsModal.desktopAi.test.jsx",
     "ui/react-app/src/components/SettingsModal.desktopOnlyPanels.test.jsx",
@@ -435,6 +438,7 @@
     "ui/react-app/src/components/player/VolumeControl.test.jsx",
     "ui/react-app/src/components/settings/AddPlaylistForm.jsx",
     "ui/react-app/src/components/settings/AddPlaylistForm.test.jsx",
+    "ui/react-app/src/components/settings/ComingSoon.jsx",
     "ui/react-app/src/components/settings/Select.jsx",
     "ui/react-app/src/components/settings/Select.test.jsx",
     "ui/react-app/src/components/settings/Slider.jsx",
@@ -489,6 +493,8 @@
     "ui/react-app/src/hooks/usePlayerState.js",
     "ui/react-app/src/hooks/usePlayerState.unmount.test.js",
     "ui/react-app/src/hooks/usePressAndHold.js",
+    "ui/react-app/src/hooks/useSettings.comingSoon.test.jsx",
+    "ui/react-app/src/hooks/useSettings.js",
     "ui/react-app/src/hooks/useVideoFullscreen.js",
     "ui/react-app/src/hooks/useVideoFullscreen.test.jsx",
     "ui/react-app/src/hooks/useVoice.holdToTalk.test.js",
@@ -654,8 +660,8 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "42349dc5f7c175deda7e2ab115964cbe9887e910",
-    "kind": "billing5 vision usage"
+    "source_commit": "b01fd8be616e42383a5d6c1425a2d5f6d42dc493",
+    "kind": "coming soon switches"
   },
   "historical_bindings": [
     {

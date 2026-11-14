@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "42349dc5f7c175deda7e2ab115964cbe9887e910",
-  "sha256": "9a5e30ec97ea8cd31a63595e5a35021a66626e5177f8b9173acb78654a030b16",
+  "revision": "b01fd8be616e42383a5d6c1425a2d5f6d42dc493",
+  "sha256": "979e0b39e018cf456d75cb6b9d2471ca131282573b1c6bf354f1eaae293b3f0e",
   "files": [
     {
       "path": ".env.example",
@@ -715,8 +715,8 @@
     },
     {
       "path": "backend/launch_kill_switches.py",
-      "sha256": "567434fb0843a0252b2410c230fd5e5426a52f5028e560a8f10a867ba5d14e11",
-      "bytes": 17518
+      "sha256": "ed6189da5f6a9f856dc4722cda75ad82fd564e767676b8253f541764b1e44126",
+      "bytes": 20258
     },
     {
       "path": "backend/music_adapter.py",
@@ -1062,6 +1062,11 @@
       "path": "core/factories.py",
       "sha256": "4ae21501bf1e6858d83c3f4e1ca708a75a73dc80abb66d5710ae7a145f03add7",
       "bytes": 10904
+    },
+    {
+      "path": "core/feature_switches.py",
+      "sha256": "0972a33f48c65dc236be4be5b4b868b040ce4fc337a52a3222dc770126b5ce19",
+      "bytes": 14385
     },
     {
       "path": "core/http_ssl.py",
@@ -1695,8 +1700,8 @@
     },
     {
       "path": "intent/context_builder.py",
-      "sha256": "15fbb830ee0b14fe7fd34777244b8bc13e568029646dd95075095fc57ab501ad",
-      "bytes": 127480
+      "sha256": "a3ffb1751cc5511f339ef102286389239803ad5eb2deac4f3498c30c1a1e0688",
+      "bytes": 128102
     },
     {
       "path": "intent/context_compaction.py",
@@ -2270,8 +2275,8 @@
     },
     {
       "path": "mcp_hub/client_hub.py",
-      "sha256": "6f2a3d2d29758d8f26e5d354be6d084535fb7b54584220c0d495ea4c42e1ddec",
-      "bytes": 132962
+      "sha256": "f21c87a37bad3caca51efe344339b2056fd75f2e86c3ee3164f348d1719c1d1c",
+      "bytes": 133228
     },
     {
       "path": "mcp_hub/compound_tools.py",
@@ -9585,8 +9590,8 @@
     },
     {
       "path": "ui/api/routes/lifecycle.py",
-      "sha256": "99d4fdc863883693a78047ea88eb915a96a8371d80e4aa3f60a1a88085c9d6c1",
-      "bytes": 47686
+      "sha256": "cbc87ca1383392ce919b0663acb99cfd5d12f0651ced74c0e7ccf85e56546eab",
+      "bytes": 48399
     },
     {
       "path": "ui/api/routes/llm_stream.py",
@@ -10505,8 +10510,8 @@
     },
     {
       "path": "ui/react-app/src/components/AccountTab.jsx",
-      "sha256": "7a14e3e52119bdb16078a4acebe554f39a9bd232f80dbf8d8e55ee49c31be46f",
-      "bytes": 92203
+      "sha256": "fd11637b949779d06c1689a1c09e4ad4fcc2f9b715e1d79cb3ffa833c9eaf15f",
+      "bytes": 92431
     },
     {
       "path": "ui/react-app/src/components/AccountTab.legacy.jsx",
@@ -10974,6 +10979,11 @@
       "bytes": 5096
     },
     {
+      "path": "ui/react-app/src/components/SettingsModal.comingSoon.test.jsx",
+      "sha256": "4dc81d9051ff578a0e4b3c15cfca01e2d6737bb0c04d36a173d6e96ac9d76946",
+      "bytes": 9161
+    },
+    {
       "path": "ui/react-app/src/components/SettingsModal.customerSpeech.test.jsx",
       "sha256": "30ce3bd539753fdfb6208c9fa8a83d3bda2cda42c5784532152f0bbeae9d34be",
       "bytes": 5584
@@ -10990,8 +11000,8 @@
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.jsx",
-      "sha256": "6706a3e9bc2b40f1d7a28db3bd9a58c0b52f386cadeedcb84db69a712287b753",
-      "bytes": 224828
+      "sha256": "193b42c0ace7c78c7ea1c53279ad69b53ae28c4c553e8800f7ef2043186e6334",
+      "bytes": 225932
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.localDiscovery.test.jsx",
@@ -11100,8 +11110,8 @@
     },
     {
       "path": "ui/react-app/src/components/WakeWordSection.jsx",
-      "sha256": "5395fb1cb18fc75eef2fd7186f15478001c8010ee1f76933dc60b009466b0b88",
-      "bytes": 32727
+      "sha256": "41ba0e416acec8367fec9dc54567ed3c31278521992c8cda920dedf9d296d340",
+      "bytes": 33129
     },
     {
       "path": "ui/react-app/src/components/WakeWordSection.status.test.jsx",
@@ -11472,6 +11482,11 @@
       "path": "ui/react-app/src/components/settings/CloseButton.jsx",
       "sha256": "f315f028393d278acc7a03ceb2884db05f2972a488e04f94e5c520f09dce84e1",
       "bytes": 1173
+    },
+    {
+      "path": "ui/react-app/src/components/settings/ComingSoon.jsx",
+      "sha256": "cfc9aa75fb8b47107f129a78cf8354c63cadccc0f84a361ead9eae3eeddf710d",
+      "bytes": 2087
     },
     {
       "path": "ui/react-app/src/components/settings/DangerButton.jsx",
@@ -12194,9 +12209,14 @@
       "bytes": 9081
     },
     {
+      "path": "ui/react-app/src/hooks/useSettings.comingSoon.test.jsx",
+      "sha256": "da8860f2b6b09f987cea508ebbf94312068c98922c3a0cce3f94b18443cf2217",
+      "bytes": 1669
+    },
+    {
       "path": "ui/react-app/src/hooks/useSettings.js",
-      "sha256": "5318bf449c903cd4eb852c66fad14545fd805b0d46d073270a6569fc8a508dcf",
-      "bytes": 13457
+      "sha256": "1a3a2e2b405cd19c0226b06d0ef5cccc7a5829d757d307cdb0cf510246098d4b",
+      "bytes": 13877
     },
     {
       "path": "ui/react-app/src/hooks/useSettingsDraft.js",
@@ -12950,8 +12970,8 @@
     },
     {
       "path": "ui/settings_api.py",
-      "sha256": "8072a9b9d4b2d059413f72f2dbf4d695724014d911040a16a8256a2ad6eafbf6",
-      "bytes": 90119
+      "sha256": "95cb43092f3aa1870ecb0490da23645740a793ec17c6e063bfc7de2a8ea2aa07",
+      "bytes": 90460
     },
     {
       "path": "ui/settings_effects.py",

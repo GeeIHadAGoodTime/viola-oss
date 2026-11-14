@@ -7,6 +7,7 @@ import { authFetch } from '../hooks/useViolaApi';
 import { THEME } from '../config';
 import { isFeatureHidden } from '../utils/featureSurface';
 import DesktopUpsell from './DesktopUpsell';
+import { ComingSoonLabel, useComingSoon } from './settings/ComingSoon';
 
 const SAMPLE_TARGET = 5;
 const SAMPLE_LIMIT = 10;
@@ -237,6 +238,9 @@ WakeWordTrainingTips.defaultProps = {
 };
 
 export default function WakeWordSection({ theme = THEME }) {
+  // Owner-switched "Coming soon": training a new word is off; switching and
+  // deleting the words you already have stay available.
+  const trainingComingSoon = useComingSoon('customize.wake_word_training');
   const [models, setModels] = useState([]);
   const [modelsLoading, setModelsLoading] = useState(true);
   const [activeModelPath, setActiveModelPath] = useState('');
@@ -562,16 +566,17 @@ export default function WakeWordSection({ theme = THEME }) {
       <div style={{ marginBottom: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <h3 style={{ margin: 0, color: theme.colors.textPrimary, fontSize: 15 }}>My Wake Words</h3>
+          {trainingComingSoon && <ComingSoonLabel />}
           <button
             onClick={() => {
-              if (!trainingAvailable) return;
+              if (!trainingAvailable || trainingComingSoon) return;
               setWizardOpen(true);
               setNotice(null);
               setTrainingError(null);
             }}
-            disabled={!trainingAvailable}
+            disabled={!trainingAvailable || trainingComingSoon}
             title={trainingAvailable ? 'Create a custom wake word' : 'Training is not available right now'}
-            style={buttonStyle(theme, 'primary', !trainingAvailable)}
+            style={buttonStyle(theme, 'primary', !trainingAvailable || trainingComingSoon)}
           >
             {trainingAvailable ? 'Create' : 'Unavailable'}
           </button>

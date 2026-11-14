@@ -588,6 +588,22 @@ class ContextBuilder:
             relevance="always",
         )
 
+        # Owner-switched "Coming soon" features (core/feature_switches.py). The
+        # provider exists only while something is switched off, so with nothing
+        # off the prompt is exactly what it was.
+        from core.feature_switches import coming_soon_line
+
+        coming_soon_text = coming_soon_line()
+        if coming_soon_text:
+            _register_provider(
+                name="coming_soon",
+                origin="settings",
+                source_tag="coming-soon",
+                priority=56,
+                build=lambda _req: coming_soon_text,
+                relevance="always",
+            )
+
         system_frames: list[Frame] = []
         # PERF (#412): "memory" is the one provider that makes a serial,
         # blocking LLM round trip (services/memory/selector.py's side-query

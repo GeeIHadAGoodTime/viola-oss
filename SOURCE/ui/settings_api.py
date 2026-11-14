@@ -492,6 +492,13 @@ def _settings_response_payload(settings: dict[str, Any]) -> dict[str, Any]:
     speech = customer_speech_payload(settings)
     if speech is not None:
         payload["customer_speech"] = speech
+    # Settings options the owner switched to "Coming soon" (core/feature_switches.py).
+    # Absent when nothing is switched off, so the payload is unchanged.
+    from core.feature_switches import coming_soon_settings_options
+
+    coming_soon = coming_soon_settings_options()
+    if coming_soon:
+        payload["coming_soon"] = coming_soon
     return payload
 
 

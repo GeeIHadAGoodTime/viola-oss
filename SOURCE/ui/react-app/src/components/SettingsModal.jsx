@@ -57,6 +57,7 @@ import {
 import WakeSensitivitySlider from './settings/WakeSensitivitySlider';
 import WakeDoubleCheckRow from './settings/WakeDoubleCheckRow';
 import AddPlaylistForm from './settings/AddPlaylistForm';
+import { ComingSoon, ComingSoonContext, ComingSoonLabel, NO_COMING_SOON } from './settings/ComingSoon';
 
 // Use centralized theme from config.js
 const theme = THEME;
@@ -229,6 +230,14 @@ const TIER_CAPABILITIES = {
     'Shell commands': true,
     'Scheduling': true,
   },
+};
+
+// Capability names in the grid above that the owner can mark "Coming soon"
+// (option ids from core/feature_switches.py).
+const CAPABILITY_COMING_SOON_OPTION = {
+  'Email': 'ai_agents.capability.email',
+  'Browser': 'ai_agents.capability.browser',
+  'Desktop control': 'ai_agents.capability.desktop_control',
 };
 
 // Map tier to browser_session_mode (derived, never shown to user)
@@ -514,6 +523,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
     clearError,
     refreshDevices,
     refreshPlaylists,
+    comingSoon = NO_COMING_SOON,
   } = useSettings({ initialFetchDelayMs: MODAL_OPEN_DEFER_MS });
   const {
     draft: localSettings, hasChanges, setDraft: setLocalSettings,
@@ -2453,6 +2463,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                             </svg>
                           )}
                           <span>{name}</span>
+                          {comingSoon.includes(CAPABILITY_COMING_SOON_OPTION[name]) && <ComingSoonLabel />}
                         </div>
                       ))}
                     </div>
@@ -2488,6 +2499,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
             />
 
             <Section title="Billing & Payment Methods">
+              <ComingSoon option="account.payment_methods">
               {isFeatureHidden('payment_cards') ? (
                 <div style={{ padding: '16px 20px' }}>
                   <DesktopUpsell feature="payment_cards" compact />
@@ -2717,6 +2729,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                 ))}
               </div>
               )}
+              </ComingSoon>
             </Section>
 
             {/* ── Privacy & Data Section ── */}
@@ -2888,6 +2901,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
             label: 'Spotify',
             icon: <span style={{ fontSize: '18px' }}>S</span>,
             desc: spotifySourceDescription(spotifyStatus),
+            ...(comingSoon.includes('music.source.spotify') ? { comingSoon: true } : {}),
           }]),
           ...(localMusicHidden ? [] : [
             { id: 'local', label: 'Local Files', icon: <Icons.Music />, desc: localFolder || 'Play from local library' },
@@ -2928,7 +2942,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                       <button
                         key={opt.id}
                         onClick={() => handleSwitchProvider(opt.id)}
-                        disabled={isSwitchingSource}
+                        disabled={isSwitchingSource || Boolean(opt.comingSoon)}
                         aria-pressed={isActive}
                         style={{
                           flex: 1,
@@ -2970,7 +2984,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                           color: isActive ? theme.colors.accent : theme.colors.textMuted,
                           minHeight: '13px',
                         }}>
-                          {opt.id === 'spotify' && spotifyStatusLoading ? 'Checking' : opt.desc}
+                          {opt.comingSoon ? 'Coming soon' : opt.id === 'spotify' && spotifyStatusLoading ? 'Checking' : opt.desc}
                         </span>
                       </button>
                     );
@@ -4044,12 +4058,14 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
       case 'connections':
         return (
           <>
-            <SmartHomeWizard
-              settings={localSettings}
-              onSettingChange={updateLocal}
-              onSettingsChange={updateLocalSettings}
-              autoLoadSettings={false}
-            />
+            <ComingSoon option="connections.smart_home">
+              <SmartHomeWizard
+                settings={localSettings}
+                onSettingChange={updateLocal}
+                onSettingsChange={updateLocalSettings}
+                autoLoadSettings={false}
+              />
+            </ComingSoon>
 
             <Section title="Calendar">
               <CalendarSettings />
@@ -4222,7 +4238,11 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
             </Section>
 
             <AdvancedSection title="Advanced">
-              {!isFeatureHidden('rooms') && <LanAccessSettingRow />}
+              {!isFeatureHidden('rooms') && (
+                <ComingSoon option="system.lan_rooms">
+                  <LanAccessSettingRow />
+                </ComingSoon>
+              )}
               <SettingRow
                 title="Network API Port"
                 description="The HTTP port the local Viola server binds to. Restart required to take effect."
@@ -4278,7 +4298,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
     : 'min(85vh, calc(100dvh - 40px))';
 
   return (
-    <>
+    <ComingSoonContext.Provider value={comingSoon}>
       <ScrollbarStyles />
 
       {/* Modal Backdrop */}
@@ -4795,7 +4815,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
         onSettingChange={updateLocal}
         onSettingsChange={updateLocalSettings}
       />
-    </>
+    </ComingSoonContext.Provider>
   );
 });
 
