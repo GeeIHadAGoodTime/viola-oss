@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiFetch } from './useViolaApi';
 import { useWebSocket } from './useWebSocket';
 import { isCloudSurface } from '../components/auth/cloudSurface';
+import { NO_COMING_SOON } from '../components/settings/ComingSoon';
 
 // On the cloud browser SPA the desktop `/v1/settings` route is not served
 // (it would custody desktop/global SettingsManager state). The cloud-native,
@@ -71,6 +72,8 @@ export function useSettings(options = {}) {
   const [hasSettingsSnapshot, setHasSettingsSnapshot] = useState(false);
   const [voiceStatus, setVoiceStatus] = useState(null);
   const [customerSpeech, setCustomerSpeech] = useState(null);
+  // Settings options switched to "Coming soon" by the owner; absent = none.
+  const [comingSoon, setComingSoon] = useState(NO_COMING_SOON);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -109,6 +112,9 @@ export function useSettings(options = {}) {
     }
     if (!preserveAbsentVoiceStatus || data.voice_status !== undefined) {
       setVoiceStatus(data.voice_status ?? null);
+    }
+    if (!preserveAbsentVoiceStatus || data.coming_soon !== undefined) {
+      setComingSoon(Array.isArray(data.coming_soon) && data.coming_soon.length ? data.coming_soon : NO_COMING_SOON);
     }
     setLoading(false);
   }, []);
@@ -358,6 +364,7 @@ export function useSettings(options = {}) {
     hasSettingsSnapshot,
     voiceStatus,
     customerSpeech,
+    comingSoon,
     loading,
     saving,
     error,

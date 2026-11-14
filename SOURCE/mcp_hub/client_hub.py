@@ -14,6 +14,7 @@ import re
 import time
 from typing import Any
 
+from core.feature_switches import coming_soon_tool_result, withheld_tool_names
 from core.logging_config import get_logger
 from intent.irreversible_actions import is_irreversible_tool_call
 from intent.tool_types import RiskLevel
@@ -1579,6 +1580,8 @@ class MCPClientHub:
             return False
         if name in _launch_gated_tool_names():
             return False
+        if name in withheld_tool_names():
+            return False
         if allowed_by_tier is not None and name not in allowed_by_tier:
             return False
         normalized_tier = str(tier or "").strip().lower()
@@ -1924,6 +1927,10 @@ class MCPClientHub:
                 legacy_name,
                 args.get("action", ""),
             )
+
+        coming_soon = coming_soon_tool_result(name)
+        if coming_soon is not None:
+            return coming_soon
 
         _call_start = time.monotonic()
         self.last_approval_path = "no_approval_needed"

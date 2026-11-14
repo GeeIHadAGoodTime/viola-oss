@@ -108,6 +108,27 @@ SUBSYSTEMS: dict[str, dict[str, Any]] = {
     "telemetry": {"description": "Opt-in telemetry send + public ingest"},
 }
 
+
+def _register_desktop_feature_flags() -> None:
+    """Register the desktop "Coming soon" keys (core/feature_switches.py).
+
+    A key that already is a cloud kill-switch (``phone``) keeps its entry. The
+    others are flags only: no cloud route serves them; the signed-in desktop
+    reads them through ``create_desktop_features_router`` and shows the feature
+    as "Coming soon". Like every switch they default to enabled.
+    """
+    from core.feature_switches import FEATURES
+
+    for feature in FEATURES:
+        if feature.key not in SUBSYSTEMS:
+            SUBSYSTEMS[feature.key] = {
+                "description": "Desktop feature flag (Coming soon): %s" % feature.label,
+                "desktop_feature_flag": True,
+            }
+
+
+_register_desktop_feature_flags()
+
 ENV_KILL_PREFIX = "VIOLA_KILL_"  # VIOLA_KILL_PHONE=1 disables at boot.
 
 
@@ -310,6 +331,20 @@ class KillSwitchStore:
     def all_states(self) -> list[dict[str, Any]]:
         return [self.get_state(name) for name in SUBSYSTEMS]
 
+    def switched_off(self, names: Any) -> list[str]:
+        """Names among *names* that are switched off, sorted.
+
+        Unlike ``is_enabled`` this does not fail closed: when a configured
+        store cannot be read it raises ``KillSwitchStoreUnavailable`` so the
+        desktop read endpoint can answer 503 and the desktop keeps its last
+        good list instead of seeing every feature switched off.
+        """
+        with self._lock:
+            self._load_from_redis_locked()
+            if self._redis is not None and self._redis_error:
+                raise KillSwitchStoreUnavailable("kill-switch store unavailable")
+        return sorted(name for name in names if name in SUBSYSTEMS and not self.is_enabled(name))
+
 
 # Module-level singleton with lazy init. Real Redis backend is wired
 # during cloud_app startup; tests can override before first access.
@@ -368,6 +403,35 @@ def require_subsystem(name: str):
 
     _checker.__name__ = "require_subsystem_%s" % name
     return _checker
+
+
+# -----------------------------------------------------------------------------
+# Signed-in desktop read: which "Coming soon" features are switched off
+# -----------------------------------------------------------------------------
+
+
+def create_desktop_features_router():
+    """FastAPI router for the desktop's "Coming soon" read.
+
+    Mounted from ``backend/cloud_app.py`` behind the signed-in user
+    dependency. Answers ``{"off": [key, ...]}`` with only the keys of
+    ``core.feature_switches.FEATURES`` that are switched off: no reasons, no
+    actors, no other switches. 503 when the store cannot be read (the desktop
+    then keeps its last good list).
+    """
+    from core.feature_switches import ENDPOINT_PATH, FEATURES
+
+    keys = [feature.key for feature in FEATURES]
+    router = APIRouter(tags=["desktop_features"])
+
+    @router.get(ENDPOINT_PATH)  # mt-ok: global owner switches, no user data; signed-in via cloud_app include
+    async def _coming_soon() -> dict[str, Any]:
+        try:
+            return {"off": get_store().switched_off(keys)}
+        except KillSwitchStoreUnavailable as exc:
+            raise HTTPException(status_code=503, detail="feature switches unavailable") from exc
+
+    return router
 
 
 # -----------------------------------------------------------------------------

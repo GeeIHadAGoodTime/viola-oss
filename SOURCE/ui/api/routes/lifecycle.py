@@ -465,6 +465,20 @@ def configure_lifecycle(context: ApiContext) -> None:
                 background_tasks.append(weather_task)
                 log.info("Background weather refresh started")
 
+            # Owner-switched "Coming soon" features: read the cached list, then
+            # ask the cloud at launch, at sign-in and every 15 minutes. Desktop only.
+            try:
+                from core.user_context import is_cloud_surface
+
+                if not is_cloud_surface():
+                    from core.feature_switches import run_desktop_refresh_loop
+
+                    coming_soon_task = asyncio.create_task(run_desktop_refresh_loop())
+                    coming_soon_task.add_done_callback(_log_task_exception)
+                    background_tasks.append(coming_soon_task)
+            except Exception as exc:
+                log.warning("Failed to start the coming-soon refresh: %s", exc)
+
             # macOS keychain pre-warm (parity with cloud_app's startup pre-warm).
             # The memory-encryption secret and the SecureSettingsManager master
             # key live in the OS keychain. On a freshly-signed macOS app the

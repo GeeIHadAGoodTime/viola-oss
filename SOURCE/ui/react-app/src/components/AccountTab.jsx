@@ -33,6 +33,7 @@ import {
   SettingRow,
   Toggle,
 } from './settings';
+import { ComingSoon } from './settings/ComingSoon';
 
 // Icons
 const Icons = {
@@ -2459,13 +2460,15 @@ export function AccountTab({
         <Section title="Phone">
           <TextMessagesSettings />
           <SectionDivider />
-          <PhoneSettings
-            settings={settings}
-            onSettingChange={onSettingChange}
-            onDeleteAllCallData={onDeleteAllCallData}
-            isDeletingCallData={isDeletingCallData}
-            callDataDeleteStatus={callDataDeleteStatus}
-          />
+          <ComingSoon option="account.phone_calls">
+            <PhoneSettings
+              settings={settings}
+              onSettingChange={onSettingChange}
+              onDeleteAllCallData={onDeleteAllCallData}
+              isDeletingCallData={isDeletingCallData}
+              callDataDeleteStatus={callDataDeleteStatus}
+            />
+          </ComingSoon>
         </Section>
 
         <Section title="Sync & Devices">
@@ -2507,13 +2510,15 @@ export function AccountTab({
       </Section>
 
       <Section title="Phone">
-        <PhoneSettings
-          settings={settings}
-          onSettingChange={onSettingChange}
-          onDeleteAllCallData={onDeleteAllCallData}
-          isDeletingCallData={isDeletingCallData}
-          callDataDeleteStatus={callDataDeleteStatus}
-        />
+        <ComingSoon option="account.phone_calls">
+          <PhoneSettings
+            settings={settings}
+            onSettingChange={onSettingChange}
+            onDeleteAllCallData={onDeleteAllCallData}
+            isDeletingCallData={isDeletingCallData}
+            callDataDeleteStatus={callDataDeleteStatus}
+          />
+        </ComingSoon>
       </Section>
     </>
   );
