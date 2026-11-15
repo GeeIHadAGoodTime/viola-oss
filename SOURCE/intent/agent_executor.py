@@ -6845,8 +6845,12 @@ class AgentExecutor:
         row["web_search_requests"] += web_search_requests
         row["cost_usd"] += float(cost_usd)
 
-    def _user_own_words(self, user_text: str) -> str:
+    def _user_own_words(self, user_text: str, *, include_saved_address: bool = True) -> str:
         """What the user has said in this conversation, and the address they already saved.
+
+        ``include_saved_address=False`` leaves the saved address out: the
+        save_delivery_address gate adds it only for a correction of the same
+        street (``_saved_address_text``).
 
         Only frames the user wrote or spoke count. Compaction summaries are
         user-role frames too, but they carry another origin, and they can quote a
@@ -6867,16 +6871,24 @@ class AgentExecutor:
                     and (frame.origin or "") in _USER_AUTHORED_FRAME_ORIGINS
                 ):
                     parts.extend(block.text for block in frame.blocks if isinstance(block, TextBlock))
+        if include_saved_address:
+            saved = self._saved_address_text()
+            if saved:
+                parts.append(saved)
+        return "\n".join(parts)
+
+    def _saved_address_text(self) -> str:
+        """The address saved in Settings, as one line ("" when there is none)."""
         try:
             from intent.tools.settings_tools import delivery_address_text
             from ui.settings_manager import get_settings_manager
 
             saved = get_settings_manager().get("delivery_address", {}, user_id=self._get_effective_user_id())
             if isinstance(saved, dict):
-                parts.append(delivery_address_text(saved))
+                return delivery_address_text(saved)
         except (ImportError, LookupError, OSError, RuntimeError, TypeError, ValueError):
             logger.debug("Saved address unavailable for the user-words check", exc_info=True)
-        return "\n".join(parts)
+        return ""
 
     def _prompt_cache_key(self) -> str | None:
         """One opaque cache key per account, the same for every command.
