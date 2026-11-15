@@ -30,10 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "4e1874d54a0cd7d77c42864e776a61cf4155cb763e8ae609f74edbf53423ab53",
-  "source_tree_sha256": "254d860141b77f9e66bc080bd75d99238036ba50275416f33c3d862cb55b1cdc",
-  "source_file_count": 2818,
-  "source_revision": "5c547ba864f648b92c0a5e48dcca33baa4c9879a",
+  "source_manifest_sha256": "1a1818e9f5fad571ab4a887576d3283f6608b96d0d136f066fb2d6cf84d69a4b",
+  "source_tree_sha256": "c34782744ba441a92d94a0f8e762ca1ea45f5c4d15f914b3420c448f51ce0106",
+  "source_file_count": 2822,
+  "source_revision": "76936d853acaf53a5966e238d776e1bc0a2bc506",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "LICENSES/SPEECH_COMPONENT_NOTICES.md",
@@ -153,6 +153,7 @@
     "mcp_servers/core_tools/server.py",
     "mcp_servers/phone_tool_descriptions.py",
     "models/player.py",
+    "models/track_title.py",
     "music/autoplay/ytmusic_radio.py",
     "music/autoplay_controller.py",
     "music/consent/adapters/google_calendar.py",
@@ -186,6 +187,7 @@
     "music/spotify/connection.py",
     "music/spotify/cookie_bridge.py",
     "music/spotify/diagnostic.py",
+    "music/spotify/oembed.py",
     "music/track_display_cache.py",
     "playback/engine_manager.py",
     "playback/engines/__init__.py",
@@ -529,6 +531,8 @@
     "ui/react-app/src/utils/runtimeSurface.test.js",
     "ui/react-app/src/utils/stageMarkdown.jsx",
     "ui/react-app/src/utils/stageMarkdown.test.jsx",
+    "ui/react-app/src/utils/trackTitle.js",
+    "ui/react-app/src/utils/trackTitle.test.js",
     "ui/react-app/src/utils/wakeSensitivity.js",
     "ui/react-app/src/utils/weatherLocation.js",
     "ui/react-app/src/utils/weatherLocation.test.js",
@@ -661,8 +665,8 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "5c547ba864f648b92c0a5e48dcca33baa4c9879a",
-    "kind": "music rating and title"
+    "source_commit": "76936d853acaf53a5966e238d776e1bc0a2bc506",
+    "kind": "music title never an id"
   },
   "historical_bindings": [
     {

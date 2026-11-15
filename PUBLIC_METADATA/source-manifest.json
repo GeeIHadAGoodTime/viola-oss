@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "5c547ba864f648b92c0a5e48dcca33baa4c9879a",
-  "sha256": "254d860141b77f9e66bc080bd75d99238036ba50275416f33c3d862cb55b1cdc",
+  "revision": "76936d853acaf53a5966e238d776e1bc0a2bc506",
+  "sha256": "c34782744ba441a92d94a0f8e762ca1ea45f5c4d15f914b3420c448f51ce0106",
   "files": [
     {
       "path": ".env.example",
@@ -1650,8 +1650,8 @@
     },
     {
       "path": "intent/command_executor.py",
-      "sha256": "f83c120c061c9e9096879c6f799f7206b75251d795ef8d677c363d38fd0d9f3f",
-      "bytes": 119210
+      "sha256": "41cd2d6c295761250788f4d59d7831a8097e2454e1122cdd71e967e779dcb2f2",
+      "bytes": 119546
     },
     {
       "path": "intent/commands/__init__.py",
@@ -2120,8 +2120,8 @@
     },
     {
       "path": "intent/tools/media_tools.py",
-      "sha256": "a3fea509653094ebf1aa0a2fda5cbfd9683c7e1beb4869ff8ac7ab8f996999c1",
-      "bytes": 42333
+      "sha256": "6409b2a7e052095e24a3d627c8a1fda6004157d49e03cd5861a57d49cba40bb7",
+      "bytes": 43553
     },
     {
       "path": "intent/tools/memory.py",
@@ -2135,8 +2135,8 @@
     },
     {
       "path": "intent/tools/music_tools.py",
-      "sha256": "acf325556d5c54dc2316171374242c4dbf2e9b68ecbc6086bc003bcc6fe64fed",
-      "bytes": 82693
+      "sha256": "cfd9d2bde9359b6f1c6e495faf799e0da41d5df0a4e3816cff64a9ace2b8c4d3",
+      "bytes": 83994
     },
     {
       "path": "intent/tools/notification_tools.py",
@@ -2475,13 +2475,18 @@
     },
     {
       "path": "models/player.py",
-      "sha256": "dc67efa576a2fc946bd561e30614454b53e7d050cccafd430233f657b27dc17f",
-      "bytes": 11522
+      "sha256": "4ea39d16b1bcebac188d0646a5dedf585fbf50266615ca340e0108c91f3d896d",
+      "bytes": 12378
     },
     {
       "path": "models/state_manager.py",
       "sha256": "c48e3ccdedeb514ace64d2d8218b5d4200a6c6139f64102a2a924ccf0931d4c6",
       "bytes": 16042
+    },
+    {
+      "path": "models/track_title.py",
+      "sha256": "9598141faf13d7eebdcda6d586e0ff4dfa9c8e4f516eed02111adc1b1b88b7ce",
+      "bytes": 1030
     },
     {
       "path": "models/transactions.py",
@@ -2930,8 +2935,8 @@
     },
     {
       "path": "music/playlists/playlist_player.py",
-      "sha256": "be2393a5df6d8e6d0fc45de68874e9d48a48949741c70265ba4837b8a22141c5",
-      "bytes": 10686
+      "sha256": "2025a60a87ccf2b2530c270d2e89291037a02b0dc624933fadb2806c56ed6c03",
+      "bytes": 10949
     },
     {
       "path": "music/playlists/playlist_store.py",
@@ -3180,8 +3185,8 @@
     },
     {
       "path": "music/resolution/provider_router.py",
-      "sha256": "bad4996591987fe150c87fa1a1332e12c298155af76e1a86771f485de941b555",
-      "bytes": 33598
+      "sha256": "6ddc61980afa90176d4e503ff4af65ab0c89c44cb7ceca2a0761eff842ad9d5e",
+      "bytes": 34264
     },
     {
       "path": "music/resolution/provider_router_metadata.py",
@@ -3319,9 +3324,14 @@
       "bytes": 6341
     },
     {
+      "path": "music/spotify/oembed.py",
+      "sha256": "7b4e35f89b46d2234c26c367c0dea46cfcee86d91c967924f5a710c71710dc93",
+      "bytes": 1558
+    },
+    {
       "path": "music/track_display_cache.py",
-      "sha256": "cfcc1bfde98a2da7eae4b4e1f892667febc7ec916e140ca52be542653a31d6ed",
-      "bytes": 2772
+      "sha256": "25f8efc2fd9f0f172b78523daf9909f1dae19dc6c65527a205f1127f61f2d352",
+      "bytes": 2533
     },
     {
       "path": "music/youtube_embed.py",
@@ -3390,8 +3400,8 @@
     },
     {
       "path": "playback/engines/spotify_cdp.py",
-      "sha256": "4f18f6d67fda6ddcf2f9a29fc15b0210d347ff4001a3c9a474be9e79abb5e4da",
-      "bytes": 45574
+      "sha256": "0a862fafb1bf208cae664363aae4351a2bef4af411e76fae85d5b57cf46ff18f",
+      "bytes": 47696
     },
     {
       "path": "playback/engines/youtube.py",
@@ -9445,8 +9455,8 @@
     },
     {
       "path": "ui/api/models.py",
-      "sha256": "817af49677c15801cf84e850b32ed45b7f45bf742bc4622b3ade4f97bbddfbd3",
-      "bytes": 5406
+      "sha256": "0334168d4d3fa0115133c6fbcf8a2be4c34026236e210b5838bb9e41274b75b7",
+      "bytes": 5527
     },
     {
       "path": "ui/api/routes/__init__.py",
@@ -9535,8 +9545,8 @@
     },
     {
       "path": "ui/api/routes/control.py",
-      "sha256": "2e9e956bfc7b9bc4c32a9c7f2aa7c3879b366eb877f5a4745864509e9c2383de",
-      "bytes": 68791
+      "sha256": "fc8f9b21d5f16f67d3acea71af8c204a7c3c9e084fd0dd99a11d4cdbac469651",
+      "bytes": 68950
     },
     {
       "path": "ui/api/routes/cost.py",
@@ -9595,8 +9605,8 @@
     },
     {
       "path": "ui/api/routes/lifecycle.py",
-      "sha256": "9c18fe647650370d40b5bb0498558163290c3d95d410cb162aba2d8b2aec4b08",
-      "bytes": 49544
+      "sha256": "cbc87ca1383392ce919b0663acb99cfd5d12f0651ced74c0e7ccf85e56546eab",
+      "bytes": 48399
     },
     {
       "path": "ui/api/routes/llm_stream.py",
@@ -11365,8 +11375,8 @@
     },
     {
       "path": "ui/react-app/src/components/player/MediaArea.jsx",
-      "sha256": "0e25c3e6e52d30e9a33493165f42ffb5569c4cfba2357331b1440346e983a833",
-      "bytes": 7850
+      "sha256": "f03f517a92c7ef854380bad01acf1d3e4b894451c9654770232ea9b7168c72fe",
+      "bytes": 7920
     },
     {
       "path": "ui/react-app/src/components/player/MediaArea.module.css",
@@ -11395,8 +11405,8 @@
     },
     {
       "path": "ui/react-app/src/components/player/PlayerSection.jsx",
-      "sha256": "2f3eba5dc93e9060e0e3c9a5069cf628cf5215180e31d26a5508e99957863687",
-      "bytes": 7287
+      "sha256": "50febde35af8f576a95d458dcc4e1e35fbe610974a7f7a23067911d01bc8982f",
+      "bytes": 7373
     },
     {
       "path": "ui/react-app/src/components/player/PlayerSection.module.css",
@@ -11405,8 +11415,8 @@
     },
     {
       "path": "ui/react-app/src/components/player/PlayerSection.test.jsx",
-      "sha256": "2f301e176fb9727f6467f4fd9bf8af5a922c6e7789e8255f2b78bad6265ca15e",
-      "bytes": 4092
+      "sha256": "4bb038711da422a6ee67bc0fac10ed1c2b4c1976bb187101d5dd3eddc23c89a5",
+      "bytes": 5061
     },
     {
       "path": "ui/react-app/src/components/player/ProgressBar.jsx",
@@ -12787,6 +12797,16 @@
       "path": "ui/react-app/src/utils/timeFormat.js",
       "sha256": "67dc9a1e6c4401d15e2e0afdb26d100ddd4b88cb1fdd9a0cc169b24a271c55fd",
       "bytes": 668
+    },
+    {
+      "path": "ui/react-app/src/utils/trackTitle.js",
+      "sha256": "5e7471a19368182ee3590afa926007682ae239664f1f2fa6b0665cedfd676b8c",
+      "bytes": 1170
+    },
+    {
+      "path": "ui/react-app/src/utils/trackTitle.test.js",
+      "sha256": "fee1da48dae17e5c32c0154b283fafd969d6fba23b3de59d80347508659a48ad",
+      "bytes": 1096
     },
     {
       "path": "ui/react-app/src/utils/ttsPlayback.js",
