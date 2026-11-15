@@ -2358,6 +2358,10 @@ async def run_agent_loop(
         if hasattr(executor, "_saved_address_text") and hasattr(taint_tracker, "set_saved_address_words"):
             taint_tracker.set_user_own_words(executor._user_own_words(user_text, include_saved_address=False))
             taint_tracker.set_saved_address_words(executor._saved_address_text())
+            # In order, oldest first: a new street's city and ZIP code count only
+            # from the message that first gave the street onward.
+            if hasattr(executor, "_user_messages") and hasattr(taint_tracker, "set_user_messages"):
+                taint_tracker.set_user_messages(executor._user_messages(user_text))
         else:
             taint_tracker.set_user_own_words(executor._user_own_words(user_text))
     # Let the gate read a tool's _meta (a payment extension's irreversible
