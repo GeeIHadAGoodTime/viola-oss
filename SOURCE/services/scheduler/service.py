@@ -1484,6 +1484,12 @@ async def _say_when_voice_free(speak: Any, words: str, *, schedule_id: Any, dead
             "Schedule %s: speech ran past the time left and was stopped; delivered as a notification",
             schedule_id,
         )
+    elif budget < 1.0:
+        # The run itself used up the time (a long model turn before its reply).
+        logger.warning(
+            "Schedule %s: no time left to speak before the scheduler's limit; delivered as a notification",
+            schedule_id,
+        )
     else:
         logger.warning(
             "Schedule %s: the voice stayed busy for %.0fs; not spoken, delivered as a notification",
