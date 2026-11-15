@@ -317,6 +317,20 @@ _DECLARATIONS = {
         FallbackBehavior.CASCADE_TO_PROVIDER,
         OwnerAlertBehavior.LOG_ONLY,
     ),
+    "spotify_oembed": _declaration(
+        "spotify_oembed",
+        "Spotify oEmbed track name and cover",
+        ProviderDomain.MUSIC,
+        ("music/spotify/oembed.py",),
+        CacheScope.PUBLIC_SHARED,
+        _ONE_DAY_SECONDS,
+        PrivacyClass.PUBLIC_DATA,
+        RateLimitPosture.PROVIDER_QUOTA,
+        SpendCapPosture.NO_DIRECT_SPEND,
+        FallbackBehavior.DEGRADE_GRACEFULLY,
+        OwnerAlertBehavior.LOG_ONLY,
+        "Spotify's public oEmbed endpoint; no token, only the track id is sent.",
+    ),
     # Weather and public-data providers.
     "noaa_gfs_weather": _declaration(
         "noaa_gfs_weather",
@@ -1142,6 +1156,7 @@ OUTBOUND_CALLSITE_PROVIDER_IDS: Mapping[str, tuple[str, ...]] = MappingProxyType
         "music/providers/browser_search.py": ("youtube_music_browser",),
         "music/providers/youtube_availability.py": ("youtube_oembed",),
         "music/spotify/cdp_controller.py": ("spotify_web",),
+        "music/spotify/oembed.py": ("spotify_oembed",),
         "playback/engines/youtube.py": ("youtube_oembed",),
         "services/api_vault/tool_factory.py": ("api_vault_user_tools",),
         "services/browser/cloud_session_pool.py": ("browser_navigation",),
