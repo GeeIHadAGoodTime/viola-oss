@@ -1775,12 +1775,29 @@ def _billed_cost_usd(record: CallRecord) -> float:
     an unsuccessful outcome alone does not establish a carrier setup fee.
     The primary call's CDR covers only the primary leg, so an owner-takeover
     leg is added on top of either figure.
+
+    On an answered call the CDR replaces only the carrier part of the estimate
+    (owner decision, build 12): the bill plus the streaming and AMD items it
+    leaves out, plus the measured non-carrier parts (GPU voice, speech-to-text,
+    model, TTS). Before this, call 79907d19 was billed its 2.1 cent carrier bill
+    and dropped about 12 cents of GPU voice time. An unanswered call, or a record
+    whose carrier estimate is unknown, keeps the earlier rule unchanged.
     """
     carrier_cost = record.carrier_total_cost_usd
+    estimate = max(0.0, float(record.estimated_cost_usd or 0.0))
     if carrier_cost is not None:
         base = max(0.0, float(carrier_cost))
+        carrier_estimate = getattr(record, "estimated_carrier_cost_usd", None)
+        if carrier_estimate is not None and bool(getattr(record, "carrier_answered", False)):
+            from telephony.cost_tracker import carrier_bill_with_unbilled_extras_usd
+
+            billed_seconds = getattr(record, "carrier_billed_duration_seconds", None)
+            if billed_seconds is None:
+                billed_seconds = getattr(record, "duration_seconds", 0.0)
+            base = carrier_bill_with_unbilled_extras_usd(base, billed_seconds)
+            base += max(0.0, estimate - max(0.0, float(carrier_estimate)))
     else:
-        base = max(0.0, float(record.estimated_cost_usd or 0.0))
+        base = estimate
     return base + _conference_leg_cost_usd(record)
 
 
@@ -3722,6 +3739,10 @@ class CallRecord:
     carrier_total_cost_usd: float | None = None
     carrier_cost_at: datetime | None = None
     carrier_revision: int = 0
+    # The carrier part of ``estimated_cost_usd`` (rate, media streaming, AMD), set
+    # with every estimate. The carrier's own bill replaces this part only; the
+    # measured GPU voice, speech-to-text, model and TTS parts stay charged.
+    estimated_carrier_cost_usd: float | None = None
     # The moment the Telnyx media stream ended AND failed to recover, recorded by
     # ``_watch_telnyx_ws_disconnect``. Second honest end anchor for the same
     # window, covering the case where the media socket dies but the ``call.hangup``
@@ -5629,6 +5650,10 @@ class CallManager:
             return False
         record.status = status
         record.duration_seconds = duration_seconds
+        if estimated_cost_usd != record.estimated_cost_usd:
+            # A durable figure, not this process's measured estimate: its carrier
+            # part is unknown until the next estimate (see _billed_cost_usd).
+            record.estimated_carrier_cost_usd = None
         record.estimated_cost_usd = estimated_cost_usd
         record.carrier_answered = projection.carrier_answered_at is not None
         record.carrier_answered_at = projection.carrier_answered_at
@@ -8689,6 +8714,7 @@ class CallManager:
             record.llm_prompt_tokens = breakdown.llm_prompt_tokens
             record.llm_completion_tokens = breakdown.llm_completion_tokens
             record.estimated_cost_usd = breakdown.total_cost_usd
+            record.estimated_carrier_cost_usd = breakdown.telnyx_cost_usd
             logger.info(
                 "Call %s cost estimate: $%.4f (telnyx=$%.4f, llm=$%.4f, stt=$%.4f, tts=$%.4f)",
                 record.call_id,
@@ -8727,6 +8753,7 @@ class CallManager:
         tts_cost = estimate_phone_tts_cost_usd(self.config.tts_provider, len(assistant_text))
 
         record.estimated_cost_usd = telnyx_cost + llm_cost + tts_cost + gpu_cost
+        record.estimated_carrier_cost_usd = telnyx_cost
 
         logger.info(
             "Call %s cost estimate: $%.4f (telnyx=$%.4f, llm=$%.4f, stt=$0, tts=$%.4f)",
