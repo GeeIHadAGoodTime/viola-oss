@@ -757,7 +757,7 @@ class ChatStreamRecoveryContract(unittest.IsolatedAsyncioTestCase):
         stop_policy = [
             node
             for node in tree.body
-            if (isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name in {"_stop_chat_turn", "_stop_watch"})
+            if (isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name in {"_stop_chat_turn", "_stop_watch", "_silence_turn_speech"})
             or (
                 isinstance(node, ast.Assign)
                 and any(isinstance(t, ast.Name) and t.id in {"_STOP_RETRY_SECONDS", "_STOP_RETRY_LIMIT"} for t in node.targets)
@@ -812,6 +812,7 @@ class ChatStreamRecoveryContract(unittest.IsolatedAsyncioTestCase):
             finalizing=False,
             stop_watch=None,
             last_cancel_at=0.0,
+            turn=None,
         )
         return task
 
