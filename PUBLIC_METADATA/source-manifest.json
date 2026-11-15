@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "400b4f200a0da522d0ffb485e4a6c22bce62e56b",
-  "sha256": "6bf03e5c59c3b88c9d40376874ff1465abe094695a8ece845ea35641a3894e93",
+  "revision": "4cb8001af32c4027a732d484fb3e45360cb09fbf",
+  "sha256": "6ab498254ba6a3e926f429578afb70363c20d92ed3ce953727a4bc1b1d692a50",
   "files": [
     {
       "path": ".env.example",
@@ -2380,8 +2380,8 @@
     },
     {
       "path": "mcp_servers/computer_use/server.py",
-      "sha256": "9383aef1cecabbad111940a7fffad145525c7e883d846ebfcb0711c03b4f4891",
-      "bytes": 63579
+      "sha256": "361f978b12faa0a3622fd5c8ed95c3cd7c9d1a86dae3950d203cd5e6f976266c",
+      "bytes": 69787
     },
     {
       "path": "mcp_servers/core_tools/__init__.py",
@@ -4359,9 +4359,14 @@
       "bytes": 3342
     },
     {
+      "path": "services/computer_use/desktop_worker.py",
+      "sha256": "5a32a9bcb4af611c399df15cf5f0023f3c8a4871d8b29a94e88aa4fd21b2699e",
+      "bytes": 7367
+    },
+    {
       "path": "services/computer_use/discard_guard.py",
-      "sha256": "ca5b7e18079317061b060907626bd0f6da103457dc1c5631528952f7bea74efe",
-      "bytes": 16544
+      "sha256": "7cbcf9d11065cf79f30d339e90ada07b0906e521f2be0cb5cf936efdc9783383",
+      "bytes": 17789
     },
     {
       "path": "services/computer_use/input.py",
