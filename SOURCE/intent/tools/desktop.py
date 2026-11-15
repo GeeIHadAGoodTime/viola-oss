@@ -245,6 +245,28 @@ _PIECE_CHARS_PYAUTOGUI = 10
 _STOPPED_KEY = "stopped"
 _PYWINAUTO_MODIFIER_CHARS = "+^%"
 
+# Line breaks in typed text (1.0.5 build 12 live check B1: a 1,930-character
+# text arrived in Notepad whole and in order, but with no line break at all).
+# pywinauto's send_chars sends "\n" (its Enter key) as WM_CHAR 13 and nothing
+# else. A classic edit control starts a new line on that; the RichEdit control
+# of Windows 11 Notepad (RichEditD2DPT), like RICHEDIT50W, starts a new line on
+# the Enter key's WM_KEYDOWN and ignores WM_CHAR 13. Measured on this PC: the
+# Enter key's own messages, WM_KEYDOWN VK_RETURN + WM_CHAR 13 + WM_KEYUP, give
+# exactly one line break in Windows 11 Notepad, RICHEDIT50W and a classic EDIT.
+# On every path a "\r\n" is one line break and a lone "\r" is one too (the
+# SendInput paths typed "\r" as character 13, which Notepad also ignores, and
+# a classic edit control then broke the line twice for "\r\n").
+_LINE_BREAK_UNITS = frozenset({"\r\n", "\n", "\r"})
+_WM_KEYDOWN = 0x0100
+_WM_KEYUP = 0x0101
+_WM_CHAR = 0x0102
+_VK_RETURN = 0x0D
+_ENTER_SCAN_CODE = 0x1C
+_ENTER_DOWN_LPARAM = 1 | (_ENTER_SCAN_CODE << 16)
+# Key-up lParam: previous key state and transition state bits set (bits 30
+# and 31), as a signed LPARAM.
+_ENTER_UP_LPARAM = (_ENTER_DOWN_LPARAM | (1 << 30) | (1 << 31)) - (1 << 32)
+
 
 class _PiecesFailed(Exception):
     """A typing call raised after ``typed`` characters had already gone out."""
@@ -269,11 +291,11 @@ def _is_surrogate_pair(text: str, index: int) -> bool:
 
 
 def _raw_text_units(text: str) -> list[str]:
-    """One character per unit; a surrogate pair stays together."""
+    """One character per unit; a surrogate pair and a "\\r\\n" stay together."""
     units: list[str] = []
     index = 0
     while index < len(text):
-        step = 2 if _is_surrogate_pair(text, index) else 1
+        step = 2 if _is_surrogate_pair(text, index) or text.startswith("\r\n", index) else 1
         units.append(text[index : index + step])
         index += step
     return units
@@ -317,16 +339,24 @@ def _key_syntax_units(text: str) -> list[str] | None:
         elif char in ")}":
             return None
         else:
-            stop = end + (2 if _is_surrogate_pair(text, end) else 1)
+            # A "\r\n" is one line break, so it is never cut between pieces.
+            whole_crlf = end == index and text.startswith("\r\n", end)
+            stop = end + (2 if _is_surrogate_pair(text, end) or whole_crlf else 1)
         units.append(text[index:stop])
         index = stop
     return units
 
 
-def _group_pieces(units: list[str], max_chars: int) -> list[str]:
+def _group_pieces(units: list[str], max_chars: int, *, line_breaks_alone: bool = False) -> list[str]:
     pieces: list[str] = []
     current = ""
     for unit in units:
+        if line_breaks_alone and unit in _LINE_BREAK_UNITS:
+            if current:
+                pieces.append(current)
+                current = ""
+            pieces.append(unit)
+            continue
         if current and len(current) + len(unit) > max_chars:
             pieces.append(current)
             current = ""
@@ -349,10 +379,16 @@ def _pywinauto_parse_keys():
         return None
 
 
-def _key_syntax_pieces(text: str, max_chars: int) -> list[str]:
-    """Pieces of pywinauto key syntax; text pywinauto would reject stays whole."""
-    if len(text) <= max_chars:
-        return [text] if text else []
+def _key_syntax_pieces(text: str, max_chars: int, *, line_breaks_alone: bool = False) -> list[str]:
+    """Pieces of pywinauto key syntax; text pywinauto would reject stays whole.
+
+    ``line_breaks_alone`` puts every line break in a piece of its own, so the
+    caller can send it as the Enter key.
+    """
+    if not line_breaks_alone or ("\r" not in text and "\n" not in text):
+        line_breaks_alone = False
+        if len(text) <= max_chars:
+            return [text] if text else []
     parse_keys = _pywinauto_parse_keys()
     if parse_keys is not None:
         try:
@@ -362,7 +398,12 @@ def _key_syntax_pieces(text: str, max_chars: int) -> list[str]:
     units = _key_syntax_units(text)
     if units is None:
         return [text]
-    return _group_pieces(units, max_chars)
+    return _group_pieces(units, max_chars, line_breaks_alone=line_breaks_alone)
+
+
+def _one_key_per_line_break(text: str) -> str:
+    """Each line break as one Enter ("\\n"): "\\r\\n" and a lone "\\r" become "\\n"."""
+    return text.replace("\r\n", "\n").replace("\r", "\n")
 
 
 def _send_in_pieces(pieces: list[str], send) -> tuple[int, bool]:
@@ -435,11 +476,31 @@ def _after_typed_prefix(result: dict, prefix: int, total: int) -> dict:
     return result
 
 
+def _send_enter_messages(wrapper) -> None:
+    """One line break into the window, as the Enter key's own messages (see _LINE_BREAK_UNITS)."""
+    wrapper.send_message(_WM_KEYDOWN, _VK_RETURN, _ENTER_DOWN_LPARAM)
+    wrapper.send_message(_WM_CHAR, 13, _ENTER_DOWN_LPARAM)
+    wrapper.send_message(_WM_KEYUP, _VK_RETURN, _ENTER_UP_LPARAM)
+
+
 def send_chars_in_pieces(wrapper, text: str, **kwargs) -> tuple[int, bool]:
-    """``wrapper.send_chars`` in pieces that honour the user's Stop: (characters sent, stopped)."""
+    """``wrapper.send_chars`` in pieces that honour the user's Stop: (characters sent, stopped).
+
+    A line break goes as the Enter key's messages, not through send_chars,
+    whose WM_CHAR 13 alone Windows 11 Notepad ignores. The count is of the
+    characters asked for ("\\r\\n" counts 2 and is one line break).
+    """
+    newlines = bool(kwargs.get("with_newlines", True))
+
+    def send(piece: str) -> None:
+        if newlines and piece in _LINE_BREAK_UNITS:
+            _send_enter_messages(wrapper)
+        else:
+            wrapper.send_chars(piece, **kwargs)
+
     return _send_in_pieces(
-        _key_syntax_pieces(str(text), _PIECE_CHARS_SEND_CHARS),
-        lambda piece: wrapper.send_chars(piece, **kwargs),
+        _key_syntax_pieces(str(text), _PIECE_CHARS_SEND_CHARS, line_breaks_alone=newlines),
+        send,
     )
 
 
@@ -627,14 +688,14 @@ def _type_text_with_pywinauto_foreground(text: str) -> dict:
 
         # The whole text is checked before the first piece: this path still
         # types all of it once or none of it.
-        desktop_input_low.require_typeable(text)
+        desktop_input_low.require_typeable(_one_key_per_line_break(text))
         dispatch: object = None
         stopped = False
         for piece in _raw_pieces(text, _PIECE_CHARS_SCANCODE):
             if _desktop_stop_requested():
                 stopped = True
                 break
-            dispatch = _merge_dispatch(dispatch, desktop_input_low.type_text(piece))
+            dispatch = _merge_dispatch(dispatch, desktop_input_low.type_text(_one_key_per_line_break(piece)))
             typed += len(piece)
         logger.info("desktop_type_text path=sendinput_scancode chars=%d", typed)
         if stopped:
@@ -671,7 +732,7 @@ def _type_text_with_pywinauto_foreground(text: str) -> dict:
         more, stopped = _send_in_pieces(
             _key_syntax_pieces(text[typed:], _PIECE_CHARS_SEND_KEYS),
             lambda piece: keyboard.send_keys(
-                piece,
+                _one_key_per_line_break(piece),
                 with_spaces=True,
                 with_tabs=True,
                 with_newlines=True,
@@ -718,7 +779,7 @@ def _type_text_without_stealing_focus(text: str, window_title: str = "") -> dict
             more, stopped = _send_in_pieces(
                 _key_syntax_pieces(text[typed:], _PIECE_CHARS_SEND_KEYS),
                 lambda piece: wrapper.type_keys(
-                    piece,
+                    _one_key_per_line_break(piece),
                     with_spaces=True,
                     with_tabs=True,
                     with_newlines=True,
@@ -1387,7 +1448,8 @@ def _type_text_sync(text: str, respect_focus: bool = True, window_title: str = "
     typed = 0
     try:
         typed, stopped = _send_in_pieces(
-            _raw_pieces(text, _PIECE_CHARS_PYAUTOGUI), lambda piece: pyautogui.write(piece, interval=0.02)
+            _raw_pieces(text, _PIECE_CHARS_PYAUTOGUI),
+            lambda piece: pyautogui.write(_one_key_per_line_break(piece), interval=0.02),
         )
         if stopped:
             return _stopped_payload({"method": "write"}, typed=typed, requested=len(text), reason=write_reason)

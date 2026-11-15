@@ -22,6 +22,22 @@ class DeferredCancellationTests(unittest.IsolatedAsyncioTestCase):
         self.manager = ApprovalManager()
         self.effects = 0
         self.args = {"target": "synthetic-counter"}
+        # A pending dangerous confirmation runs only when the user's own reply on
+        # the turn affirms it; these lifecycle tests are about the store, so the
+        # user said yes and the classifier reads it as such.
+        from intent.content_sanitizer import BrowserTaintTracker, bind_active_taint_tracker, reset_active_taint_tracker
+
+        tracker = BrowserTaintTracker()
+        tracker.set_user_request("yes, go ahead")
+        token = bind_active_taint_tracker(tracker)
+        self.addCleanup(reset_active_taint_tracker, token)
+
+        async def affirm(_self, _text, _action, _risk):
+            return "strong_affirm"
+
+        classifier = patch.object(ApprovalManager, "_classify_response", affirm)
+        classifier.start()
+        self.addCleanup(classifier.stop)
 
     async def dispatch(self, args, task, *, manager=None):
         manager = manager or self.manager

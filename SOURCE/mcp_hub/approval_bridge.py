@@ -1225,6 +1225,7 @@ class ApprovalBridge:
         PermissionRequest hook semantics — not just the agent loop.
         """
         _normalize_approval_only_args(tool_name, args)
+        _clear_deferred_confirmation_refusal()
         relay_denial = self._relay_consent_denial(tool_name)
         if relay_denial is not None:
             self.last_permission_decision = relay_denial
@@ -1281,12 +1282,12 @@ class ApprovalBridge:
                 action_description=description,
             )
             if confirmation_state == "accepted":
-                # Under taint, a re-issued call alone is not consent: the
-                # user's own words for this turn must confirm (fails closed).
-                holds_under_taint = getattr(self._approval, "confirmation_holds_under_taint", None)
+                # A re-issued call alone is not consent: the user's own reply
+                # on this turn decides (ApprovalManager.users_reply_confirms_pending).
+                users_reply_confirms = getattr(self._approval, "users_reply_confirms_pending", None)
                 user_confirmed = True
-                if callable(holds_under_taint):
-                    user_confirmed = bool(await holds_under_taint(description, risk))
+                if callable(users_reply_confirms):
+                    user_confirmed = bool(await users_reply_confirms(description, risk, tool_name=tool_name))
                 final_decision = self._permission_policy.resolve_user_response(
                     context,
                     decision,
@@ -1611,6 +1612,14 @@ class ApprovalBridge:
                 manager.add_message(decision.frame)
         except Exception as exc:
             logger.debug("Could not append permission meta frame: %s", exc)
+
+
+def _clear_deferred_confirmation_refusal() -> None:
+    """Start each approval check without a refusal text left by an earlier one."""
+
+    from intent.approval import clear_deferred_confirmation_refusal
+
+    clear_deferred_confirmation_refusal()
 
 
 def _normalize_approval_only_args(tool_name: str, args: dict[str, Any]) -> None:
