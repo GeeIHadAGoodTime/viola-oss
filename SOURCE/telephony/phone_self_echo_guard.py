@@ -185,6 +185,11 @@ class BotTurnFloorState:
         # her voicemail message. That speech has no floor to win: a single "hello"
         # counts, or a person could be hung up on for answering briefly.
         self.live_answer_check: Callable[[], bool] | None = None
+        # Set on outbound calls: True when far-end speech is the voicemail recording
+        # talking while her message is in progress. A recording does not take turns,
+        # so it must not cut her message off (call 79907d19). A person answering is
+        # excluded by the check itself and still interrupts.
+        self.recording_over_message_check: Callable[[], bool] | None = None
 
     def note_generation_started(self) -> None:
         """Recipient yielded the floor; the LLM run/generation has begun."""
@@ -345,6 +350,14 @@ class SelfEchoGuardedMinWordsUserTurnStartStrategy(MinWordsUserTurnStartStrategy
             bot_speaking=bool(self._bot_speaking),
         )
         floor = self._floor_state
+        recording_check = getattr(floor, "recording_over_message_check", None)
+        if recording_check is not None and recording_check():
+            logger.info(
+                "phone turn guard: voicemail recording speech during Viola's message does not interrupt her (%d chars)",
+                len(getattr(frame, "text", "") or ""),
+            )
+            await self.trigger_reset_aggregation()
+            return ProcessFrameResult.CONTINUE
         check = getattr(floor, "live_answer_check", None)
         self._judging_live_answer = bool(check is not None and check())
         try:

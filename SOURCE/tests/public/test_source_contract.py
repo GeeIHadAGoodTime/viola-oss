@@ -96,7 +96,11 @@ class SourceContract(unittest.TestCase):
         nodes = [ast.ImportFrom(module="__future__", names=[ast.alias(name="annotations")], level=0)]
         constants = {"_MIN_BILLED_COST_USD", "_BILLABLE_FAILURE_STATES"}
         for node in tree.body:
-            if isinstance(node, ast.FunctionDef) and node.name in {"_billed_cost_usd", "_conference_leg_cost_usd"}:
+            if isinstance(node, ast.FunctionDef) and node.name in {
+                "_billed_cost_usd",
+                "_conference_leg_cost_usd",
+                "_non_carrier_cost_usd",
+            }:
                 nodes.append(node)
             elif isinstance(node, ast.Assign) and any(
                 isinstance(target, ast.Name) and target.id in constants for target in node.targets
