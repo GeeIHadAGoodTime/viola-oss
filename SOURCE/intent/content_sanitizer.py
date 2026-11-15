@@ -1309,7 +1309,9 @@ class BrowserTaintTracker:
                 return (
                     "BLOCKED: nothing was saved. This is a new street, so it needs its own city and ZIP code, "
                     "and the user has not said them with it. Ask the user for the city and ZIP code of the new "
-                    "street. Do not reuse the old ones and do not leave them empty."
+                    "street. Do not reuse the old ones and do not leave them empty. Send every address the user "
+                    "gives to this tool first, complete or not, including a different street they give next; it "
+                    "says what to ask, so do not call it again for this street until the user answers."
                 )
         return None
 

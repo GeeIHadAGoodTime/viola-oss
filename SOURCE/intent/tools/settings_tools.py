@@ -565,7 +565,9 @@ async def save_delivery_address_handler(
                 error=(
                     "Nothing was saved: a new delivery address needs its own city and ZIP code. Ask the user for "
                     "the city and ZIP code of this street, then save it with them. Do not reuse an old city or "
-                    "ZIP code and do not leave them empty."
+                    "ZIP code and do not leave them empty. Send every address the user gives to this tool first, "
+                    "complete or not, including a different street they give next; it says what to ask, so do not "
+                    "call it again for this street until the user answers."
                 ),
             )
         saved = sm.set_user_setting(resolved_user_id, "delivery_address", address, save_immediately=True)
