@@ -8,6 +8,7 @@ from contracts.api_response import failure_response, success_response
 from core.json_types import JsonDict, to_json_value
 from core.logging_config import get_logger
 from diagnostics.failure_envelope import emit_failure
+from music.exceptions import InvalidOperation
 from music.providers.errors import MusicTrackNotFoundError
 from music.runtime import PlayerControlSurface
 
@@ -622,6 +623,13 @@ class MusicControllerAdapter:
         try:
             self._call(["previous", "prev", "previous_track"])
             return self._success("previous", **self._status_payload())
+        except InvalidOperation as exc:
+            # "No previous track" is an answer, not a fault: one INFO line, no
+            # traceback, no diagnostics event. Each try wrote 3 ERROR lines and
+            # a traceback in the build-12 live check. Same envelope as before,
+            # so the route still answers 409 and the user hears the same reply.
+            logger.info("Previous: %s (nothing to go back to; not an error)", exc)
+            return self._expected_failure("previous", exc)
         except Exception as exc:
             logger.exception("Previous operation failed: %s", exc)
             return self._failure("previous", exc)

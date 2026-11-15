@@ -90,6 +90,23 @@ def tidy_session_memory(user_id: str | None, *, root: Path | None = None, now: f
     return deleted
 
 
+def _mask_for_account(user_id: str, text: str) -> str:
+    """*text* with the private values held for *user_id* replaced (unchanged when none are held)."""
+    try:
+        from intent import sensitive_values
+
+        if not sensitive_values.has_values():
+            return text
+        from core.user_context import user_scope
+
+        with user_scope(str(user_id or "").strip()):
+            masked = sensitive_values.mask(text)
+        return masked if isinstance(masked, str) else text
+    except Exception:  # noqa: BLE001 - masking must never stop the memory file being written
+        logger.debug("Session memory mask not applied", exc_info=True)
+        return text
+
+
 @dataclass
 class SessionMemory:
     """Per-task agent memory scoped to a specific user.
@@ -194,7 +211,13 @@ class SessionMemory:
         if self.file_path is None:
             return
         self.file_path.parent.mkdir(parents=True, exist_ok=True)
-        self.file_path.write_text(self._render_markdown(), encoding="utf-8", newline="\n")
+        # Written through the live private-value mask: a value already known
+        # (a street from a refused save, the post-turn address check, the
+        # saved address) never lands in the file. Values learned later are
+        # overwritten in place by the log clean-up (intent/sensitive_values).
+        # This object keeps the plain text for the rest of its own task.
+        text = _mask_for_account(self.user_id, self._render_markdown())
+        self.file_path.write_text(text, encoding="utf-8", newline="\n")
 
     @property
     def allowed_file_path(self) -> str:
@@ -237,10 +260,17 @@ class SessionMemory:
         text = self.file_path.read_text(encoding="utf-8", errors="replace")
         sections: dict[str, list[str]] = {}
         current = ""
+        headers_seen = 0
         for line in text.splitlines():
             match = re.match(r"^##\s+(.+?)\s*$", line)
             if match:
                 current = match.group(1).strip()
+                if current not in self.SECTIONS and headers_seen < len(self.SECTIONS):
+                    # A private-value mask can overwrite a word of a heading
+                    # (a street word "state" in "current_state"); the headings
+                    # are always written in this order.
+                    current = self.SECTIONS[headers_seen]
+                headers_seen += 1
                 sections[current] = []
                 continue
             if current:
