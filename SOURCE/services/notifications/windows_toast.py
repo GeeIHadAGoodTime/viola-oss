@@ -17,6 +17,36 @@ logger = get_logger(__name__)
 APP_ID = "Viola.Desktop"
 APP_NAME = "Viola"
 _TOAST_TIMEOUT_SECONDS = 10
+_TOAST_TITLE_MAX = 160
+_TOAST_BODY_MAX = 360
+# The notification text reaches PowerShell only as data: three environment
+# variables set for that one child process. The script below is a constant and
+# never contains any of the text. Before, the text was pasted into the script
+# between single quotes with only the ASCII apostrophe doubled; PowerShell also
+# ends a quoted string at the typographic quotes U+2018 to U+201B, so a reply
+# with a typographic apostrophe failed to show and the words after such a quote
+# ran as PowerShell.
+_ENV_APP_ID = "VIOLA_TOAST_APP_ID"
+_ENV_TITLE = "VIOLA_TOAST_TITLE"
+_ENV_BODY = "VIOLA_TOAST_BODY"
+_TOAST_SCRIPT = """
+$ErrorActionPreference = 'Stop'
+$appId = [string]$env:VIOLA_TOAST_APP_ID
+$title = [string]$env:VIOLA_TOAST_TITLE
+$body = [string]$env:VIOLA_TOAST_BODY
+[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] > $null
+[Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime] > $null
+$template = [Windows.UI.Notifications.ToastTemplateType]::ToastText02
+$xml = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent($template)
+$textNodes = $xml.GetElementsByTagName('text')
+$textNodes.Item(0).AppendChild($xml.CreateTextNode($title)) > $null
+$textNodes.Item(1).AppendChild($xml.CreateTextNode($body)) > $null
+$toast = [Windows.UI.Notifications.ToastNotification]::new($xml)
+$toast.Tag = 'viola-notification'
+$toast.Group = 'viola'
+$notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier($appId)
+$notifier.Show($toast)
+"""
 
 
 def _is_windows() -> bool:
@@ -79,10 +109,6 @@ def _powershell_executable() -> str:
     return str(candidate if candidate.exists() else "powershell.exe")
 
 
-def _ps_single_quote(value: str) -> str:
-    return "'" + value.replace("'", "''") + "'"
-
-
 def _shortcut_path() -> Path:
     appdata = os.environ.get("APPDATA")
     base = Path(appdata) if appdata else Path.home() / "AppData" / "Roaming"
@@ -141,34 +167,22 @@ def _quote_windows_arg(value: str) -> str:
     return subprocess.list2cmdline([value])
 
 
+def _env_value(value: str) -> str:
+    # An environment block cannot hold a NUL character; nothing else is changed.
+    return str(value).replace("\x00", "")
+
+
+def _toast_environment(title: str, body: str, app_id: str) -> dict[str, str]:
+    """The child's environment: this process's own, plus the three toast values."""
+    env = dict(os.environ)
+    env[_ENV_APP_ID] = _env_value(app_id)
+    env[_ENV_TITLE] = _env_value(title[:_TOAST_TITLE_MAX])
+    env[_ENV_BODY] = _env_value(body[:_TOAST_BODY_MAX])
+    return env
+
+
 def _send_windows_toast_sync(title: str, body: str, *, app_id: str = APP_ID) -> bool:
     _ensure_app_shortcut(app_id)
-    script = (
-        """
-$ErrorActionPreference = 'Stop'
-$appId = __APP_ID__
-$title = __TITLE__
-$body = __BODY__
-[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] > $null
-[Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime] > $null
-$template = [Windows.UI.Notifications.ToastTemplateType]::ToastText02
-$xml = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent($template)
-$textNodes = $xml.GetElementsByTagName('text')
-$textNodes.Item(0).AppendChild($xml.CreateTextNode($title)) > $null
-$textNodes.Item(1).AppendChild($xml.CreateTextNode($body)) > $null
-$toast = [Windows.UI.Notifications.ToastNotification]::new($xml)
-$toast.Tag = 'viola-notification'
-$toast.Group = 'viola'
-$notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier($appId)
-$notifier.Show($toast)
-""".replace("__APP_ID__", _ps_single_quote(app_id))
-        .replace("__TITLE__", _ps_single_quote(title[:160]))
-        .replace(
-            "__BODY__",
-            _ps_single_quote(body[:360]),
-        )
-    )
-
     creationflags = subprocess.CREATE_NO_WINDOW if hasattr(subprocess, "CREATE_NO_WINDOW") else 0
     # PowerShell is a full interpreter that can spawn grandchildren, so this is routed
     # through proc_tree.run's tree-killing runner (nosec B603 - fixed executable and
@@ -183,17 +197,17 @@ $notifier.Show($toast)
             "-NoProfile",
             "-NonInteractive",
             "-Command",
-            script,
+            _TOAST_SCRIPT,
         ],
+        env=_toast_environment(title, body, app_id),
         creationflags=creationflags,
         timeout=_TOAST_TIMEOUT_SECONDS,
     )
     if completed.returncode != 0:
-        logger.warning(
-            "Windows toast delivery failed: %s",
-            (completed.stderr or completed.stdout).strip(),
-        )
+        # PowerShell's own output can quote the notification text, so it is never logged.
+        logger.warning("Windows toast delivery failed: PowerShell exit code %s", completed.returncode)
         return False
+    logger.info("Windows toast shown: PowerShell exit code 0")
     return True
 
 

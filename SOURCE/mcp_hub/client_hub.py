@@ -1892,6 +1892,28 @@ class MCPClientHub:
         if isinstance(access_token, str) and access_token.strip():
             user_context_meta["cloud_access_token"] = access_token.strip()
 
+    def _attach_inprocess_scheduled_run(self, call_meta: dict[str, Any], server_name: str | None) -> None:
+        """Tell an in-process server that the calling turn is a fired scheduled command.
+
+        The memory transport pins the tool handler to the hub-build context (see
+        ``_attach_inprocess_cloud_bearer``), so the scheduler's ContextVar set for
+        the run is invisible there. The marker carries only the schedule id.
+        """
+
+        if not server_name:
+            return
+        config = self._configs.get(server_name) or self._deferred_server_configs.get(server_name)
+        if getattr(config, "transport", "") != "inprocess":
+            return
+        try:
+            from services.scheduler.service import SCHEDULED_RUN_META_KEY, scheduled_run_call_meta
+
+            marker = scheduled_run_call_meta()
+        except ImportError:
+            return
+        if marker is not None:
+            call_meta[SCHEDULED_RUN_META_KEY] = marker
+
     async def call_tool(
         self,
         name: str,
@@ -2269,6 +2291,9 @@ class MCPClientHub:
         # could not already reach. It is never attached for stdio/SSE servers,
         # so a third-party MCP server can never observe a user's GoTrue bearer.
         self._attach_inprocess_cloud_bearer(call_meta, server_name)
+        # Same reason for the scheduled-run marker: a tool must know whether the
+        # turn calling it is a fired scheduled command (services.scheduler.service).
+        self._attach_inprocess_scheduled_run(call_meta, server_name)
         # Claude parity (S6-007): forward ``claudecode/toolUseId`` on _meta so
         # MCP servers can correlate progress/audit log entries to the host
         # turn (``services/mcp/client.ts:1840-1843``).

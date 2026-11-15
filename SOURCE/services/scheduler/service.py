@@ -49,6 +49,15 @@ _CHECK_INTERVAL = 30  # seconds between due-schedule checks
 _MAX_CONCURRENT_SUBAGENTS = 3
 _SUBAGENT_TIMEOUT = 60.0  # seconds per sub-agent execution
 _SHUTDOWN_GRACE_PERIOD = 5.0  # seconds to wait for in-flight sub-agents
+# A reminder (or a scheduled command's reply) is said only when the voice is
+# free. The engine says one thing at a time, so during a long reading the call
+# waits for the reading to end; waiting past _SUBAGENT_TIMEOUT cancelled the
+# whole action and the notification was never shown (live: a reminder fired in
+# the middle of a 214 s reading and was lost). 15 s rides out a normal spoken
+# reply; with _DELIVERY_RESERVE_S kept for the notification (the toast runner's
+# own limit is 10 s) about 30 s are still left for words that did start.
+_SPEECH_WAIT_S = 15.0
+_DELIVERY_RESERVE_S = 12.0
 _ERROR_BACKOFF_SECONDS = TIMEOUT_5_MINUTES  # 300s backoff after error/timeout
 # A one-shot action (a reminder, alarm or timer set for a moment) that could not
 # run for more than a day is skipped and recorded instead of firing late: an
@@ -138,27 +147,63 @@ def current_scheduled_action_denied_tools() -> frozenset[str]:
     return _SCHEDULED_ACTION_DENIED_TOOLS.get() or frozenset()
 
 
-def scheduled_run_refusal(tool_name: str, args: Any) -> tuple[str, str | None] | None:
-    """While a fired scheduled command runs, refuse a call that would schedule more runs.
+def scheduled_run_refusal(what: str) -> str | None:
+    """Inside a fired scheduled command, refuse writing a schedule row for a later run.
 
-    Returns ``(what, schedule_id)`` for a refused call (``what`` is the tool and
-    its action, for the log), or ``None`` when the call may run. Outside a
-    scheduled run nothing is refused.
+    Called by the tool handlers at the point where they would write the row
+    (``notify`` with a later time, ``schedule`` create/update), never on the shape
+    of the request: a notification sent now writes no row and is not refused.
+    ``what`` names the tool and its action for the log line. Returns the text the
+    model is told, or ``None`` when the write may go ahead (outside a scheduled
+    run). Rows written by code without the model (calendar reminders, timers,
+    alarms) do not pass through here.
     """
 
     if _SCHEDULED_ACTION_DENIED_TOOLS.get() is None:
         return None
-    # A bare name or an MCP-qualified one (mcp__core__schedule).
-    name = str(tool_name or "").strip().rsplit("__", 1)[-1].lower()
-    fields = args if isinstance(args, dict) else {}
-    action = str(fields.get("action") or "").strip().lower()
-    run = _SCHEDULED_RUN_ID.get()
-    run_id = None if run is None else str(run)
-    if name == "schedule" and action in {"create", "update"}:
-        return "schedule %s" % action, run_id
-    if name == "notify" and str(fields.get("when") or "").strip() and action not in {"list", "delete"}:
-        return "notify with a time", run_id
-    return None
+    logger.warning(
+        "Scheduled run %s: refused %s (a scheduled command does not schedule more)", _SCHEDULED_RUN_ID.get(), what
+    )
+    return SCHEDULED_RUN_REFUSAL
+
+
+# The in-process tool server runs each tool in a task created when the hub was
+# built, so it never sees this module's ContextVars as the calling turn set them.
+# The hub sends the caller's state along with the call under this key
+# (mcp_hub/client_hub.py), and the server binds it for the call
+# (mcp_servers/core_tools/server.py).
+SCHEDULED_RUN_META_KEY = "viola_scheduled_run"
+
+
+def scheduled_run_call_meta() -> dict[str, Any] | None:
+    """The calling turn's scheduled-run marker for a tool call, or None outside a run."""
+
+    if _SCHEDULED_ACTION_DENIED_TOOLS.get() is None:
+        return None
+    return {"schedule_id": _SCHEDULED_RUN_ID.get()}
+
+
+@contextlib.contextmanager
+def scheduled_run_from_call_meta(marker: Any):
+    """Bind the caller's scheduled-run state (from ``scheduled_run_call_meta``) for one tool call.
+
+    No marker means the caller is not a scheduled run, and that is bound too, so
+    whatever the server's own task happened to capture never decides.
+    """
+
+    if isinstance(marker, dict):
+        raw = marker.get("schedule_id")
+        schedule_id = raw if isinstance(raw, int) and not isinstance(raw, bool) else None
+        with _scheduled_action_tool_guard(schedule_id):
+            yield
+        return
+    token = _SCHEDULED_ACTION_DENIED_TOOLS.set(None)
+    run_token = _SCHEDULED_RUN_ID.set(None)
+    try:
+        yield
+    finally:
+        _SCHEDULED_RUN_ID.reset(run_token)
+        _SCHEDULED_ACTION_DENIED_TOOLS.reset(token)
 
 
 @contextlib.contextmanager
@@ -1222,7 +1267,9 @@ class SchedulerService:
                 ),
             ) from exc
 
-    async def _deliver_schedule_reply(self, schedule: Schedule, result: dict[str, Any]) -> None:
+    async def _deliver_schedule_reply(
+        self, schedule: Schedule, result: dict[str, Any], *, deadline: float | None = None
+    ) -> None:
         """Say what a model-run schedule produced; nobody else will.
 
         A typed or spoken request has a caller waiting for the reply. A schedule
@@ -1231,12 +1278,13 @@ class SchedulerService:
         reply = _schedule_reply_text(result)
         if not reply:
             return
+        if deadline is None:
+            deadline = time.monotonic() + _SUBAGENT_TIMEOUT
         spoken = False
         speak = getattr(getattr(self._intent_pipeline, "tts", None), "speak", None)
         if callable(speak):
             try:
-                await speak(reply)
-                spoken = True
+                spoken = await _say_when_voice_free(speak, reply, schedule_id=schedule.id, deadline=deadline)
             except (RuntimeError, OSError, TypeError, ValueError) as exc:
                 logger.warning("Scheduled reply TTS failed for schedule=%s: %s", schedule.id, exc)
         from intent.tools.notification_tools import deliver_notification_handler
@@ -1257,6 +1305,8 @@ class SchedulerService:
         ``finally`` so a slow/erroring sub-agent cannot leak the schedule
         owner's ContextVar onto whatever runs next on the same task.
         """
+        # The scheduler cancels the whole action at _SUBAGENT_TIMEOUT; speech waits within it.
+        deadline = time.monotonic() + _SUBAGENT_TIMEOUT
         with user_scope(schedule.user_id):
             structured_action = decode_tool_action(schedule.action)
             if structured_action is None and str(schedule.action or "").strip().lower() == "play alarm sound":
@@ -1264,20 +1314,24 @@ class SchedulerService:
                 # instead of sending the words through the model.
                 structured_action = {"tool": "alarm", "args": {"action": "sound", "label": schedule.label or "Alarm"}}
             if structured_action is not None:
-                return await self._dispatch_structured_action(schedule, structured_action)
+                return await self._dispatch_structured_action(schedule, structured_action, deadline=deadline)
 
             process = getattr(self._intent_pipeline, "process", None)
             if callable(process):
                 with _scheduled_action_tool_guard(schedule.id):
                     result = _schedule_result_fields(await process(schedule.action, user_key=schedule.user_id))
                 if result.get("ok"):
-                    await self._deliver_schedule_reply(schedule, result)
+                    await self._deliver_schedule_reply(schedule, result, deadline=deadline)
                 return result
 
             raise RuntimeError("Scheduled action could not be processed (pipeline unavailable)")
 
-    async def _dispatch_structured_action(self, schedule: Schedule, action: dict[str, Any]) -> dict[str, Any]:
+    async def _dispatch_structured_action(
+        self, schedule: Schedule, action: dict[str, Any], *, deadline: float | None = None
+    ) -> dict[str, Any]:
         """Dispatch a tool-owned scheduler action without LLM or instant routing."""
+        if deadline is None:
+            deadline = time.monotonic() + _SUBAGENT_TIMEOUT
         tool = str(action.get("tool") or "").strip().lower()
         raw_args = action.get("args")
         args = raw_args if isinstance(raw_args, dict) else {}
@@ -1311,8 +1365,7 @@ class SchedulerService:
                     # Said with the card's wording ("Reminder: Stretch"), not the bare word.
                     words = reminder_wording(message)
                     logger.info("Scheduled reminder schedule=%s: saying %r", schedule.id, words)
-                    await speak(words)
-                    spoken = True
+                    spoken = await _say_when_voice_free(speak, words, schedule_id=schedule.id, deadline=deadline)
                 except (RuntimeError, OSError, TypeError, ValueError) as exc:
                     logger.warning("Scheduled reminder TTS failed for schedule=%s: %s", schedule.id, exc)
 
@@ -1384,6 +1437,60 @@ def _schedule_result_fields(result: Any) -> dict[str, Any]:
     if ok is None:
         return {"ok": False, "error": "the action returned no result"}
     return {"ok": bool(ok), "error": getattr(result, "error", None), "data": getattr(result, "data", None)}
+
+
+def _own_speech_started(called_at: float) -> bool:
+    """True when the voice started speaking after ``called_at`` (the words asked for then are playing).
+
+    Reads the speaking state every engine reports (``diagnostics.wake_state_sync``):
+    a reading in progress started before the call; words that got the voice once
+    it was free started after it.
+    """
+    try:
+        from diagnostics.wake_state_sync import get_state_sync_monitor
+
+        tts = get_state_sync_monitor().get_sync_health().tts_state
+        started = tts.speech_start_timestamp
+        return bool(tts.is_speaking) and started is not None and started >= called_at
+    except Exception:  # noqa: BLE001, RUF100 - a diagnostics read must never decide delivery
+        return False
+
+
+async def _say_when_voice_free(speak: Any, words: str, *, schedule_id: Any, deadline: float) -> bool:
+    """Say ``words`` if the voice becomes free in time; True when they were said.
+
+    Voice free: the words are said in full, as before. Still busy after
+    ``_SPEECH_WAIT_S``: the call, which is only waiting for its turn, is dropped,
+    one WARNING is logged, and False is returned so the caller shows the
+    notification. The speech in progress is not interrupted and nothing is queued
+    for later. An error from the engine itself reaches the caller as before.
+    """
+    called_at = time.time()
+    budget = max(0.0, deadline - time.monotonic() - _DELIVERY_RESERVE_S)
+    task = asyncio.ensure_future(speak(words))
+    done, _pending = await asyncio.wait({task}, timeout=min(_SPEECH_WAIT_S, budget))
+    if not done and _own_speech_started(called_at):
+        # The voice became free and these words are playing: let them finish.
+        left = max(0.0, deadline - time.monotonic() - _DELIVERY_RESERVE_S)
+        done, _pending = await asyncio.wait({task}, timeout=left)
+    if done:
+        task.result()
+        return True
+    started = _own_speech_started(called_at)
+    task.cancel()
+    await asyncio.gather(task, return_exceptions=True)
+    if started:
+        logger.warning(
+            "Schedule %s: speech ran past the time left and was stopped; delivered as a notification",
+            schedule_id,
+        )
+    else:
+        logger.warning(
+            "Schedule %s: the voice stayed busy for %.0fs; not spoken, delivered as a notification",
+            schedule_id,
+            time.time() - called_at,
+        )
+    return False
 
 
 def _schedule_reply_text(result: dict[str, Any]) -> str:

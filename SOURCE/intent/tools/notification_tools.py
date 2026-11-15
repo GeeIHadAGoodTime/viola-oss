@@ -45,6 +45,14 @@ def _sms_transport_configured() -> bool:
     return False
 
 
+_NOW_WORDS = frozenset({"now", "right now", "immediately"})
+
+
+def _means_now(when: str | None) -> bool:
+    """True for a ``when`` that asks for delivery at once ("now")."""
+    return " ".join(str(when or "").lower().split()).strip(" .!") in _NOW_WORDS
+
+
 def _parse_when(when: str | None, *, now: datetime | None = None) -> datetime | None:
     """Parse `when` into an aware UTC datetime, or None if unparseable.
 
@@ -82,6 +90,10 @@ async def notify_handler(
             ),
         )
 
+    if _means_now(when):
+        # "now" is a delivery time the model sends for a notification it wants
+        # shown at once; it is not a time to schedule, and not unparseable.
+        when = None
     scheduled_at = _parse_when(when)
 
     # A caller who supplied a delivery time expects the notification to be
@@ -98,6 +110,13 @@ async def notify_handler(
         )
 
     if scheduled_at is not None:
+        from services.scheduler.service import scheduled_run_refusal
+
+        # Inside a fired scheduled command a reminder for later would be a new
+        # schedule row made by an unattended run (the live loop); one sent now is not.
+        refused = scheduled_run_refusal("notify with a time")
+        if refused is not None:
+            return ToolResult(ok=False, data=None, error=refused)
         try:
             from services.scheduler.service import get_scheduler_service
 
