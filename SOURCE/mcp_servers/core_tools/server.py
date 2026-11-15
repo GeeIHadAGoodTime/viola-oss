@@ -4114,9 +4114,8 @@ async def memory(
 
 @server.tool(
     description=(
-        "Save or correct the user's own delivery address when they want it kept, from their words only. No confirmation first. "
-        "Call it with whatever part of the address the user gave, even without the city or ZIP code; it says what to "
-        "ask for. Say the returned read_back word for word."
+        "Save or correct the user's own delivery address to keep, from their words only. No confirmation first. "
+        "Send any part they gave, even with no city or ZIP; it says what to ask. Say read_back verbatim."
     ),
     annotations=_SAFE,
     meta={"risk": "safe", "anthropic/alwaysLoad": True},
