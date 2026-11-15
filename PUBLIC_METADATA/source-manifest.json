@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "ed78d143aa5de8eb9888dd26fd958edec2b29896",
-  "sha256": "1e205b79242631446fe81c51833bd5c57738291903142428aa4871c9fc0ebb03",
+  "revision": "d61afebc5657ba8c7165bf2533a7477ca17f17d7",
+  "sha256": "f0283665b169f80a1b70bac28d1b38384c2ddd4b374dd55d785499afd131f8c3",
   "files": [
     {
       "path": ".env.example",
@@ -1605,8 +1605,8 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "6395d11d7cd6a9031916d3832698590f26871654eb195b2bf8990fef10efa1c4",
-      "bytes": 647779
+      "sha256": "8e17808bf4c465340b2cbc92fd969394ef4222e0960542feea949f986d421697",
+      "bytes": 650400
     },
     {
       "path": "intent/agent_loop.py",
@@ -4855,8 +4855,8 @@
     },
     {
       "path": "services/memory/extract_memories.py",
-      "sha256": "931bac2e97855380f71326861aa9ab0befb4d272e665972290a69fc377024dc9",
-      "bytes": 21008
+      "sha256": "3d2fd6643d5a8939384e21c9cccc516d13917fec5820ab07d50bdfeaa483cb96",
+      "bytes": 39164
     },
     {
       "path": "services/memory/hygiene.py",

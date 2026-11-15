@@ -30,10 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "1aa8a888042385b47f255302775ef691ecf430c3c020c9bdff61061f6308d9b9",
-  "source_tree_sha256": "1e205b79242631446fe81c51833bd5c57738291903142428aa4871c9fc0ebb03",
+  "source_manifest_sha256": "1fc9933fadb5c3a155e6bea8888107ebdd5038a56cf389d824479a7ea78f80a4",
+  "source_tree_sha256": "f0283665b169f80a1b70bac28d1b38384c2ddd4b374dd55d785499afd131f8c3",
   "source_file_count": 2829,
-  "source_revision": "ed78d143aa5de8eb9888dd26fd958edec2b29896",
+  "source_revision": "d61afebc5657ba8c7165bf2533a7477ca17f17d7",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "LICENSES/SPEECH_COMPONENT_NOTICES.md",
@@ -693,8 +693,8 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "ed78d143aa5de8eb9888dd26fd958edec2b29896",
-    "kind": "build-12 integration: gate2, speech2, scheduled-run guard"
+    "source_commit": "d61afebc5657ba8c7165bf2533a7477ca17f17d7",
+    "kind": "build-12 integration: gate2, speech2, schedule guard, addr3"
   },
   "historical_bindings": [
     {
