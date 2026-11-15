@@ -346,7 +346,10 @@ def _other_tabs(document: int, title: str) -> tuple[str, ...]:
     current = normalize_control_name(title)
     others = []
     for tab in tabs:
+        # Notepad names a tab "notes. Modified." when it holds unsaved changes.
         cleaned = normalize_control_name(tab).lstrip("*").strip()
+        if cleaned.endswith(". modified"):
+            cleaned = cleaned[: -len(". modified")].strip()
         if cleaned and cleaned in current:
             # The tab being closed is named in the window title ("notes - Notepad").
             continue

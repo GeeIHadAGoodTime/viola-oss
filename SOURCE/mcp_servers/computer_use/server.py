@@ -1016,7 +1016,12 @@ async def computer(
 
         if action == "launch_app":
             result = app_launcher.launch_app(app_name or title or window_title, bring_to_front=bring_to_front)
-            if isinstance(result, dict) and result.get("ok", True) and result.get("hwnd"):
+            if (
+                isinstance(result, dict)
+                and result.get("ok", True)
+                and result.get("hwnd")
+                and not result.get("already_open")
+            ):
                 opened_handle = int(result.get("hwnd") or 0)
                 safety.record_opened_window(
                     opened_handle,
