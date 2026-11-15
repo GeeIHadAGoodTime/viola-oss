@@ -225,6 +225,10 @@ def _computer_use_whitelist_allows(args: Mapping[str, Any] | None) -> bool:
 # reads as "no consent" (1.0.5 laptop A6.3).
 _COMPUTER_USE_CALL_IDENTITY: ContextVar[tuple[str, str] | None] = ContextVar("computer_use_call_identity", default=None)
 
+# Added to the arguments a discard question is matched on, so a yes is bound to
+# the window it was asked about. Stripped before the model sees the question.
+DISCARD_WINDOW_ARG = "_discard_window"
+
 
 def computer_use_call_identity(user_context: Any) -> tuple[str, str]:
     """(user_id, grant session id) the computer tool will see for this call's context."""
@@ -1346,6 +1350,66 @@ class ApprovalBridge:
         finally:
             if channel is not None and original_channel is None:
                 self._approval._channel = original_channel
+
+    async def check_discard_approval(
+        self,
+        details: Mapping[str, Any],
+        tool_args: Mapping[str, Any] | None = None,
+        *,
+        channel: Any | None = None,
+    ) -> bool:
+        """Ask before a desktop action throws away unsaved work in one window.
+
+        The computer tool decides from the screen that the action would press
+        "Don't save" (by name, ref, point, or a key press into a save prompt)
+        and holds it. This asks through the same card and yes/no flow as any
+        other approval, but nothing short of the user's answer counts: no app
+        grant, whitelist, allow rule, permission mode or hook skips it. The
+        question is bound to the window, so a yes for one Notepad window never
+        covers another. Raises ``ConfirmationDeferred`` like ``check_approval``.
+        """
+        window_handle = int(details.get("window_handle") or 0)
+        description = str(details.get("planned_action") or "throw away the unsaved changes")
+        approval_args = dict(tool_args or {})
+        approval_args[DISCARD_WINDOW_ARG] = window_handle
+        user_id, _session_id = self._resolve_permission_identity()
+        decision = PermissionDecision(
+            behavior="ask",
+            source="discardUnsavedWork",
+            mode=self._permission_mode,
+            reason="This throws away unsaved work and cannot be undone.",
+            risk_level=RiskLevel.DANGEROUS,
+        )
+        self.last_permission_decision = decision
+        original_channel = getattr(self._approval, "channel", None)
+        if channel is not None and original_channel is None:
+            self._approval._channel = channel
+
+        from intent.approval import ConfirmationDeferred
+
+        try:
+            try:
+                approved = await _request_permission_decision(
+                    self._approval,
+                    decision,
+                    action_description=description,
+                    tool_name="computer",
+                    tool_args=approval_args,
+                    task_id=_active_agent_task_id(),
+                )
+            except ConfirmationDeferred:
+                await _broadcast_approval_state("computer", description, "deferred", user_id)
+                raise
+        finally:
+            if channel is not None and original_channel is None:
+                self._approval._channel = original_channel
+        await _broadcast_approval_state("computer", description, "approved" if approved else "denied", user_id)
+        logger.info(
+            "Discard of unsaved work %s by the user (window_handle=%s)",
+            "approved" if approved else "declined",
+            window_handle,
+        )
+        return bool(approved)
 
     async def _dispatch_permission_request_hook(
         self,

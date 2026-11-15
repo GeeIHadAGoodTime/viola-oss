@@ -6,7 +6,7 @@ import os
 import re
 import time
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from core.logging_config import get_logger
@@ -103,6 +103,14 @@ COMPUTER_USE_MUTATING_ACTIONS: frozenset[str] = frozenset(
 # approval cannot grant desktop control for the whole process lifetime.
 _SESSION_APP_GRANTS: dict[tuple[str, str, str], float] = {}
 _LOW_LEVEL_HELD_KEYS: dict[tuple[str, str], set[str]] = {}
+# Throwing away unsaved work is never covered by an app grant or the whitelist.
+# One "yes" covers one discard in one window: (owner, session, window handle)
+# -> monotonic expiry. Consumed by the action it was given for.
+DISCARD_APPROVAL_TTL_SECONDS = 120.0
+_DISCARD_APPROVALS: dict[tuple[str, str, int], float] = {}
+# Windows Viola opened in this conversation: (owner, session) -> {hwnd: executable}.
+# "Close Notepad" with several Notepad windows open means the one she opened.
+_OPENED_WINDOWS: dict[tuple[str, str], dict[int, str]] = {}
 _CONTROL_SESSION_LOCKS: dict[str, ComputerUseControlSession] = {}
 _KEY_ALIASES: dict[str, str] = {
     "control": "ctrl",
@@ -123,15 +131,20 @@ class ComputerUseRefusal(Exception):
     reason: str
     action: str = ""
     target_app_executable: str = ""
+    details: Mapping[str, object] | None = field(default=None, hash=False, compare=False)
 
     def to_envelope(self) -> dict[str, object]:
-        return {
+        envelope: dict[str, object] = {
             "ok": False,
             "error_category": self.error_category,
             "reason": self.reason,
             "action": self.action,
             "target_app_executable": self.target_app_executable,
         }
+        if self.details:
+            for key, value in self.details.items():
+                envelope.setdefault(str(key), value)
+        return envelope
 
 
 @dataclass(frozen=True)
@@ -417,6 +430,72 @@ def clear_session_app_grants(*, user_id: str | None = None, session_id: str | No
     session = str(session_id or "local-session").strip() or "local-session"
     for key in [key for key in _SESSION_APP_GRANTS if key[0] == owner and key[1] == session]:
         _SESSION_APP_GRANTS.pop(key, None)
+
+
+def _owner_session(user_id: str | None, session_id: str | None) -> tuple[str, str]:
+    owner = _resolve_local_user_id(user_id)
+    session = str(session_id or "local-session").strip() or "local-session"
+    return owner, session
+
+
+def grant_discard_once(
+    window_handle: int,
+    *,
+    user_id: str | None = None,
+    session_id: str | None = None,
+) -> bool:
+    """Record the user's "yes" to throwing away the unsaved work in one window, once."""
+    handle = int(window_handle or 0)
+    if not handle:
+        return False
+    owner, session = _owner_session(user_id, session_id)
+    _DISCARD_APPROVALS[(owner, session, handle)] = time.monotonic() + DISCARD_APPROVAL_TTL_SECONDS
+    return True
+
+
+def consume_discard_approval(
+    window_handle: int,
+    *,
+    user_id: str | None = None,
+    session_id: str | None = None,
+) -> bool:
+    """Use up the one-time discard approval for this window. False when there is none."""
+    handle = int(window_handle or 0)
+    if not handle:
+        return False
+    owner, session = _owner_session(user_id, session_id)
+    expiry = _DISCARD_APPROVALS.pop((owner, session, handle), None)
+    return expiry is not None and time.monotonic() < expiry
+
+
+def clear_discard_approvals() -> None:
+    _DISCARD_APPROVALS.clear()
+
+
+def record_opened_window(
+    window_handle: int | None,
+    executable: str | None,
+    *,
+    user_id: str | None = None,
+    session_id: str | None = None,
+) -> None:
+    """Remember a window launch_app opened in this conversation."""
+    handle = int(window_handle or 0)
+    if not handle:
+        return
+    windows = _OPENED_WINDOWS.setdefault(_owner_session(user_id, session_id), {})
+    windows[handle] = normalize_executable_name(executable)
+    if len(windows) > 64:
+        for stale in list(windows)[: len(windows) - 64]:
+            windows.pop(stale, None)
+
+
+def opened_windows(*, user_id: str | None = None, session_id: str | None = None) -> dict[int, str]:
+    return dict(_OPENED_WINDOWS.get(_owner_session(user_id, session_id), {}))
+
+
+def clear_opened_windows() -> None:
+    _OPENED_WINDOWS.clear()
 
 
 def require_action_consent(

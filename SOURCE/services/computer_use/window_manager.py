@@ -322,7 +322,9 @@ def _window_to_info(window: Any) -> WindowInfo:
 
 
 def list_windows(*, include_minimized: bool = True, include_titles: bool = True) -> dict[str, object]:
-    """List open top-level windows. A minimized window is open, so it is listed and marked.
+    """List open top-level windows. A minimized window is open, so it is always listed and marked.
+
+    ``include_minimized`` is accepted for old callers and no longer hides anything.
 
     Windows uses Win32 EnumWindows (UIA only if that returns nothing). macOS uses native Quartz
     ``CGWindowListCopyWindowInfo`` — the UIA backend is Windows-only and
@@ -332,7 +334,7 @@ def list_windows(*, include_minimized: bool = True, include_titles: bool = True)
     list instead of raising out of the Win32/UIA bindings.
     """
     if _IS_DARWIN:
-        return _list_windows_darwin(include_minimized=include_minimized, include_titles=include_titles)
+        return _list_windows_darwin(include_minimized=True, include_titles=include_titles)
     if not _IS_WINDOWS:
         logger.debug("No native window-listing path on %s; reporting empty", sys.platform)
         return {"ok": True, "action": "list_windows", "windows": [], "count": 0}
@@ -369,9 +371,11 @@ def list_windows(*, include_minimized: bool = True, include_titles: bool = True)
         if info.class_name in _SHELL_CHROME_CLASSES:
             chrome += 1
             continue
-        if info.minimized and not include_minimized:
-            minimized_out += 1
-            continue
+        # A minimized window is always listed (marked minimized=True). Strict tool
+        # schemas make the model send every argument, and it sent
+        # include_minimized=false on the 1.0.5 build-11 laptop
+        # (minimized_left_out=7), so "is Notepad open" was answered from a list
+        # with the Notepad windows taken out. The argument is still accepted.
         if not info.title if source == "win32" else (not info.title and not info.executable):
             # EnumWindows also returns the untitled helper windows every app owns.
             unnamed += 1
@@ -1088,7 +1092,7 @@ def describe_desktop(monitor: Any) -> str:
         visible = list_windows(include_minimized=False, include_titles=False)
         apps = []
         for item in visible.get("windows", []):
-            if isinstance(item, dict):
+            if isinstance(item, dict) and not item.get("minimized"):
                 executable = str(item.get("executable", "") or "")
                 if executable and executable not in apps:
                     apps.append(executable)

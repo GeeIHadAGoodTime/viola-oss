@@ -180,8 +180,11 @@ def irreversible_action_class(
             return "calendar_write"
     if name == "memory" and action in _MEMORY_DELETE_ACTIONS:
         return "memory_delete"
-    if _discards_unsaved_work(name, args):
-        return "discard_unsaved_work"
+    # Throwing away unsaved work in a desktop app ("Don't save") is not decided
+    # here from the call's arguments: the model reached the button by element
+    # ref, by coordinate and by key press, none of which name it (1.0.5 build 11
+    # laptop). The computer tool decides it from the screen and the approval
+    # bridge asks (services/computer_use/discard_guard.py).
     if name == "payment":
         if action in _PAYMENT_SAFE_ACTIONS:
             return None
@@ -198,22 +201,6 @@ def irreversible_action_class(
         return "oauth_connect"
 
     return None
-
-
-_DISCARD_BUTTON_NAMES = frozenset({"don't save", "dont save", "do not save", "discard", "discard changes"})
-
-
-def _discards_unsaved_work(tool_name: str, args: Mapping[str, Any] | None) -> bool:
-    """A click on the "Don't save" button of a real app. It cannot be undone.
-
-    Consent for an app lasts the session, so this click would otherwise go through
-    with no question at all once the user had said yes to anything in that app.
-    """
-    params = args or {}
-    if tool_name != "computer" or "click" not in str(params.get("action") or "").lower():
-        return False
-    name = " ".join(str(params.get("name") or "").replace("\u2019", "'").lower().split())
-    return name in _DISCARD_BUTTON_NAMES
 
 
 def _gmail_message_count(args: Mapping[str, Any] | None) -> int:
