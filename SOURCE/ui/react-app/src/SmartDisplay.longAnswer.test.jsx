@@ -10,8 +10,15 @@ describe('long answers', () => {
   it('puts a long background-agent result on the big card with a short response line', () => {
     const essay = 'The cello is a bowed string instrument. '.repeat(60);
     const view = agentResultView(essay, false);
-    expect(view.card).toEqual({ type: 'detail', body: essay, long_answer: true });
+    expect(view.card).toEqual({ type: 'detail', body: essay, long_answer: true, markdown: true });
     expect(view.line.length).toBeLessThanOrEqual(163);
+  });
+
+  it('asks the card to draw the agent result as Markdown (build 12)', () => {
+    const view = agentResultView(`# The Cello
+
+${'The *violoncello* is a string instrument. '.repeat(20)}`, false);
+    expect(view.card.markdown).toBe(true);
   });
 
   it('keeps a short result in the response line without a card', () => {

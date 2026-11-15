@@ -323,6 +323,19 @@ def _load_call_history_entry(call_dir: Path) -> CallHistoryEntry | None:
         return None
 
 
+def _is_listable_history_entry(entry: CallHistoryEntry) -> bool:
+    """False for a bookkeeping stub with no number and no start time.
+
+    ``update_call_history_billing_fields`` writes a minimal entry
+    (call_id, user_id, status, cost) when a carrier update lands before the
+    call's own record is saved. Until the full save merges over it the entry has
+    no phone number and no timestamps, and the call log showed it as
+    "Unknown recipient / ACTIVE / Unknown date". A call that was never answered
+    has no ``started_at`` but still has its number, so it stays listed.
+    """
+    return bool(entry.phone_number) or bool(entry.started_at)
+
+
 def list_call_history(user_id: str | None, limit: int = 50, offset: int = 0) -> list[CallHistoryEntry]:
     """List saved call records for one user, newest first.
 
@@ -356,7 +369,7 @@ def list_call_history(user_id: str | None, limit: int = 50, offset: int = 0) -> 
         if raw_data.get("user_id") != user_id:
             continue
         entry = _load_call_history_entry(call_dir)
-        if entry is not None:
+        if entry is not None and _is_listable_history_entry(entry):
             entries.append(entry)
 
     return entries[offset : offset + limit]

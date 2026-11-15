@@ -235,10 +235,12 @@ const RESPONSE_LINE_MAX_CHARS = 160;
  * it docks in the corner, the video stays bright, and it leaves in 15 s. The
  * full text stays in Chat History.
  */
-export function longAnswerCard(body, overVideo) {
-  return overVideo
+export function longAnswerCard(body, overVideo, markdown = false) {
+  const card = overVideo
     ? { type: 'detail', body, long_answer: true, compact: true, dismiss_after_ms: LONG_ANSWER_OVER_VIDEO_MS }
     : { type: 'detail', body, long_answer: true };
+  // A background agent writes Markdown; the card draws it like the chat does.
+  return markdown ? { ...card, markdown: true } : card;
 }
 
 // A background agent's result: the response line, and the big card when it is
@@ -246,7 +248,7 @@ export function longAnswerCard(body, overVideo) {
 export function agentResultView(content, overVideo) {
   const text = typeof content === 'string' ? content : String(content ?? '');
   if (text.trim().length > LONG_ANSWER_CARD_CHARS) {
-    return { text, line: truncateForResponseLine(text), card: longAnswerCard(text, overVideo) };
+    return { text, line: truncateForResponseLine(text), card: longAnswerCard(text, overVideo, true) };
   }
   return { text, line: text, card: null };
 }
@@ -265,6 +267,13 @@ const WEATHER_FORECAST_TTL_MS = 30 * 60 * 1000;
 // How long the UI socket may be down before "Connection lost" is shown. The
 // socket retries after 2 s, so a quick drop (e.g. waking from sleep) stays quiet.
 const DISCONNECT_TOAST_GRACE_MS = 6000;
+const PHONE_LIVE_EVENT_TYPES = new Set([
+  'call_started',
+  'call_briefing',
+  'call_consultation',
+  'call_cost_update',
+  'recipient_state',
+]);
 
 function hasForecastPayload(data) {
   const hourly = data?.hourly_forecast || data?.hourly;
@@ -819,6 +828,11 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
     applyCostUpdate: applyCallCostUpdate,
   } = useCallAudio(activeCallId);
   const callFallbackStartRef = useRef(Date.now());
+  // Calls that already sent call_ended. A late call_started / cost / recipient
+  // frame (the cloud repeats call_started while the call waits for its voice
+  // worker) or a stale "is a call live?" answer must not bring the live-call
+  // screen back for a call that is over.
+  const endedCallIdsRef = useRef(new Set());
   const pendingCallTakeoverRef = useRef(false);
   const activeCallPanelMeta = useMemo(() => {
     const merged = {
@@ -2027,7 +2041,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   // Video started while a long answer is up: the answer gets out of the way.
   useEffect(() => {
     if (!videoPlaying) return;
-    setActiveCard((card) => (card?.long_answer && !card.compact ? longAnswerCard(card.body, true) : card));
+    setActiveCard((card) => (card?.long_answer && !card.compact ? longAnswerCard(card.body, true, card.markdown) : card));
   }, [videoPlaying]);
   useEffect(() => {
     if (!setChatResponseCallback) return;
@@ -2218,6 +2232,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       try {
         const active = await fetchActiveCall();
         if (cancelled || !active || !active.call_id) return;
+        if (endedCallIdsRef.current.has(active.call_id)) return;
         callFallbackStartRef.current = Date.now();
         rememberCallMeta(active, active.call_id, true);
         setActiveCallId(active.call_id);
@@ -2237,6 +2252,15 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
     const callId = payload.call_id || payload.id;
 
     if (handlePaidActionGatePayload(data)) {
+      return;
+    }
+
+    if (
+      callId
+      && endedCallIdsRef.current.has(callId)
+      && data.type !== 'call_ended'
+      && PHONE_LIVE_EVENT_TYPES.has(data.type)
+    ) {
       return;
     }
 
@@ -2285,6 +2309,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       setPhoneCallQueue(Array.isArray(payload.queue) ? payload.queue : []);
     } else if (data.type === 'call_ended') {
       if (callId && activeCallId && callId !== activeCallId) return;
+      if (callId) endedCallIdsRef.current.add(callId);
       const endedCall = {
         ...(activeCallMeta || {}),
         ...(payload || {}),

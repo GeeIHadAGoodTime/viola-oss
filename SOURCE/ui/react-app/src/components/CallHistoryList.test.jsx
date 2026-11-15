@@ -146,3 +146,45 @@ describe('CallHistoryList', () => {
   });
 
 });
+
+describe('CallHistoryList bookkeeping stubs', () => {
+  beforeEach(() => {
+    fetchCallHistory.mockReset();
+    getCallTranscript.mockReset();
+  });
+
+  // Build 12: a stub with only call_id, user_id, status and cost came back from
+  // the server and rendered as "Unknown recipient / ACTIVE / Unknown date".
+  it('never lists a call with no number and no start time', async () => {
+    fetchCallHistory.mockResolvedValueOnce({
+      count: 2,
+      calls: [{ call_id: 'stub-1', status: 'active', duration_seconds: 0 }, firstCall],
+    });
+
+    render(<CallHistoryList />);
+
+    expect(await screen.findByText('+1 555 0100')).toBeInTheDocument();
+    expect(screen.getAllByTestId('call-history-row')).toHaveLength(1);
+    expect(screen.queryByText('Unknown recipient')).toBeNull();
+    expect(screen.queryByText('Unknown date')).toBeNull();
+  });
+
+  it('still lists a call that was never answered (number, no start time)', async () => {
+    fetchCallHistory.mockResolvedValueOnce({
+      count: 1,
+      calls: [{ call_id: 'no-answer', phone_number: '+1 555 0111', status: 'no_answer', created_at: '2026-05-09T17:00:00Z' }],
+    });
+
+    render(<CallHistoryList />);
+
+    expect(await screen.findByText('+1 555 0111')).toBeInTheDocument();
+  });
+
+  it('shows the empty state when the only row is a stub', async () => {
+    fetchCallHistory.mockResolvedValueOnce({ count: 1, calls: [{ call_id: 'stub-2', status: 'active' }] });
+
+    render(<CallHistoryList />);
+
+    expect(await screen.findByTestId('call-history-empty')).toBeInTheDocument();
+  });
+});

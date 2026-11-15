@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "b0589e22510d738aa4ed4386b0ca916e7c848a3b",
-  "sha256": "bc82493c668fa9766a21e34d52717930b2f1638bd22d3a706a2991dbdf0faf95",
+  "revision": "525d325e9feb0f7703503d20f4ddbef5051487b2",
+  "sha256": "aa9146477a4e9860328d604aeeea387a3f959efae1c0c4b139a00ef83b4df545",
   "files": [
     {
       "path": ".env.example",
@@ -1650,8 +1650,8 @@
     },
     {
       "path": "intent/command_executor.py",
-      "sha256": "41cd2d6c295761250788f4d59d7831a8097e2454e1122cdd71e967e779dcb2f2",
-      "bytes": 119546
+      "sha256": "f83c120c061c9e9096879c6f799f7206b75251d795ef8d677c363d38fd0d9f3f",
+      "bytes": 119210
     },
     {
       "path": "intent/commands/__init__.py",
@@ -2120,8 +2120,8 @@
     },
     {
       "path": "intent/tools/media_tools.py",
-      "sha256": "6409b2a7e052095e24a3d627c8a1fda6004157d49e03cd5861a57d49cba40bb7",
-      "bytes": 43553
+      "sha256": "a3fea509653094ebf1aa0a2fda5cbfd9683c7e1beb4869ff8ac7ab8f996999c1",
+      "bytes": 42333
     },
     {
       "path": "intent/tools/memory.py",
@@ -2135,8 +2135,8 @@
     },
     {
       "path": "intent/tools/music_tools.py",
-      "sha256": "cfd9d2bde9359b6f1c6e495faf799e0da41d5df0a4e3816cff64a9ace2b8c4d3",
-      "bytes": 83994
+      "sha256": "0ea41e23b032c0e4fa34ddb946251ff5fe2ec20718961f836a95cc33a0a824ca",
+      "bytes": 82546
     },
     {
       "path": "intent/tools/notification_tools.py",
@@ -2475,18 +2475,13 @@
     },
     {
       "path": "models/player.py",
-      "sha256": "4ea39d16b1bcebac188d0646a5dedf585fbf50266615ca340e0108c91f3d896d",
-      "bytes": 12378
+      "sha256": "dc67efa576a2fc946bd561e30614454b53e7d050cccafd430233f657b27dc17f",
+      "bytes": 11522
     },
     {
       "path": "models/state_manager.py",
       "sha256": "c48e3ccdedeb514ace64d2d8218b5d4200a6c6139f64102a2a924ccf0931d4c6",
       "bytes": 16042
-    },
-    {
-      "path": "models/track_title.py",
-      "sha256": "9598141faf13d7eebdcda6d586e0ff4dfa9c8e4f516eed02111adc1b1b88b7ce",
-      "bytes": 1030
     },
     {
       "path": "models/transactions.py",
@@ -2935,8 +2930,8 @@
     },
     {
       "path": "music/playlists/playlist_player.py",
-      "sha256": "2025a60a87ccf2b2530c270d2e89291037a02b0dc624933fadb2806c56ed6c03",
-      "bytes": 10949
+      "sha256": "be2393a5df6d8e6d0fc45de68874e9d48a48949741c70265ba4837b8a22141c5",
+      "bytes": 10686
     },
     {
       "path": "music/playlists/playlist_store.py",
@@ -3185,8 +3180,8 @@
     },
     {
       "path": "music/resolution/provider_router.py",
-      "sha256": "6ddc61980afa90176d4e503ff4af65ab0c89c44cb7ceca2a0761eff842ad9d5e",
-      "bytes": 34264
+      "sha256": "54d72369b5d3f9585aaa84cd19cb3dc31001ae7230aa84940e60f9ed4ab895ec",
+      "bytes": 33238
     },
     {
       "path": "music/resolution/provider_router_metadata.py",
@@ -3324,16 +3319,6 @@
       "bytes": 6341
     },
     {
-      "path": "music/spotify/oembed.py",
-      "sha256": "7b4e35f89b46d2234c26c367c0dea46cfcee86d91c967924f5a710c71710dc93",
-      "bytes": 1558
-    },
-    {
-      "path": "music/track_display_cache.py",
-      "sha256": "25f8efc2fd9f0f172b78523daf9909f1dae19dc6c65527a205f1127f61f2d352",
-      "bytes": 2533
-    },
-    {
       "path": "music/youtube_embed.py",
       "sha256": "3f2bfe41f410fff43d31c982e6c700a6aa0e4c04836bba6466cccc72d3147744",
       "bytes": 2946
@@ -3400,8 +3385,8 @@
     },
     {
       "path": "playback/engines/spotify_cdp.py",
-      "sha256": "0a862fafb1bf208cae664363aae4351a2bef4af411e76fae85d5b57cf46ff18f",
-      "bytes": 47696
+      "sha256": "31f365eca5b8a0a55aff60478fec0e54c542a68aa479fdbb88a4559e0cab26da",
+      "bytes": 44392
     },
     {
       "path": "playback/engines/youtube.py",
@@ -5780,8 +5765,8 @@
     },
     {
       "path": "telephony/call_history.py",
-      "sha256": "86a252dada0eaa4360037dc3cc479b6ceaba9eb88283d5ffb1123c11a7d60007",
-      "bytes": 18696
+      "sha256": "35e26ba3c4260f0fbab37fc53164705a0986c2e189cecf364a097fc0e0980921",
+      "bytes": 19386
     },
     {
       "path": "telephony/call_manager.py",
@@ -6455,8 +6440,8 @@
     },
     {
       "path": "tests/public/test_source_contract.py",
-      "sha256": "bccbcf550ae1d9a3a4d5a378e580e8fda910054305958f3380114e41f68c9b30",
-      "bytes": 56481
+      "sha256": "4798ac1f49f2b5ef1154e245c1e0ca61e8dc35e13136ec168c1b4cc79015c555",
+      "bytes": 56247
     },
     {
       "path": "tests/public/test_speech_volume_wiring.py",
@@ -9455,8 +9440,8 @@
     },
     {
       "path": "ui/api/models.py",
-      "sha256": "0334168d4d3fa0115133c6fbcf8a2be4c34026236e210b5838bb9e41274b75b7",
-      "bytes": 5527
+      "sha256": "817af49677c15801cf84e850b32ed45b7f45bf742bc4622b3ade4f97bbddfbd3",
+      "bytes": 5406
     },
     {
       "path": "ui/api/routes/__init__.py",
@@ -9545,8 +9530,8 @@
     },
     {
       "path": "ui/api/routes/control.py",
-      "sha256": "fc8f9b21d5f16f67d3acea71af8c204a7c3c9e084fd0dd99a11d4cdbac469651",
-      "bytes": 68950
+      "sha256": "2e9e956bfc7b9bc4c32a9c7f2aa7c3879b366eb877f5a4745864509e9c2383de",
+      "bytes": 68791
     },
     {
       "path": "ui/api/routes/cost.py",
@@ -9675,8 +9660,8 @@
     },
     {
       "path": "ui/api/routes/rating.py",
-      "sha256": "4a64f3cc459fa740eec68908cdd593c191adc434ada7e9cf5c80a6c7966df1a5",
-      "bytes": 13694
+      "sha256": "0446a6e2562f3a0f1b90b557b3c1e870fc5458dbd6b65170aad271d82a6e9736",
+      "bytes": 13316
     },
     {
       "path": "ui/api/routes/regression_stubs.py",
@@ -9785,8 +9770,8 @@
     },
     {
       "path": "ui/api/routes/weather.py",
-      "sha256": "0145422b3ce5cb508e99c943a6317ebfa97b3fb792c1f1a180d639dadfd2d05c",
-      "bytes": 16885
+      "sha256": "1850ecf494ce5463497cc1384f68b45616eab3a03488cbfe477fc49c0ef26607",
+      "bytes": 17603
     },
     {
       "path": "ui/api/routes/websocket_auth.py",
@@ -10165,13 +10150,13 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "c50aaf3a2958eaaea8b1919b989119789f2dfd36be4f62272565e522b9256a7b",
-      "bytes": 204764
+      "sha256": "53b8a527277932f4e0abc57f304fa1ee6e8f820e4bfef2ecedccf5b9510a7463",
+      "bytes": 205395
     },
     {
       "path": "ui/react-app/src/SmartDisplay.longAnswer.test.jsx",
-      "sha256": "cb87d7091b6771339ad4164ba5b93f6c178437ac01cbf59f437fe90f6669d8ac",
-      "bytes": 1240
+      "sha256": "efed2236b95de2d723a9d604a355ba94df8bd0148ec405cc3aa55fc0e0d9a090",
+      "bytes": 1500
     },
     {
       "path": "ui/react-app/src/SmartDisplay.overlayLifecycle.test.jsx",
@@ -10210,8 +10195,8 @@
     },
     {
       "path": "ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-      "sha256": "400f1c573420efed72a253463c4c0b8e5c5042a779b4f2e3f598dfaf6a030d20",
-      "bytes": 153984
+      "sha256": "700993a38681e7d8f51bae987b064f34611e3bb9ac708f6894a36d0fc3984760",
+      "bytes": 155177
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useEventBus.test.jsx",
@@ -10570,13 +10555,13 @@
     },
     {
       "path": "ui/react-app/src/components/AgentCard.jsx",
-      "sha256": "2d32e088ab307a513c07c4d2a775444969270f07a286122324e974bb10cf2e0b",
-      "bytes": 6471
+      "sha256": "afed0fdf68663f38240867e27ae05d11a22c529518046f212c986f6b2149accb",
+      "bytes": 6819
     },
     {
       "path": "ui/react-app/src/components/AgentCard.test.jsx",
-      "sha256": "fe1a1f91a055d341b1bed6ab4973bf50d03187e154eff2d89c959da2ec0f5ba7",
-      "bytes": 3646
+      "sha256": "313b21c2f8a16d94dbd74f714ef3feaa1de2b95a5ce6636f739c0840d40079b8",
+      "bytes": 4921
     },
     {
       "path": "ui/react-app/src/components/AgentDrawer.jsx",
@@ -10650,13 +10635,13 @@
     },
     {
       "path": "ui/react-app/src/components/CallHistoryList.jsx",
-      "sha256": "9b6200070dd4fd27b9d56756fb86c770a693adcdfebf3e46b22019a61032b1f7",
-      "bytes": 7180
+      "sha256": "29380abf1932e4385a1d2d9c7d6b2536d3201228e14e003a689d82fe674aa8ef",
+      "bytes": 7934
     },
     {
       "path": "ui/react-app/src/components/CallHistoryList.test.jsx",
-      "sha256": "baeac3ae5dd22048b53bff14afb091ec15fe985289f8cdaa06be29ce0c1679ad",
-      "bytes": 6520
+      "sha256": "2fdbddc9841d47a07e366bde4000277fd102bbefed37c20ed24a890309d8b116",
+      "bytes": 8074
     },
     {
       "path": "ui/react-app/src/components/CallHistoryRow.jsx",
@@ -10710,13 +10695,13 @@
     },
     {
       "path": "ui/react-app/src/components/ContentCard.jsx",
-      "sha256": "85e82ebbf62eac2327f74f89b00de550d7f60de7717e2a6df38648440f538818",
-      "bytes": 28689
+      "sha256": "8a55635dbf9036d73426cf6fa558ee8cec3b548813571ad9ccfe9d8e05403523",
+      "bytes": 28879
     },
     {
       "path": "ui/react-app/src/components/ContentCard.test.jsx",
-      "sha256": "799c50ccc2343eb84ae9c593c2b18ffbf5b0ec2a02f2bf097d27c0f18e2e8291",
-      "bytes": 6849
+      "sha256": "f0c59029be85beed0d4c736b8dd6cca2ae5b0404ee8326d5b0e831ae008c1184",
+      "bytes": 7931
     },
     {
       "path": "ui/react-app/src/components/CustomizeTab.jsx",
@@ -10830,13 +10815,13 @@
     },
     {
       "path": "ui/react-app/src/components/MemoryPanel.jsx",
-      "sha256": "9199284225ca87a90efcfa22ededa1dc667da8f7b1413466f42c5e4d8bc495b1",
-      "bytes": 51540
+      "sha256": "ce1f98a1b2df9cdc0e1fb16632de8bda71b6722e4fa5f8b7af25e02ed04ec775",
+      "bytes": 51565
     },
     {
       "path": "ui/react-app/src/components/MemoryPanel.test.jsx",
-      "sha256": "988ac5a87fa5da24206ff9f0e6547603dd0cba9c6ed307f225d585a4d98b7882",
-      "bytes": 7026
+      "sha256": "7c0483729fe3625f6c0cc8d41d0791d620a45eab4078bea7e29af9e83981be8a",
+      "bytes": 8763
     },
     {
       "path": "ui/react-app/src/components/MemoryPanel.workbench.test.jsx",
@@ -11025,8 +11010,8 @@
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.outputDevice.test.jsx",
-      "sha256": "02c05bb1891e7058a8aeea835f8913c5ee8b2186cc8ef6f2762667ad5d071860",
-      "bytes": 3479
+      "sha256": "95e8fd9e58f5aa6327375828bbea3649f468e81af67d1c9a660848596fa09348",
+      "bytes": 4053
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.sidebar.test.jsx",
@@ -11375,8 +11360,8 @@
     },
     {
       "path": "ui/react-app/src/components/player/MediaArea.jsx",
-      "sha256": "f03f517a92c7ef854380bad01acf1d3e4b894451c9654770232ea9b7168c72fe",
-      "bytes": 7920
+      "sha256": "0e25c3e6e52d30e9a33493165f42ffb5569c4cfba2357331b1440346e983a833",
+      "bytes": 7850
     },
     {
       "path": "ui/react-app/src/components/player/MediaArea.module.css",
@@ -11405,8 +11390,8 @@
     },
     {
       "path": "ui/react-app/src/components/player/PlayerSection.jsx",
-      "sha256": "50febde35af8f576a95d458dcc4e1e35fbe610974a7f7a23067911d01bc8982f",
-      "bytes": 7373
+      "sha256": "2f3eba5dc93e9060e0e3c9a5069cf628cf5215180e31d26a5508e99957863687",
+      "bytes": 7287
     },
     {
       "path": "ui/react-app/src/components/player/PlayerSection.module.css",
@@ -11415,8 +11400,8 @@
     },
     {
       "path": "ui/react-app/src/components/player/PlayerSection.test.jsx",
-      "sha256": "4bb038711da422a6ee67bc0fac10ed1c2b4c1976bb187101d5dd3eddc23c89a5",
-      "bytes": 5061
+      "sha256": "2f301e176fb9727f6467f4fd9bf8af5a922c6e7789e8255f2b78bad6265ca15e",
+      "bytes": 4092
     },
     {
       "path": "ui/react-app/src/components/player/ProgressBar.jsx",
@@ -12797,16 +12782,6 @@
       "path": "ui/react-app/src/utils/timeFormat.js",
       "sha256": "67dc9a1e6c4401d15e2e0afdb26d100ddd4b88cb1fdd9a0cc169b24a271c55fd",
       "bytes": 668
-    },
-    {
-      "path": "ui/react-app/src/utils/trackTitle.js",
-      "sha256": "5e7471a19368182ee3590afa926007682ae239664f1f2fa6b0665cedfd676b8c",
-      "bytes": 1170
-    },
-    {
-      "path": "ui/react-app/src/utils/trackTitle.test.js",
-      "sha256": "fee1da48dae17e5c32c0154b283fafd969d6fba23b3de59d80347508659a48ad",
-      "bytes": 1096
     },
     {
       "path": "ui/react-app/src/utils/ttsPlayback.js",

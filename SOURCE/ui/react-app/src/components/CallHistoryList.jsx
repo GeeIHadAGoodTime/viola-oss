@@ -6,6 +6,20 @@ import { fetchCallHistory, getCallTranscript } from '../hooks/useCallAudio';
 import { toUserMessage } from '../utils/userFacingError';
 import CallHistoryRow from './CallHistoryRow';
 
+// A call with no number and no start time is not a call anyone can read: it is
+// a bookkeeping stub (a carrier-billing update that arrived before the call's
+// own record was saved), and listing it showed "Unknown recipient / ACTIVE /
+// Unknown date". A call that was never answered has no start time but still has
+// its number, so it stays listed.
+function hasText(value) {
+  return typeof value === 'string' ? value.trim() !== '' : Boolean(value);
+}
+
+function isListableCall(call) {
+  if (!call || typeof call !== 'object') return false;
+  return hasText(call.phone_number) || hasText(call.phone) || hasText(call.started_at);
+}
+
 export default function CallHistoryList({ pageSize = 50, focusCallId = null }) {
   const [calls, setCalls] = useState([]);
   const [offset, setOffset] = useState(0);
@@ -25,10 +39,12 @@ export default function CallHistoryList({ pageSize = 50, focusCallId = null }) {
 
     try {
       const page = await fetchCallHistory(pageSize, nextOffset);
-      const pageCalls = Array.isArray(page.calls) ? page.calls : [];
+      const rawCalls = Array.isArray(page.calls) ? page.calls : [];
+      const pageCalls = rawCalls.filter(isListableCall);
       setCalls((current) => (isFirstPage ? pageCalls : [...current, ...pageCalls]));
-      setOffset(nextOffset + pageCalls.length);
-      setHasMore(pageCalls.length === pageSize);
+      // Paging follows what the server sent, not what is shown.
+      setOffset(nextOffset + rawCalls.length);
+      setHasMore(rawCalls.length === pageSize);
     } catch (err) {
       setError(toUserMessage(err, 'Could not load your call history. Please try again.'));
     } finally {
