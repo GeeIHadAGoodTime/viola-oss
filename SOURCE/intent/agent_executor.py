@@ -12583,19 +12583,25 @@ class AgentExecutor:
                 logger.debug("TTS fallback also failed for payment stream")
 
     def _agent_job_origin(self) -> str | None:
-        """How the user asked for this turn's work: "voice", "typed", or None.
+        """How the user asked for this turn's work: "voice", "typed", "remote", or None.
 
         Read from the turn's own channel (``chat.channel.resolve_rest_channel``
         turns a wake turn's ``"voice"`` into ``channel_type == "voice"``, the
         Chat tab's into ``"chat_mode"`` and ``/v1/command`` into ``"web"``).
-        Anything else is left unknown rather than guessed.
+        "typed" is a channel whose reply is spoken on this machine (the same set
+        ``_should_speak_reply`` uses); any other known channel (Telegram, phone,
+        email...) is "remote". A turn with no channel at all is None (unknown).
         """
+        from core.reply_speech_settings import is_locally_spoken_channel
+
         channel_type = self._get_origin_channel_type()
+        if not channel_type:
+            return None
         if channel_type == "voice":
             return "voice"
-        if channel_type in {"web", "chat_mode"}:
+        if is_locally_spoken_channel(channel_type):
             return "typed"
-        return None
+        return "remote"
 
     def _get_origin_channel_type(self) -> str | None:
         """Return the originating request channel for gate-card replies."""

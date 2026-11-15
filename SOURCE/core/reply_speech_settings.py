@@ -21,6 +21,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+# The channels whose reply is spoken on this machine when the user asks for it:
+# the desktop's own command box and web chat (``/v1/command``, "http"/"web")
+# and saved Chat tab threads ("chat_mode"). A voice turn speaks through the
+# voice handler, and every other known channel (Telegram, phone, email...) is
+# remote: what it starts is never said out loud on the PC.
+LOCALLY_SPOKEN_CHANNELS = frozenset({"http", "web", "chat_mode"})
+
+
+def is_locally_spoken_channel(key: str) -> bool:
+    """Whether a reply on this channel key may be spoken on this machine."""
+    return str(key or "").strip().lower() in LOCALLY_SPOKEN_CHANNELS
+
 
 @dataclass(frozen=True, slots=True)
 class ReplySpeechSettings:

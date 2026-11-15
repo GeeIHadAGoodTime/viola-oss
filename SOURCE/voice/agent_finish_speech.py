@@ -23,7 +23,9 @@ When it is spoken: only on the desktop surface, never with speech off or the
 voice muted, not in quiet hours, not while a call this device placed is live. A
 job asked for by voice is announced; a typed one (or one whose origin is not
 known) only when "Speak Responses Aloud" is on, the same rule as a typed reply
-(``core.reply_speech_settings``).
+(``core.reply_speech_settings``). A job asked for on a remote channel (Telegram,
+phone, email: any known channel that is not locally spoken) is never announced
+on the PC, as its reply never is.
 
 How: through the TTS engine's own ``speak`` (the path that records her words in
 ``audio_core.own_playback``, so the wake loop and the voice turn know the words
@@ -163,12 +165,16 @@ class AgentFinishSpeech:
         user_id = str(getattr(task, "user_id", "") or "")
         if not self._on_desktop():
             return "not_desktop"
+        origin = str(getattr(task, "origin", "") or "").lower()
+        if origin == "remote":
+            # Asked for on Telegram, the phone, email...: its reply is never
+            # spoken on the PC, so neither is the end of the job.
+            return "remote_channel"
         settings = self._speech_settings(user_id)
         if not settings.tts_enabled:
             return "tts_off"
         if settings.voice_muted:
             return "voice_muted"
-        origin = str(getattr(task, "origin", "") or "").lower()
         if origin != "voice" and not settings.speak_all_replies:
             return "typed_and_speak_responses_aloud_off"
         if self._in_quiet_hours(user_id):

@@ -33,7 +33,8 @@ log = get_logger(__name__)
 # ``ui/qt_native/window_core.py`` both POST here with no channel, which the
 # route defaults to "http") and the web chat. Saved ChatMode threads have
 # their own completion route, which invokes this same policy with "chat_mode".
-_LOCALLY_SPOKEN_CHANNELS = frozenset({"http", "web", "chat_mode"})
+# The set itself is ``core.reply_speech_settings.LOCALLY_SPOKEN_CHANNELS``, shared
+# with the line that says a background task has finished.
 
 # Upper bound on one spoken reply, so a wedged synthesizer leaks one task and
 # not one per command. Well above any real reply; this is a backstop, not a
@@ -162,11 +163,12 @@ def _should_speak_reply(channel_value: Any, user_id: str) -> bool:
     whether to speak from user settings, and a path that speaks straight
     through the user's own mute would be a new bug rather than a fixed one.
     """
-    if channel_key(channel_value) not in _LOCALLY_SPOKEN_CHANNELS:
+    from core.reply_speech_settings import is_locally_spoken_channel, read_reply_speech_settings
+
+    if not is_locally_spoken_channel(channel_key(channel_value)):
         return False
     if not is_desktop_surface():
         return False
-    from core.reply_speech_settings import read_reply_speech_settings
 
     return read_reply_speech_settings(user_id).typed_allowed
 
@@ -226,7 +228,9 @@ def _new_streamed_reply(
 
 def _silent_stage_reply(channel_value: Any, stream_id: str | None, user_id: str) -> Any:
     """Live stage text for a reply on a local text surface that is not being spoken."""
-    if channel_key(channel_value) not in _LOCALLY_SPOKEN_CHANNELS or not is_desktop_surface():
+    from core.reply_speech_settings import is_locally_spoken_channel
+
+    if not is_locally_spoken_channel(channel_key(channel_value)) or not is_desktop_surface():
         return contextlib.nullcontext()
     from voice.stage_reply import stage_reply
 
