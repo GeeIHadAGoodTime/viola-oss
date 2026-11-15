@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "946074bc4d60e1fa1f13529805b870ba6d8f915d",
-  "sha256": "057b7b7731ac5bf66c5a93aa5773c5d2815c0242033d9050da1e50455d4819b4",
+  "revision": "eaa2f7ebafa5130b050e077b6333fb4c421a0c3c",
+  "sha256": "ba2749b838806283cddeb3091429fca4be77efa165c1cdbe796bff229f82681e",
   "files": [
     {
       "path": ".env.example",
@@ -1605,8 +1605,8 @@
     },
     {
       "path": "intent/agent_loop.py",
-      "sha256": "82be6f5960b9d3316752873191f13ef96b1b20741dad9733f1088a82bb6ffa1c",
-      "bytes": 275430
+      "sha256": "f270ae0c28a320a447a1b6f12efd3b1b6e2fa0560b2b9eed4af4df8abd8066fa",
+      "bytes": 275878
     },
     {
       "path": "intent/agent_message_manager.py",

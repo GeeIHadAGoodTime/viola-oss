@@ -30,10 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "27cb2f777a6882b647f2a212ef6b7287ff4d1a88bcc9b14113021c4d07e111e8",
-  "source_tree_sha256": "057b7b7731ac5bf66c5a93aa5773c5d2815c0242033d9050da1e50455d4819b4",
+  "source_manifest_sha256": "1d5c994ba407a2b8c13a5b7fdae5be86291c5fa118e2293664cb8b4c12b9b23a",
+  "source_tree_sha256": "ba2749b838806283cddeb3091429fca4be77efa165c1cdbe796bff229f82681e",
   "source_file_count": 2818,
-  "source_revision": "946074bc4d60e1fa1f13529805b870ba6d8f915d",
+  "source_revision": "eaa2f7ebafa5130b050e077b6333fb4c421a0c3c",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "LICENSES/SPEECH_COMPONENT_NOTICES.md",
@@ -663,7 +663,7 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "946074bc4d60e1fa1f13529805b870ba6d8f915d",
+    "source_commit": "eaa2f7ebafa5130b050e077b6333fb4c421a0c3c",
     "kind": "chat tab parity and stop"
   },
   "historical_bindings": [
