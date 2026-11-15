@@ -1010,14 +1010,19 @@ def register_chat_mode_routes(context: ApiContext, toolbox: RouteToolbox) -> Non
         async def _inner() -> dict[str, Any]:
             user_id = _require_request_user_id(request)
             active = _ACTIVE_CHAT_TASKS.get(stream_id)
+            # Every press leaves a line: the build-11 laptop log could not say
+            # whether a Stop ever reached the server.
             if active is None:
+                logger.info("Chat Stop press for stream %s: no running turn found; nothing to stop", stream_id)
                 return success_response({"cancelled": False})
             if active.user_id != user_id:
+                logger.warning("Chat Stop press for stream %s refused: the turn belongs to another user", stream_id)
                 raise HTTPException(
                     status_code=HTTPStatus.FORBIDDEN,
                     detail=failure_response("stream_access_denied", "Stream access denied."),
                 )
             if active.task.done():
+                logger.info("Chat Stop press for stream %s: the turn had already finished", stream_id)
                 _ACTIVE_CHAT_TASKS.pop(stream_id, None)
                 return success_response({"cancelled": False})
             # Cancellation is requested, not yet completed. The task's

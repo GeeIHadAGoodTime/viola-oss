@@ -22,7 +22,11 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def source_functions(path, names, namespace, constants=()):
     tree = ast.parse((ROOT / path).read_text(encoding="utf-8"))
-    selected = [n for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name in names]
+    selected = [
+        n
+        for n in tree.body
+        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and n.name in names
+    ]
     assert {n.name for n in selected} == set(names)
     selected += [
         n
@@ -102,6 +106,8 @@ class SavedChatSpeechDispatch(unittest.IsolatedAsyncioTestCase):
         ns = vars(self.speech_module)
         ns.update(
             asyncio=asyncio,
+            contextlib=contextlib,
+            Any=object,
             log=self.log,
             is_desktop_surface=lambda: self.desktop,
             _reply_speech_tasks=Tracker(),
@@ -110,9 +116,23 @@ class SavedChatSpeechDispatch(unittest.IsolatedAsyncioTestCase):
         source_functions("services/command/command_service_core.py", {"channel_key"}, ns)
         source_functions(
             "ui/api/routes/command.py",
-            {"_command_stream_message", "_reply_tts_engine", "_should_speak_reply", "_speak_reply_now", "_speak_reply"},
+            {
+                "_command_stream_message",
+                "_reply_tts_engine",
+                "_should_speak_reply",
+                "_speak_reply_now",
+                "_speak_reply",
+                # The finish both typed routes share (POST /v1/command and saved chats).
+                "_new_streamed_reply",
+                "_silent_stage_reply",
+                "ui_action_fields",
+                "_ask_user_questions",
+                "_folded",
+                "show_pending_questions",
+                "TypedTurn",
+            },
             ns,
-            {"_LOCALLY_SPOKEN_CHANNELS", "_SPEAK_REPLY_TIMEOUT_SECONDS"},
+            {"_LOCALLY_SPOKEN_CHANNELS", "_SPEAK_REPLY_TIMEOUT_SECONDS", "_UI_ACTION_KEYS"},
         )
         self.enterContext(
             patch.dict(
@@ -158,8 +178,9 @@ class SavedChatSpeechDispatch(unittest.IsolatedAsyncioTestCase):
             _sanitize_chat_tool_events=lambda events: events,
             _ACTIVE_CHAT_TASKS={},
             _command_stream_message=ns["_command_stream_message"],
+            to_json_value=lambda value: value,
         )
-        source_functions("ui/api/routes/chat_mode.py", {"_run_chat_command"}, scope)
+        source_functions("ui/api/routes/chat_mode.py", {"_run_chat_command", "_stop_was_pressed"}, scope)
         self.run_generation = scope["_run_chat_command"]
         self.args = dict(
             context=self.context,
