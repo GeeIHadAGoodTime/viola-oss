@@ -86,7 +86,12 @@ async def schedule_create_handler(
     Returns:
         ToolResult with the new schedule ID or an error.
     """
-    from services.scheduler.service import _normalise_one_shot_at, get_scheduler_service, validate_cron_expr_detail
+    from services.scheduler.service import (
+        _normalise_one_shot_at,
+        get_scheduler_service,
+        scheduled_run_refusal,
+        validate_cron_expr_detail,
+    )
 
     label = label.strip()
     action = action.strip()
@@ -108,6 +113,9 @@ async def schedule_create_handler(
         # Determine if this is a cron expression or a one-shot datetime.
         cron_detail = validate_cron_expr_detail(schedule)
         if cron_detail is None:
+            refused = scheduled_run_refusal("schedule create")
+            if refused is not None:
+                return ToolResult(ok=False, data=None, error=refused)
             # Valid cron — svc.add() may raise ValueError for semantic issues
             # (e.g. schedule limit reached).  Let those propagate to the outer
             # except so the caller gets the real reason.
@@ -153,6 +161,9 @@ async def schedule_create_handler(
                     error="That time has already passed. It is now %s. Give a time in the future."
                     % datetime.now().astimezone().isoformat(timespec="minutes"),
                 )
+            refused = scheduled_run_refusal("schedule create")
+            if refused is not None:
+                return ToolResult(ok=False, data=None, error=refused)
             # svc.add_async() may raise ValueError (e.g. schedule limit reached).
             # Let it propagate to the outer except so the real reason surfaces.
             # Async-native: this handler is awaited ON the cloud FastAPI serving
@@ -364,7 +375,7 @@ async def schedule_update_handler(
     Returns:
         ToolResult indicating success or failure.
     """
-    from services.scheduler.service import get_scheduler_service
+    from services.scheduler.service import get_scheduler_service, scheduled_run_refusal
 
     resolved_user_id = user_id.strip()
     if not resolved_user_id:
@@ -403,6 +414,9 @@ async def schedule_update_handler(
         if not kwargs:
             return ToolResult(ok=False, data=None, error="No fields to update.")
 
+        refused = scheduled_run_refusal("schedule update")
+        if refused is not None:
+            return ToolResult(ok=False, data=None, error=refused)
         updated = await svc.update_async(resolved_user_id, schedule_id, **kwargs)
         if updated:
             return ToolResult(

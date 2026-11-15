@@ -140,7 +140,10 @@ class WindowsToastDeliveryContract(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(await self.mod.send_windows_toast("Viola", "reminder", user_id="synthetic-user"))
         call = self.mod.proc_tree.run.call_args
         self.assertEqual(call.args[0][1:4], ["-NoProfile", "-NonInteractive", "-Command"])
-        self.assertIn("Viola.Desktop", call.args[0][4])
+        # The script is a constant; the app id and the text reach it as data only.
+        self.assertEqual(call.args[0][4], self.mod._TOAST_SCRIPT)
+        self.assertEqual(call.kwargs["env"]["VIOLA_TOAST_APP_ID"], "Viola.Desktop")
+        self.assertEqual(call.kwargs["env"]["VIOLA_TOAST_BODY"], "reminder")
         self.assertEqual(call.kwargs["timeout"], self.mod._TOAST_TIMEOUT_SECONDS)
 
     async def test_powershell_failure_is_not_reported_as_success(self):
