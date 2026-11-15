@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "b01fd8be616e42383a5d6c1425a2d5f6d42dc493",
-  "sha256": "979e0b39e018cf456d75cb6b9d2471ca131282573b1c6bf354f1eaae293b3f0e",
+  "revision": "0741068789cb48ab938dc6c232fe2cebd2f0a2a7",
+  "sha256": "d198244eb6bc798696f3cb41132debbc45454930ddbda7fc0862a01c63027644",
   "files": [
     {
       "path": ".env.example",
@@ -9965,8 +9965,8 @@
     },
     {
       "path": "ui/qt_native/surface_watchdog.py",
-      "sha256": "c3a61257483b265e9af0fceae163da64180a58ac99933e90f04ff2a743830ca2",
-      "bytes": 12238
+      "sha256": "2e0b64d98cd7b77daf38b8c7265b07ccdb520fa22df73eb6158f59273c3055b5",
+      "bytes": 28568
     },
     {
       "path": "ui/qt_native/touch_input.py",
@@ -9990,8 +9990,8 @@
     },
     {
       "path": "ui/qt_native/webview_window.py",
-      "sha256": "37a9666b28c1be912cf3df2f35d1b58512c692bb5a3b18ebda341aa5fcb41d2c",
-      "bytes": 261807
+      "sha256": "2fdbb5d55731904a49ac78e95da852d6cb6c95c972f30f2cc3e27148cff5f398",
+      "bytes": 261998
     },
     {
       "path": "ui/qt_native/widgets/connectivity_status.py",
@@ -10150,8 +10150,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "5723f11aafb98c0dc8376305ae230d666cbe305bde9e59aa50edf297f1c8347d",
-      "bytes": 204445
+      "sha256": "fc43229e5bfa3022f92245a905ca21a0f416931a2a101ae83af7f509ff062d4d",
+      "bytes": 204859
     },
     {
       "path": "ui/react-app/src/SmartDisplay.longAnswer.test.jsx",
