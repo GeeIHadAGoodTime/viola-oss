@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "92d7b9eb6dcce935cd06aa7750c14914ef08d1f4",
-  "sha256": "c8b9aef49c483ea062a49839c6b2973c3ad339e7d4fef82ffc61731d94771497",
+  "revision": "e4311912718939fb7ffd0db1834fd8f27f3ae3f3",
+  "sha256": "bdd47e571f5114310437656a2acac6cbcd2c87b30d4b632545351ae4eab5b00b",
   "files": [
     {
       "path": ".env.example",
@@ -6245,8 +6245,8 @@
     },
     {
       "path": "tests/public/test_deferred_confirmation_contract.py",
-      "sha256": "afc3a642497fb2d1f25270b756048336a3d422ca109d56632e5bcc54f68a3d25",
-      "bytes": 12061
+      "sha256": "963ebe60a38241345ec41eb65272d74cb1a16bb1c9a41a34eecae20316ad3b22",
+      "bytes": 12462
     },
     {
       "path": "tests/public/test_desktop_session_ordering.py",
