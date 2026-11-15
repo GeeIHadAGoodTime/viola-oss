@@ -4947,6 +4947,8 @@ class AgentExecutor:
         tools_called: list[str],
         model_visible_messages: list[dict[str, Any]] | None = None,
     ) -> None:
+        # A helper agent's task text is written by the model, not the user: no
+        # memory extraction and no address check for it.
         if getattr(self, "_current_agent_id", None):
             return
         transcript = self._post_turn_memory_transcript(user_text, final_answer, model_visible_messages)
@@ -4955,12 +4957,15 @@ class AgentExecutor:
         try:
             from services.memory.extract_memories import extract_memories_after_turn
 
+            # user_text: the same hidden pass also reports any address the user
+            # gave, so a street Viola only asked about is masked in the logs too.
             await extract_memories_after_turn(
                 user_id=str(self._get_effective_user_id()),
                 transcript=transcript,
                 task_id=task_id,
                 tools_called=tools_called,
                 model_visible_messages=model_visible_messages,
+                user_text=user_text,
             )
         except (OSError, RuntimeError, TimeoutError, ValueError) as exc:
             logger.debug("Post-turn memory extraction skipped: %s", exc)
