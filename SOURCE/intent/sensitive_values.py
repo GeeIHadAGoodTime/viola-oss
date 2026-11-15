@@ -632,8 +632,8 @@ _scrub_running = False
 _CHUNK_BYTES = 64 * 1024
 _CHUNK_PAUSE_SECONDS = 0.002
 # How far back a pass that resumes a file first reads, to find a line break no
-# value can run across.
-_LOOKBACK_BYTES = 64 * 1024
+# value can run across (four times further each time that is not enough).
+_LOOKBACK_BYTES = 4 * 1024
 # A line longer than this has the city rule's context searched around its anchors only.
 _LONG_LINE_BYTES = 4096
 # What ``\s`` matches in a bytes pattern.
