@@ -5,6 +5,7 @@ import { authFetch } from '../hooks/useViolaApi';
 import { openSafeExternalUrl } from '../lib/safeUrl';
 import { useCloudConsentGate } from '../hooks/cloudConsentGate';
 import { renderStageMarkdown } from '../utils/stageMarkdown';
+import Markdown from './stage/modes/chat/markdown';
 
 const AUTO_DISMISS_BASE_MS = 12000;
 const AUTO_DISMISS_PER_CHAR_MS = 40;
@@ -286,9 +287,9 @@ const DetailContent = ({ data }) => (
         fontSize: 'clamp(15px, 1.6vw, 17px)',
         color: THEME.colors.textSecondary,
         lineHeight: 1.7,
-        whiteSpace: 'pre-wrap',
+        whiteSpace: data.markdown ? 'normal' : 'pre-wrap',
       }}>
-        {renderTextWithLinks(data.body)}
+        {data.markdown ? <Markdown content={data.body} /> : renderTextWithLinks(data.body)}
       </div>
     )}
     {data.source && (
@@ -309,6 +310,7 @@ DetailContent.propTypes = {
   data: PropTypes.shape({
     body: PropTypes.string,
     source: PropTypes.string,
+    markdown: PropTypes.bool,
   }).isRequired,
 };
 
@@ -850,6 +852,7 @@ ContentCardInner.propTypes = {
     // detail
     body: PropTypes.string,
     source: PropTypes.string,
+    markdown: PropTypes.bool,
     // optional override
     dismiss_after_ms: PropTypes.number,
     compact: PropTypes.bool,

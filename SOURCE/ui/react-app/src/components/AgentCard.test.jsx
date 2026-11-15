@@ -74,3 +74,29 @@ describe('AgentCard for scheduled work', () => {
     expect(screen.getByText('Running a scheduled task')).toBeInTheDocument();
   });
 });
+
+// Build 12: the card read "Working..." beside "COMPLETED 00:24".
+describe('AgentCard final status line', () => {
+  it('says Done, not Working..., once the task completed', () => {
+    render(<AgentCard agent={{ ...baseAgent, status: 'completed' }} activityText="" onCancel={vi.fn()} />);
+
+    expect(screen.queryByText('Working...')).not.toBeInTheDocument();
+    expect(screen.getByText('Done')).toBeInTheDocument();
+    expect(screen.getByText(/Completed 01:05/i)).toBeInTheDocument();
+  });
+
+  it('drops the last running step once the task has a final status', () => {
+    render(<AgentCard agent={{ ...baseAgent, status: 'completed' }} activityText="step 4: writing" onCancel={vi.fn()} />);
+
+    expect(screen.queryByText('step 4: writing')).not.toBeInTheDocument();
+    expect(screen.getByText('Done')).toBeInTheDocument();
+  });
+
+  it('says Failed for a failed task and keeps the running step while it runs', () => {
+    const { rerender } = render(<AgentCard agent={{ ...baseAgent, status: 'failed' }} onCancel={vi.fn()} />);
+    expect(screen.getByText('Failed')).toBeInTheDocument();
+
+    rerender(<AgentCard agent={baseAgent} activityText="step 2: searching" onCancel={vi.fn()} />);
+    expect(screen.getByText('step 2: searching')).toBeInTheDocument();
+  });
+});

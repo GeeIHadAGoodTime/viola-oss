@@ -16,6 +16,7 @@ from ui.api.routes.common import RouteToolbox
 from utils.text_encoding import repair_mojibake_deep
 from utils.weather_location import (
     WEATHER_LOCATION_REQUIRED_MESSAGE,
+    get_configured_weather_location,
     normalize_weather_request_location,
     resolve_weather_request_location,
 )
@@ -178,7 +179,17 @@ def register_weather_routes(context: ApiContext, toolbox: RouteToolbox) -> None:
                     resolved_city = resolve_weather_request_location(None, user_ip=user_ip)
                     if resolved_city:
                         from_settings = True
-                        log.info("Using weather_location from settings: %s", resolved_city)
+                        # Say where the city really came from: a saved location, or the
+                        # approximate one the internet connection gives (build 12: this
+                        # line said "from settings" for the second, so an empty
+                        # Customize > Location field looked like a bug).
+                        if get_configured_weather_location() == resolved_city:
+                            log.info("Using weather_location from settings: %s", resolved_city)
+                        else:
+                            log.info(
+                                "No saved weather_location; using the approximate location of the internet connection: %s",
+                                resolved_city,
+                            )
                     else:
                         return _weather_error_response(
                             status_code=400,

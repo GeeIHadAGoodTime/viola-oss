@@ -65,4 +65,14 @@ describe('SettingsModal output-device wiring', () => {
     await waitFor(() => expect(harness.updateSettings).toHaveBeenCalled());
     expect(harness.updateSettings.mock.calls.at(-1)[0].output_device).toBe('');
   });
+  // Build 12: the tester could not find "Refresh" by looking in Settings > Voice;
+  // the audio device pickers and the refresh control live in Settings > System.
+  it('offers Refresh as a real, named button next to the device pickers', async () => {
+    openSystem();
+    const refresh = await screen.findByRole('button', { name: 'Refresh audio devices' });
+    expect(refresh.tagName).toBe('BUTTON');
+    expect(refresh).toHaveTextContent('Refresh devices');
+    fireEvent.click(refresh);
+    await waitFor(() => expect(harness.refreshDevices).toHaveBeenCalled());
+  });
 });

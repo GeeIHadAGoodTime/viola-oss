@@ -1312,6 +1312,32 @@ describe('SmartDisplay', () => {
     await waitFor(() => expect(screen.getByTestId('viola-stage')).not.toHaveAttribute('data-stage-mode', 'phone'));
   });
 
+  // Build 12: while a call waits for its voice worker the cloud repeats
+  // call_started with no number and no start time. After call_ended nothing of
+  // that call may stay live, and a late repeat must not bring it back.
+  it('leaves no live call after five repeated call_started and a call_ended', async () => {
+    render(<SmartDisplay />);
+
+    await waitFor(() => expect(wsHarness.handler).toBeTypeOf('function'));
+    act(() => {
+      for (let i = 0; i < 5; i += 1) {
+        wsHarness.handler({ type: 'call_started', payload: { call_id: 'call-prep' } });
+      }
+    });
+    expect(await screen.findByTestId('stage-pill-phone')).toHaveTextContent('Live');
+
+    act(() => {
+      wsHarness.handler({ type: 'call_ended', payload: { call_id: 'call-prep' } });
+    });
+    await waitFor(() => expect(screen.getByTestId('stage-pill-phone')).not.toHaveTextContent('Live'));
+
+    act(() => {
+      wsHarness.handler({ type: 'call_started', payload: { call_id: 'call-prep' } });
+      wsHarness.handler({ type: 'call_cost_update', payload: { call_id: 'call-prep', current_cost_usd: 0.01 } });
+    });
+    expect(screen.getByTestId('stage-pill-phone')).not.toHaveTextContent('Live');
+  });
+
   it('renders the live-call screen when the phone tab is opened mid-call', async () => {
     // The founder-observed symptom: a tab opened mid-call showed the history
     // list because activeCallId was never set (the call_started event had

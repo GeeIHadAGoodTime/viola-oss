@@ -86,9 +86,20 @@ export default function AgentCard({ agent, activityText = '', onCancel }) {
   const terminal = ['completed', 'cancelled', 'killed', 'error', 'failed'].includes(status);
   const scheduled = agent.subagent_type === 'scheduler' || String(agent.reason || '').startsWith('scheduler:');
   // The plain step the agent reports, never its reasoning (1.0.5 build 10).
-  const visibleThinking = activityText
-    ? activityText.slice(0, 80)
-    : scheduled ? (terminal ? 'Scheduled task' : 'Running a scheduled task') : 'Working...';
+  // Once the task has its final status the card says that, not the last step
+  // or "Working..." (build 12: it sat on "Working..." beside "COMPLETED 00:24").
+  const finalLine = {
+    completed: 'Done',
+    cancelled: 'Cancelled',
+    killed: 'Stopped',
+    error: 'Failed',
+    failed: 'Failed',
+  }[status];
+  const visibleThinking = terminal
+    ? (scheduled ? 'Scheduled task' : finalLine)
+    : activityText
+      ? activityText.slice(0, 80)
+      : scheduled ? 'Running a scheduled task' : 'Working...';
   const task = agentTaskTitle(agent);
 
   return (

@@ -180,7 +180,7 @@ function EntryRow({ entry, onDelete, busy }) {
       </div>
       <button
         type="button"
-        aria-label={`Delete ${entry.text}`}
+        aria-label={memoryControlLabel('Delete memory', entry.text)}
         disabled={busy}
         onClick={() => onDelete(entry)}
         style={{ ...iconButton, color: THEME.colors.textMuted }}
