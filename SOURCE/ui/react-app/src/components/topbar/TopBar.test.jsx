@@ -14,7 +14,6 @@ const handlers = {
   onOpenWeatherSettings: vi.fn(),
   onOpenWeatherForecast: vi.fn(),
   onOpenBugReport: vi.fn(),
-  onToggleAgentDrawer: vi.fn(),
 };
 
 function renderTopBar(props = {}) {
@@ -30,8 +29,6 @@ function renderTopBar(props = {}) {
       weatherRetryTrigger={0}
       menuOpen={false}
       userSettings={{ time_display_format: 'auto' }}
-      activeAgentCount={0}
-      agentDrawerExpanded={false}
       {...handlers}
       {...props}
     />,

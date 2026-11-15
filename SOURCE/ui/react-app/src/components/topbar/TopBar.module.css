@@ -114,21 +114,6 @@
   flex: 0 0 auto;
 }
 
-.agentCountButton {
-  min-width: 26px;
-  height: 24px;
-  padding: 0 8px;
-  border-radius: 8px;
-  border: 1px solid var(--border-hover);
-  background-color: var(--bg-elevated);
-  color: var(--text-secondary);
-  box-shadow: 0 8px 22px var(--shadow-light);
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 1;
-}
-
 .bugReportButton {
   /* 44px is the mobile touch-target floor (was 34px; see issue #367). */
   width: 44px;

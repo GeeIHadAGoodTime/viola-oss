@@ -1,0 +1,110 @@
+/* One quiet line for running tasks. No box, border, strip, shadow or blur. */
+.line {
+  position: absolute;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 40px;
+  row-gap: 6px;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 400;
+  pointer-events: none;
+  animation: taskLineIn 200ms ease-out both;
+}
+
+.leaving {
+  animation: taskLineOut 200ms ease-in both;
+}
+
+.group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  row-gap: 6px;
+  min-width: 0;
+}
+
+.lead {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.icon {
+  flex: none;
+  width: 15px;
+  height: 15px;
+}
+
+/* Very slow and subtle: the only motion on the line besides the fade. */
+.working {
+  animation: taskLinePulse 3.6s ease-in-out infinite;
+}
+
+.item {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  margin-left: 28px;
+}
+
+/* The first task sits close to its label, like the mockup. */
+.lead + .item {
+  margin-left: 14px;
+}
+
+.more {
+  margin-left: 28px;
+}
+
+.name {
+  white-space: nowrap;
+}
+
+.stop {
+  pointer-events: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+
+.stop:hover {
+  color: var(--text-secondary);
+}
+
+.stop:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@keyframes taskLineIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes taskLineOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes taskLinePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .line,
+  .leaving,
+  .working {
+    animation: none;
+  }
+}

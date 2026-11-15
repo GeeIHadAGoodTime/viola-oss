@@ -36,9 +36,6 @@ const TopBar = ({
   onOpenBugReport,
   onCalendarModalOpenChange,
   userSettings,
-  activeAgentCount,
-  agentDrawerExpanded,
-  onToggleAgentDrawer,
 }) => {
   const canOpenWeatherForecast = Boolean(
     weatherLocation
@@ -144,17 +141,6 @@ const TopBar = ({
           </div>
         </div>
         <div className={styles.topbarActions}>
-          {activeAgentCount > 0 && (
-            <button
-              type="button"
-              className={styles.agentCountButton}
-              aria-label={agentDrawerExpanded ? 'Collapse background agents' : 'Show background agents'}
-              title={agentDrawerExpanded ? 'Collapse background agents' : 'Show background agents'}
-              onClick={onToggleAgentDrawer}
-            >
-              {activeAgentCount}
-            </button>
-          )}
           <button
             type="button"
             className={styles.bugReportButton}
@@ -223,15 +209,9 @@ TopBar.propTypes = {
   onOpenBugReport: PropTypes.func.isRequired,
   onCalendarModalOpenChange: PropTypes.func,
   userSettings: PropTypes.object.isRequired,
-  activeAgentCount: PropTypes.number,
-  agentDrawerExpanded: PropTypes.bool,
-  onToggleAgentDrawer: PropTypes.func,
 };
 
 TopBar.defaultProps = {
-  activeAgentCount: 0,
-  agentDrawerExpanded: true,
-  onToggleAgentDrawer: () => {},
   onOpenWeatherForecast: () => {},
 };
 

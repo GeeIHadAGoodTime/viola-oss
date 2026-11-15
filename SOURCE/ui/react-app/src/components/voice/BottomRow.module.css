@@ -7,7 +7,7 @@
   align-items: center;
   padding-top: clamp(20px, 3vh, 36px);
   min-width: 0;
-  /* Room for the background-agent cards, which float above this row. */
+  /* Room for the quiet task line (TaskLine), which sits over the bottom edge. */
   margin-bottom: var(--agent-drawer-space, 0px);
 }
 
