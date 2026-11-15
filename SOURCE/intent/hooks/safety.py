@@ -71,11 +71,17 @@ def _check_safety(**kwargs: Any) -> None:
     args: dict[str, Any] = kwargs.get("args", {})
 
     try:
-        from services.scheduler.service import current_scheduled_action_denied_tools
+        from services.scheduler.service import (
+            SCHEDULED_RUN_REFUSAL,
+            current_scheduled_action_denied_tools,
+            scheduled_run_refusal,
+        )
 
         scheduled_denied_tools = current_scheduled_action_denied_tools()
+        refused = scheduled_run_refusal(tool_name, args)
     except ImportError:
         scheduled_denied_tools = frozenset()
+        refused = None
     if tool_name in scheduled_denied_tools:
         message = (
             "SAFETY: scheduled actions cannot run unattended tool '%s'. "
@@ -83,6 +89,10 @@ def _check_safety(**kwargs: Any) -> None:
         )
         logger.warning("%s", message)
         raise SafetyBlockError(message)
+    if refused is not None:
+        what, schedule_id = refused
+        logger.warning("Scheduled run %s: refused %s (a scheduled command does not schedule more)", schedule_id, what)
+        raise SafetyBlockError(SCHEDULED_RUN_REFUSAL)
 
     # ── 1. BLOCK destructive shell commands ──────────────────────────
     if tool_name == "run_command":

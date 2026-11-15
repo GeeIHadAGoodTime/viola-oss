@@ -117,18 +117,58 @@ _SCHEDULED_ACTION_DENIED_TOOLS: contextvars.ContextVar[frozenset[str] | None] = 
 )
 
 
+_SCHEDULED_RUN_ID: contextvars.ContextVar[int | None] = contextvars.ContextVar(
+    "scheduled_run_id",
+    default=None,
+)
+# A fired scheduled command runs in the user's own conversation, so the model
+# sees the user's recent requests. In one live run it re-created five schedules
+# and five timed reminders from them, which fired again two minutes later: a
+# loop nobody was there to stop. A scheduled run may still list and delete
+# schedules and send a notification now; it may not add or change future runs.
+SCHEDULED_RUN_REFUSAL = (
+    "Nothing new was scheduled: this command is already running from a schedule. "
+    "Do what it asks now and give the answer."
+)
+
+
 def current_scheduled_action_denied_tools() -> frozenset[str]:
     """Return tools blocked for the currently running scheduled action."""
 
     return _SCHEDULED_ACTION_DENIED_TOOLS.get() or frozenset()
 
 
+def scheduled_run_refusal(tool_name: str, args: Any) -> tuple[str, str | None] | None:
+    """While a fired scheduled command runs, refuse a call that would schedule more runs.
+
+    Returns ``(what, schedule_id)`` for a refused call (``what`` is the tool and
+    its action, for the log), or ``None`` when the call may run. Outside a
+    scheduled run nothing is refused.
+    """
+
+    if _SCHEDULED_ACTION_DENIED_TOOLS.get() is None:
+        return None
+    # A bare name or an MCP-qualified one (mcp__core__schedule).
+    name = str(tool_name or "").strip().rsplit("__", 1)[-1].lower()
+    fields = args if isinstance(args, dict) else {}
+    action = str(fields.get("action") or "").strip().lower()
+    run = _SCHEDULED_RUN_ID.get()
+    run_id = None if run is None else str(run)
+    if name == "schedule" and action in {"create", "update"}:
+        return "schedule %s" % action, run_id
+    if name == "notify" and str(fields.get("when") or "").strip() and action not in {"list", "delete"}:
+        return "notify with a time", run_id
+    return None
+
+
 @contextlib.contextmanager
-def _scheduled_action_tool_guard():
+def _scheduled_action_tool_guard(schedule_id: int | None = None):
     token = _SCHEDULED_ACTION_DENIED_TOOLS.set(_SUBAGENT_DENY_LIST)
+    run_token = _SCHEDULED_RUN_ID.set(schedule_id)
     try:
         yield
     finally:
+        _SCHEDULED_RUN_ID.reset(run_token)
         _SCHEDULED_ACTION_DENIED_TOOLS.reset(token)
 
 
@@ -1228,7 +1268,7 @@ class SchedulerService:
 
             process = getattr(self._intent_pipeline, "process", None)
             if callable(process):
-                with _scheduled_action_tool_guard():
+                with _scheduled_action_tool_guard(schedule.id):
                     result = _schedule_result_fields(await process(schedule.action, user_key=schedule.user_id))
                 if result.get("ok"):
                     await self._deliver_schedule_reply(schedule, result)
