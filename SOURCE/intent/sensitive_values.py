@@ -64,6 +64,8 @@ _WORD_AFTER = r"(?![A-Za-z])"
 _EARLIER_MASK = r"\[(?:private|redacted|REDACTED:ADDRESS)\]|\*{4,}"
 _MIN_NUMBER_DIGITS = 3
 _MIN_NAME_WORD = 3
+# Lower-case text every _EARLIER_MASK match holds.
+_EARLIER_MASK_ANCHORS = ("[private]", "[redacted]", "[redacted:address]", "****")
 # Words that say nothing about which street it is.
 _STREET_FILLER_WORDS = frozenset(
     "n s e w ne nw se sw north south east west northeast northwest southeast southwest "
@@ -91,6 +93,19 @@ class _AddressRules:
     always: tuple[str, ...]
     city: str | None
     context: str | None
+    # For the log clean-up only (see _scan). A lower-case literal every match of
+    # some pattern holds, and a held number's digits with what may sit between
+    # them: a stretch of log holding none of these holds no match at all.
+    anchors: tuple[str, ...] = ()
+    number_anchors: tuple[str, ...] = ()
+    # Where whitespace (so a line break) can sit inside a match: for each gap, the
+    # characters that can come just before it and just after it.
+    joins: tuple[tuple[str, str], ...] = ()
+    # The same for the city rule's context: lower-case words, words that count only
+    # as written (a two-letter state), the ZIP code's digits.
+    context_anchors: tuple[str, ...] = ()
+    context_exact: tuple[str, ...] = ()
+    context_numbers: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -99,6 +114,11 @@ class _Compiled:
     city_rules: tuple[tuple[re.Pattern[str], re.Pattern[str]], ...]
     always_bytes: re.Pattern[bytes] | None
     city_rules_bytes: tuple[tuple[re.Pattern[bytes], re.Pattern[bytes]], ...]
+    anchor_words: tuple[bytes, ...] = ()
+    anchor_numbers: tuple[re.Pattern[bytes], ...] = ()
+    joins: frozenset[tuple[int, int]] = frozenset()
+    # For each of city_rules_bytes: its context's anchors (lower-case, as written, numbers).
+    city_contexts: tuple[tuple[tuple[bytes, ...], tuple[bytes, ...], tuple[re.Pattern[bytes], ...]], ...] = ()
 
 
 _LOCK = threading.RLock()
@@ -107,6 +127,9 @@ _COMPILED_BY_USER: dict[str, _Compiled] = {}
 _UNION: _Compiled | None = None
 _LOADED_USERS: set[str] = set()
 _LAST_REGISTERED_AT = 0.0
+# Bumped whenever the held values change: a log file scanned with older values
+# is scanned again from its tail.
+_RULES_VERSION = 0
 
 
 # --------------------------------------------------------------------------- building
@@ -114,6 +137,23 @@ _LAST_REGISTERED_AT = 0.0
 
 def _phrase(words: list[str]) -> str:
     return _WORD_BEFORE + _GAP.join(re.escape(word) for word in words) + _WORD_AFTER
+
+
+# What can stand right before / right after the whitespace inside a gap other
+# than the words themselves: the end of "+", "_" or "%20", the start of "+", "_" or "%20".
+_GAP_LEFT = "+_0"
+_GAP_RIGHT = "+_%"
+# Between the digits of a number (_DIGIT_SEP): a digit, or the end / start of a separator.
+_DIGIT_JOIN = ("0123456789,.+-cC", "0123456789,.+-%")
+_ASCII_LETTERS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+
+def _phrase_joins(words: list[str]) -> list[tuple[str, str]]:
+    return [(word[-1] + _GAP_LEFT, after[0] + _GAP_RIGHT) for word, after in zip(words, words[1:]) if word and after]
+
+
+def _longest(words: list[str]) -> str:
+    return max(words, key=lambda word: len(word.encode("utf-8")))
 
 
 def _digits_pattern(digits: str) -> str:
@@ -172,6 +212,16 @@ def _address_rules(address: Mapping[str, Any], own_words: str = "", extra_street
     always: list[str] = []
     name_word_patterns: list[str] = []
     numbers: list[str] = []
+    # Every pattern added to ``always`` (and the city's) adds what it must contain
+    # to ``anchors``/``number_anchors`` and its gaps to ``joins``: the log clean-up
+    # relies on that to skip text and to cut a file between lines (_scan).
+    anchors: list[str] = []
+    number_anchors: list[str] = []
+    joins: list[tuple[str, str]] = []
+    name_words: list[str] = []
+    context_anchors: list[str] = []
+    context_exact: list[str] = []
+    context_numbers: list[str] = []
     for street in streets:
         number, words = _house_number_and_name(street)
         if number:
@@ -179,45 +229,66 @@ def _address_rules(address: Mapping[str, Any], own_words: str = "", extra_street
         literal_words = street.split()
         if literal_words:
             always.append(_WORD_BEFORE + _GAP.join(re.escape(w) for w in literal_words) + _WORD_AFTER)
+            anchors.append(_longest(literal_words))
+            joins.extend(_phrase_joins(literal_words))
         if words:
             name = _phrase(words)
             if number:
                 number_form = _DIGIT_SEP.join(re.escape(digit) for digit in number)
                 always.append(_NUMBER_BEFORE + "#?" + number_form + "[A-Za-z]?" + _GAP + name[len(_WORD_BEFORE) :])
+                joins.append(("0123456789" + _ASCII_LETTERS + _GAP_LEFT, words[0][0] + _GAP_RIGHT))
+                if len(number) > 1:
+                    joins.append(_DIGIT_JOIN)
             always.append(name)
+            anchors.append(_longest(words))
+            joins.extend(_phrase_joins(words))
             for word in words:
                 if len(word) >= _MIN_NAME_WORD and word.lower() not in _STREET_FILLER_WORDS:
                     pattern = _WORD_BEFORE + re.escape(word) + _WORD_AFTER
                     always.append(pattern)
                     name_word_patterns.append(pattern)
+                    name_words.append(word)
+                    anchors.append(word)
     zip_digits = "".join(_DIGITS_RE.findall(zip_code))[:5]
     digit_values = [number for number in numbers if len(number) >= _MIN_NUMBER_DIGITS]
     if len(zip_digits) >= _MIN_NUMBER_DIGITS:
         digit_values.append(zip_digits)
     for digits in dict.fromkeys(digit_values):
         always.append(_digits_pattern(digits))
+        number_anchors.append(_DIGIT_SEP.join(re.escape(digit) for digit in digits))
+        joins.append(_DIGIT_JOIN)
     for form in _own_number_forms(own_words, digit_values):
         always.append(_NUMBER_BEFORE + re.escape(form) + _NUMBER_AFTER)
+        anchors.append(form)
     if full_text:
         full_words = full_text.split()
         always.append(_WORD_BEFORE + _GAP.join(re.escape(w) for w in full_words) + r"(?![A-Za-z0-9])")
+        anchors.append(_longest(full_words))
+        joins.extend(_phrase_joins(full_words))
 
     city_pattern: str | None = None
     context_pattern: str | None = None
     city_words = [word for word in re.split(r"[\s,]+", city) if word]
     if city_words:
         city_pattern = _phrase(city_words)
+        anchors.append(_longest(city_words))
+        joins.extend(_phrase_joins(city_words))
         # A piece an earlier mask already took out still counts: "Is it Ostbrook,
         # [redacted]?" held the ZIP code before the number mask ran.
         context: list[str] = [_EARLIER_MASK, *name_word_patterns]
+        context_anchors.extend([*_EARLIER_MASK_ANCHORS, *name_words])
         if zip_digits and len(zip_digits) >= _MIN_NUMBER_DIGITS:
             context.append(_digits_pattern(zip_digits))
+            context_numbers.append(_DIGIT_SEP.join(re.escape(digit) for digit in zip_digits))
         if state:
             if len(state) == 2:
                 # "IN", "OR", "ME": a two-letter state counts only in capitals.
                 context.append("(?-i:" + _WORD_BEFORE + re.escape(state.upper()) + _WORD_AFTER + ")")
+                context_exact.append(state.upper())
             else:
                 context.append(_phrase(state.split()))
+                context_anchors.append(_longest(state.split()))
+                joins.extend(_phrase_joins(state.split()))
         context_pattern = "|".join(context) if context else None
 
     key = tuple(
@@ -237,16 +308,49 @@ def _address_rules(address: Mapping[str, Any], own_words: str = "", extra_street
         always=tuple(dict.fromkeys(always)),
         city=city_pattern,
         context=context_pattern,
+        anchors=tuple(dict.fromkeys(anchor for anchor in anchors if anchor)),
+        number_anchors=tuple(dict.fromkeys(number_anchors)),
+        joins=tuple(dict.fromkeys(joins)),
+        context_anchors=tuple(dict.fromkeys(context_anchors)),
+        context_exact=tuple(dict.fromkeys(context_exact)),
+        context_numbers=tuple(dict.fromkeys(context_numbers)),
     )
+
+
+def _edge_bytes(chars: str, *, last: bool) -> set[int]:
+    """The byte of each character that touches a gap (its last byte before it, its first after it), both cases."""
+    found: set[int] = set()
+    for char in chars:
+        # A bytes pattern's IGNORECASE folds ASCII letters only.
+        for variant in {char, char.lower(), char.upper()} if char.isascii() else {char}:
+            encoded = variant.encode("utf-8")
+            found.add(encoded[-1] if last else encoded[0])
+    return found
 
 
 def _compile(rules: Iterable[_AddressRules]) -> _Compiled:
     always: list[str] = []
     city_rules: list[tuple[str, str]] = []
+    city_contexts: list[tuple[tuple[bytes, ...], tuple[bytes, ...], tuple[re.Pattern[bytes], ...]]] = []
+    anchor_words: list[bytes] = []
+    anchor_numbers: list[str] = []
+    joins: set[tuple[int, int]] = set()
     for rule in rules:
         always.extend(rule.always)
         if rule.city and rule.context:
             city_rules.append((rule.city, rule.context))
+            city_contexts.append(
+                (
+                    tuple(anchor.encode("utf-8").lower() for anchor in rule.context_anchors),
+                    tuple(anchor.encode("utf-8") for anchor in rule.context_exact),
+                    tuple(re.compile(source.encode("utf-8")) for source in rule.context_numbers),
+                )
+            )
+        # bytes.lower() folds ASCII only, like a bytes pattern's IGNORECASE.
+        anchor_words.extend(anchor.encode("utf-8").lower() for anchor in rule.anchors)
+        anchor_numbers.extend(rule.number_anchors)
+        for left, right in rule.joins:
+            joins.update((a, b) for a in _edge_bytes(left, last=True) for b in _edge_bytes(right, last=False))
     # Longer patterns first, so a whole street line is one mask, not three.
     ordered = sorted(dict.fromkeys(always), key=len, reverse=True)
     union = "|".join("(?:%s)" % pattern for pattern in ordered)
@@ -258,11 +362,16 @@ def _compile(rules: Iterable[_AddressRules]) -> _Compiled:
             (re.compile(c.encode("utf-8"), re.IGNORECASE), re.compile(x.encode("utf-8"), re.IGNORECASE))
             for c, x in city_rules
         ),
+        anchor_words=tuple(dict.fromkeys(anchor_words)),
+        anchor_numbers=tuple(re.compile(source.encode("utf-8")) for source in dict.fromkeys(anchor_numbers)),
+        joins=frozenset(joins),
+        city_contexts=tuple(city_contexts),
     )
 
 
 def _rebuild_locked(user_id: str) -> None:
-    global _UNION
+    global _UNION, _RULES_VERSION
+    _RULES_VERSION += 1
     _COMPILED_BY_USER[user_id] = _compile(_RULES.get(user_id, []))
     _UNION = _compile(rule for rules in _RULES.values() for rule in rules) if len(_RULES) <= _UNION_MAX_USERS else None
 
@@ -364,6 +473,8 @@ def _reset_for_tests() -> None:
         _LOADED_USERS.clear()
         _UNION = None
         _LAST_REGISTERED_AT = 0.0
+    with _SCRUB_LOCK:
+        _SCANNED.clear()
 
 
 # --------------------------------------------------------------------------- masking
@@ -513,6 +624,35 @@ _SCRUB_LOCK = threading.Lock()
 _SCRUB_STATE = threading.Condition()
 _scrub_pending = False
 _scrub_running = False
+# The clean-up runs on a background thread, but ``re`` holds the GIL for a whole
+# search: one search over an 8 MB tail stopped every other Python thread in Viola
+# (audio, the wake listener, the API server) for about 3 s. So a pass reads only
+# what it has not scanned with the current values, works in pieces of about this
+# size cut where no value can run across, and sleeps between pieces.
+_CHUNK_BYTES = 64 * 1024
+_CHUNK_PAUSE_SECONDS = 0.002
+# How far back a pass that resumes a file first reads, to find a line break no
+# value can run across.
+_LOOKBACK_BYTES = 64 * 1024
+# A line longer than this has the city rule's context searched around its anchors only.
+_LONG_LINE_BYTES = 4096
+# What ``\s`` matches in a bytes pattern.
+_WHITESPACE = frozenset(b" \t\n\r\x0b\x0c")
+
+
+@dataclass(frozen=True)
+class _FileScan:
+    """How far one log file was scanned, and with which held values."""
+
+    version: int
+    tail_bytes: int
+    identity: int
+    # The end of the last complete line scanned: a line still being written is scanned again.
+    offset: int
+
+
+_SCANNED: dict[str, _FileScan] = {}
+_SCRUB_COMPILED: tuple[int, _Compiled | None] = (-1, None)
 
 
 def _is_text_log(path: Path) -> bool:
@@ -538,18 +678,205 @@ def _log_files(roots: Iterable[Path], newer_than: float) -> list[Path]:
     return files
 
 
-def _spans(compiled: _Compiled, buffer: bytes) -> list[tuple[int, int]]:
+def _spans(
+    compiled: _Compiled,
+    buffer: bytes,
+    start: int = 0,
+    end: int | None = None,
+    line_lo: int | None = None,
+    line_hi: int | None = None,
+) -> list[tuple[int, int]]:
+    """Every held value in ``buffer[start:end]``, by one regex pass over that stretch.
+
+    The city rule looks at the whole line around a city match, within
+    ``buffer[line_lo:line_hi]`` (by default the stretch itself).
+    """
+    end = len(buffer) if end is None else end
+    line_lo = start if line_lo is None else line_lo
+    line_hi = end if line_hi is None else line_hi
     spans: list[tuple[int, int]] = []
-    for city_re, context_re in compiled.city_rules_bytes:
-        for match in city_re.finditer(buffer):
-            line_start = buffer.rfind(b"\n", 0, match.start()) + 1
-            line_end = buffer.find(b"\n", match.end())
+    for index, (city_re, context_re) in enumerate(compiled.city_rules_bytes):
+        for match in city_re.finditer(buffer, start, end):
+            newline = buffer.rfind(b"\n", line_lo, match.start())
+            line_start = newline + 1 if newline >= 0 else line_lo
+            line_end = buffer.find(b"\n", match.end(), line_hi)
             if line_end < 0:
-                line_end = len(buffer)
-            if context_re.search(buffer[line_start:line_end]):
+                line_end = line_hi
+            if _context_in_line(compiled, index, context_re, buffer, line_start, line_end):
                 spans.append(match.span())
     if compiled.always_bytes is not None:
-        spans.extend(match.span() for match in compiled.always_bytes.finditer(buffer))
+        spans.extend(match.span() for match in compiled.always_bytes.finditer(buffer, start, end))
+    return spans
+
+
+def _context_in_line(
+    compiled: _Compiled, index: int, context_re: re.Pattern[bytes], buffer: bytes, start: int, end: int
+) -> bool:
+    """``context_re.search(buffer[start:end])``, the line around a city match.
+
+    A long line (a page of text in a tool result) is searched only around the
+    context's anchors, from the nearest place no value runs across before each to
+    the nearest one after it: one search over a 400 KB line held the GIL for 36 ms.
+    """
+    if end - start <= _LONG_LINE_BYTES or index >= len(compiled.city_contexts):
+        return context_re.search(buffer[start:end]) is not None
+    words, exact, numbers = compiled.city_contexts[index]
+    low = buffer[start:end].lower()
+    hits: list[tuple[int, int]] = []
+    for word in words:
+        found = low.find(word)
+        while found >= 0:
+            hits.append((start + found, start + found + len(word)))
+            found = low.find(word, found + len(word))
+    for word in exact:
+        found = buffer.find(word, start, end)
+        while found >= 0:
+            hits.append((found, found + len(word)))
+            found = buffer.find(word, found + len(word), end)
+    for number in numbers:
+        match = number.search(low)
+        while match is not None:
+            hits.append((start + match.start(), start + match.end()))
+            match = number.search(low, match.end())
+    searched_to = start
+    for hit_start, hit_end in sorted(hits):
+        if hit_end <= searched_to:
+            continue
+        window_start = _back_to_cut(compiled, buffer, hit_start, start, start, end)
+        window_end = _forward_to_cut(compiled, buffer, hit_end, end, start, end)
+        if context_re.search(buffer, window_start, window_end):
+            return True
+        searched_to = window_end
+    return False
+
+
+def _neighbours(buffer: bytes, cut: int, lo: int, hi: int) -> tuple[int, int]:
+    """The last non-blank byte before ``cut`` and the first at or after it (``lo - 1`` / ``hi`` when none)."""
+    before = cut - 1
+    while before >= lo and buffer[before] in _WHITESPACE:
+        before -= 1
+    after = cut
+    while after < hi and buffer[after] in _WHITESPACE:
+        after += 1
+    return before, after
+
+
+def _can_cut(compiled: _Compiled, buffer: bytes, cut: int, lo: int, hi: int) -> bool:
+    """True when no held value can run across ``cut``, a place just after whitespace in ``buffer[lo:hi]``.
+
+    Inside a match, whitespace sits only in a gap between two words or two digits,
+    and no match starts or ends with whitespace. So a match across this place
+    holds the last non-blank byte before it and the first one after it, and that
+    pair is one a held pattern joins (``_Compiled.joins``). The lookaheads that end
+    a match refuse only a letter or a digit, which whitespace and the end of a
+    stretch both satisfy; lookbehinds see the bytes before a stretch. ``lo`` and
+    ``hi`` bound what this pass scans: nothing beyond them is matched in it anyway.
+    """
+    before, after = _neighbours(buffer, cut, lo, hi)
+    if before < lo or after >= hi:
+        return True
+    return (buffer[before], buffer[after]) not in compiled.joins
+
+
+_WHITESPACE_RUN = re.compile(rb"\s+")
+
+
+def _back_to_cut(compiled: _Compiled, buffer: bytes, index: int, floor: int, lo: int, hi: int) -> int:
+    """The nearest place at or before ``index`` no value runs across (``floor`` when there is none)."""
+    end = index
+    step = 256
+    while end > floor:
+        begin = max(floor, end - step)
+        for run in reversed(list(_WHITESPACE_RUN.finditer(buffer, begin, end))):
+            if _can_cut(compiled, buffer, run.end(), lo, hi):
+                return run.end()
+        end = begin
+        step *= 4
+    return floor
+
+
+def _forward_to_cut(compiled: _Compiled, buffer: bytes, index: int, ceiling: int, lo: int, hi: int) -> int:
+    """The nearest place at or after ``index`` no value runs across (``ceiling`` when there is none)."""
+    pos = index
+    while pos < ceiling:
+        run = _WHITESPACE_RUN.search(buffer, pos, ceiling)
+        if run is None:
+            break
+        if _can_cut(compiled, buffer, run.end(), lo, hi):
+            return run.end()
+        pos = run.end()
+    return ceiling
+
+
+def _next_cut(compiled: _Compiled, buffer: bytes, pos: int, lo: int, hi: int) -> int:
+    """The end of the piece that starts at ``pos``: the last line break no value runs across within
+    _CHUNK_BYTES, else the last such space (a line longer than a piece), else the first one after."""
+    target = pos + _CHUNK_BYTES
+    if target >= hi:
+        return hi
+    newline = buffer.rfind(b"\n", pos, target)
+    while newline >= pos:
+        if _can_cut(compiled, buffer, newline + 1, lo, hi):
+            return newline + 1
+        newline = buffer.rfind(b"\n", pos, newline)
+    cut = _back_to_cut(compiled, buffer, target, pos, lo, hi)
+    return cut if cut > pos else _forward_to_cut(compiled, buffer, target, hi, lo, hi)
+
+
+def _scan_piece(compiled: _Compiled, buffer: bytes, pos: int, cut: int, lo: int, hi: int) -> list[tuple[int, int]]:
+    """:func:`_spans` over ``buffer[pos:cut]``, run only where a match can be.
+
+    Every match holds one of the held values' anchors (a word of it, lower-case, or
+    a number's digits) and lies between two places no value runs across. So the
+    regex runs only from the nearest such place before each anchor to the nearest
+    one after it, usually a word or two; the rest of the piece costs a ``lower()``
+    and a few ``find()`` calls.
+    """
+    low = buffer[pos:cut].lower()
+    hits: list[tuple[int, int]] = []
+    for word in compiled.anchor_words:
+        found = low.find(word)
+        while found >= 0:
+            hits.append((pos + found, pos + found + len(word)))
+            found = low.find(word, found + len(word))
+    for number in compiled.anchor_numbers:
+        match = number.search(low)
+        while match is not None:
+            hits.append((pos + match.start(), pos + match.end()))
+            match = number.search(low, max(match.end(), match.start() + 1))
+    if not hits:
+        return []
+    windows: list[list[int]] = []
+    for start, end in sorted(hits):
+        if windows and end <= windows[-1][1]:
+            continue  # inside the last window already
+        start = _back_to_cut(compiled, buffer, start, pos, lo, hi)
+        end = _forward_to_cut(compiled, buffer, end, cut, lo, hi)
+        if windows and start <= windows[-1][1]:
+            windows[-1][1] = max(windows[-1][1], end)
+        else:
+            windows.append([start, end])
+    spans: list[tuple[int, int]] = []
+    for start, end in windows:
+        spans.extend(_spans(compiled, buffer, start, end, lo, hi))
+    return spans
+
+
+def _scan(compiled: _Compiled, buffer: bytes, start: int, end: int) -> list[tuple[int, int]]:
+    """The spans one :func:`_spans` call over ``buffer[start:end]`` finds, found piece by piece.
+
+    ``start`` is a line start. Pieces end where no value can run across, so no
+    match is split; each is about _CHUNK_BYTES, and the thread sleeps between
+    pieces so no other thread waits long on the GIL.
+    """
+    spans: list[tuple[int, int]] = []
+    pos = start
+    while pos < end:
+        cut = _next_cut(compiled, buffer, pos, start, end)
+        spans.extend(_scan_piece(compiled, buffer, pos, cut, start, end))
+        pos = cut
+        if pos < end and _CHUNK_PAUSE_SECONDS > 0:
+            time.sleep(_CHUNK_PAUSE_SECONDS)
     return spans
 
 
@@ -565,26 +892,96 @@ def _overwrite(found: bytes) -> bytes:
     return _DIGIT_BYTES.sub(b"9", found)
 
 
-def _scrub_file(path: Path, compiled: _Compiled, tail_bytes: int) -> int:
+def _read(path: Path, start: int, size: int) -> bytes:
+    with open(path, "rb") as handle:
+        handle.seek(start)
+        return handle.read(size - start)
+
+
+def _file_key(path: Path) -> str:
+    return os.path.normcase(os.path.abspath(path))
+
+
+def _resume_point(compiled: _Compiled, buffer: bytes, at: int, lo: int | None) -> int | None:
+    """The nearest line start at or before ``at`` that no value runs across.
+
+    ``lo`` is where this pass's scan may start at the earliest (the tail's first
+    line), or None when ``buffer`` starts in the middle of the file: then None
+    means "read further back".
+    """
+    floor = 0 if lo is None else lo
+    cut = at
+    while cut > floor:
+        before, after = _neighbours(buffer, cut, floor, len(buffer))
+        if before < floor:
+            return None if lo is None else cut
+        if after >= len(buffer) or (buffer[before], buffer[after]) not in compiled.joins:
+            return cut
+        newline = buffer.rfind(b"\n", floor, cut - 1)
+        if newline < 0:
+            return None if lo is None else floor
+        cut = newline + 1
+    return None if lo is None else floor
+
+
+def _scrub_file(path: Path, compiled: _Compiled, tail_bytes: int, version: int = -1) -> int:
+    """Mask held values in the part of *path* not yet scanned with these values (the last *tail_bytes* at most)."""
+    key = _file_key(path)
     try:
-        with open(path, "rb") as handle:
-            handle.seek(0, os.SEEK_END)
-            size = handle.tell()
-            start = max(0, size - tail_bytes)
-            handle.seek(start)
-            buffer = handle.read(size - start)
+        stat = os.stat(path)
+    except OSError:
+        _SCANNED.pop(key, None)
+        return 0
+    size = stat.st_size
+    floor = max(0, size - tail_bytes)
+    seen = _SCANNED.get(key)
+    resume = -1
+    if (
+        seen is not None
+        and (seen.version, seen.tail_bytes, seen.identity) == (version, tail_bytes, stat.st_ino)
+        and seen.offset <= size
+    ):
+        if seen.offset == size:
+            return 0  # nothing appended: nothing read
+        if seen.offset > floor:
+            resume = seen.offset
+    try:
+        begin = -1
+        if resume >= 0:
+            # Only the lines appended since, from the nearest earlier line break no value runs across.
+            lookback = _LOOKBACK_BYTES
+            while True:
+                read_from = max(floor, resume - lookback)
+                buffer = _read(path, read_from, size)
+                at = resume - read_from
+                if at > len(buffer) or buffer[at - 1 : at] != b"\n":
+                    break  # rewritten under the same name: scan the tail
+                lo: int | None = None
+                if read_from == floor:
+                    lo = 0 if floor == 0 else buffer.find(b"\n") + 1
+                point = _resume_point(compiled, buffer, at, lo)
+                if point is not None:
+                    begin = point
+                    break
+                lookback *= 4
+        if begin < 0:
+            read_from = floor
+            buffer = _read(path, read_from, size)
+            begin = 0
+            if read_from:
+                # Start on a whole line.
+                newline = buffer.find(b"\n")
+                if newline < 0:
+                    return 0
+                begin = newline + 1
     except OSError:
         return 0
-    if start:
-        # Start on a whole line.
-        newline = buffer.find(b"\n")
-        if newline < 0:
-            return 0
-        start += newline + 1
-        buffer = buffer[newline + 1 :]
-    if b"\x00" in buffer[:4096]:
+    end_of_lines = buffer.rfind(b"\n", begin)
+    offset = read_from + (end_of_lines + 1 if end_of_lines >= 0 else begin)
+    _SCANNED[key] = _FileScan(version, tail_bytes, stat.st_ino, max(offset, resume))
+    if b"\x00" in buffer[begin : begin + 4096]:
         return 0
-    spans = _spans(compiled, buffer)
+    spans = _scan(compiled, buffer, begin, len(buffer))
     if not spans:
         return 0
     written = 0
@@ -592,12 +989,14 @@ def _scrub_file(path: Path, compiled: _Compiled, tail_bytes: int) -> int:
         # In place, same length: no rename and no truncate, so a handle the
         # logger holds open keeps appending where it was.
         with open(path, "r+b") as handle:
-            for begin, end in sorted(set(spans)):
-                if end > begin:
-                    handle.seek(start + begin)
-                    handle.write(_overwrite(buffer[begin:end]))
+            for start, end in sorted(set(spans)):
+                if end > start:
+                    handle.seek(read_from + start)
+                    handle.write(_overwrite(buffer[start:end]))
                     written += 1
     except OSError:
+        # Scan its tail again next pass, as before.
+        _SCANNED.pop(key, None)
         logger.debug("Could not overwrite private values in a log file", exc_info=True)
     return written
 
@@ -624,11 +1023,22 @@ def scrub_recent_logs(
 ) -> int:
     """Overwrite held private values with ``*`` (a bare number with ``9``) in log files changed recently.
 
-    Same byte length, in place, only the last *tail_bytes* of each file. Returns
-    how many places were overwritten. Uses every account's values.
+    Same byte length, in place, only the last *tail_bytes* of each file. A file
+    already scanned with the same values is scanned only from where the last pass
+    stopped (the start of its last whole line); new values, or a file that shrank
+    or was replaced, mean its tail is scanned again. Returns how many places were
+    overwritten. Uses every account's values.
     """
+    global _SCRUB_COMPILED
     with _LOCK:
-        compiled = _compile(rule for rules in _RULES.values() for rule in rules) if _RULES else None
+        version = _RULES_VERSION
+        if not _RULES:
+            compiled = None
+        elif _SCRUB_COMPILED[0] == version:
+            compiled = _SCRUB_COMPILED[1]
+        else:
+            compiled = _compile(rule for rules in _RULES.values() for rule in rules)
+            _SCRUB_COMPILED = (version, compiled)
     if compiled is None:
         return 0
     if roots is None:
@@ -640,8 +1050,13 @@ def scrub_recent_logs(
     newer_than = time.time() - max_age_seconds
     total = 0
     with _SCRUB_LOCK:
-        for path in _log_files(root_list, newer_than):
-            total += _scrub_file(path, compiled, tail_bytes)
+        files = _log_files(root_list, newer_than)
+        # Forget files that are gone or no longer recent, so this cannot grow without bound.
+        current = {_file_key(path) for path in files}
+        for key in [key for key in _SCANNED if key not in current]:
+            del _SCANNED[key]
+        for path in files:
+            total += _scrub_file(path, compiled, tail_bytes, version)
     if total:
         # A count only: the values themselves are never logged.
         logger.info("Private-value log clean-up: masked=%d in log files changed in the last 15 minutes", total)
