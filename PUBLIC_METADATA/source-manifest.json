@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "6b10e2fcf9bf0b8d1b5b9b5e9b795838d590f1bb",
-  "sha256": "301d40af49cb1818dbd77957c21cb47ab1a91de0965ffe6c56614bd5ade0feb6",
+  "revision": "68f311d0c3a2723e8b7a00c47c2eb3089e9b8845",
+  "sha256": "d5a9738df3171ca1377a10fa2b050324adfae83fbf7fada74bb5caa827324911",
   "files": [
     {
       "path": ".env.example",
@@ -1400,8 +1400,8 @@
     },
     {
       "path": "diagnostics/observability_logging.py",
-      "sha256": "0fa00a6c918647db80821ca0ad0f35dc0898649620f6c9a0f7530d9fc41abc87",
-      "bytes": 20435
+      "sha256": "46116ad8ac4f9c2b4b622e57e3656ac64bd9eaeb7be709eeb89dd00fb25789ab",
+      "bytes": 20454
     },
     {
       "path": "diagnostics/operation_trace.py",
@@ -1600,8 +1600,8 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "74e67f5f02fdef3dcc37c6256dba02f44223d4c8620f0d4c920439dcfd5f3a74",
-      "bytes": 644674
+      "sha256": "d8af4a2b2a32e18d03469289d638b705346bc769833af45d944ee22af558a7b5",
+      "bytes": 643769
     },
     {
       "path": "intent/agent_loop.py",
@@ -1910,8 +1910,8 @@
     },
     {
       "path": "intent/pipeline.py",
-      "sha256": "ca31b32e81f3fe59c9e777a0b243a696de6db21cd4f976c834e5a52117bc6422",
-      "bytes": 114608
+      "sha256": "e9febc989fe15682661e54f73bdd079f39d2a5a5d4de841bd83560459935e744",
+      "bytes": 114893
     },
     {
       "path": "intent/pipeline_contracts.py",
@@ -2400,8 +2400,8 @@
     },
     {
       "path": "mcp_servers/core_tools/server.py",
-      "sha256": "2434a416db77e60cac12d8a3400efd82bfdb6aaead6810b24f29f6458100a4bc",
-      "bytes": 268000
+      "sha256": "de96d08bed7730a811f07bb738d66ce4e0cf18e73ece74c0d83645fcdfbda1f8",
+      "bytes": 268012
     },
     {
       "path": "mcp_servers/phone_tool_descriptions.py",
@@ -4490,8 +4490,8 @@
     },
     {
       "path": "services/conversation/session_memory.py",
-      "sha256": "89997f65000aca3a79f01daad1fae3760c7785c1487d6cb286186f98a91422a2",
-      "bytes": 11780
+      "sha256": "225f0a0d21b2823906ece40c0b3492aa3a7245a5878fa75f828990d8e620a2f5",
+      "bytes": 14716
     },
     {
       "path": "services/conversation/state_manager.py",
@@ -9770,8 +9770,8 @@
     },
     {
       "path": "ui/api/routes/wake_training.py",
-      "sha256": "9b170426e3517131ab6b5949f9b52c66c4d030579a12672d495cc18ff9d30b98",
-      "bytes": 31592
+      "sha256": "9f984316d188b8fb80e5d3bb4bf0f5b8bc08e7e20ff1ab6e87d52370600ebb95",
+      "bytes": 31986
     },
     {
       "path": "ui/api/routes/weather.py",
@@ -12990,8 +12990,8 @@
     },
     {
       "path": "ui/settings_schema.py",
-      "sha256": "dc896ec8d3377ce033efb6c66f90e621aa0afcc9015d736956d72592e528a6f7",
-      "bytes": 12208
+      "sha256": "1a96cf4893e7728ee7d4d9c53351fe1754319f5a58c1f89662747a486ef1ba1b",
+      "bytes": 12254
     },
     {
       "path": "ui/static/README_WEB_UI.txt",

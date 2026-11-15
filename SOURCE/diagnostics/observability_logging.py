@@ -118,8 +118,8 @@ class RepeatCollapseFilter(logging.Filter):
             sample.levelno,
             sample.pathname,
             sample.lineno,
-            "%s [%d more like this in the last %ds]",
-            (text[:300], kind.suppressed, int(now - kind.suppressed_since)),
+            "[summary] %d similar lines in the last %ds, first was: %s",
+            (kind.suppressed, int(now - kind.suppressed_since), text[:300]),
             None,
             func=sample.funcName,
         )

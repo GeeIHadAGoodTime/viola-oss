@@ -211,6 +211,12 @@ def _hold_saved_private_values(user_id: str | None) -> None:
         load_saved_address(user_id)
     except Exception:  # noqa: BLE001 - masking must never break start-up or a command
         logger.debug("Saved address not loaded for the log mask", exc_info=True)
+    try:
+        from services.conversation.session_memory import tidy_session_memory
+
+        tidy_session_memory(user_id)
+    except Exception:  # noqa: BLE001 - a clean-up must never break start-up or a command
+        logger.debug("Session memory clean-up not run", exc_info=True)
 
 
 class IntentPipeline:
