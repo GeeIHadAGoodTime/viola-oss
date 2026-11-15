@@ -526,6 +526,13 @@ def _legacy_computer_alias(tool_name: str, args: dict[str, Any]) -> tuple[str, d
     return None
 
 
+def _deferred_refusal_text() -> str | None:
+    """What to tell the model when the user's reply refused a pending confirmation, else None."""
+    from intent.approval import take_deferred_confirmation_refusal
+
+    return take_deferred_confirmation_refusal()
+
+
 class MCPClientHub:
     """Central hub that connects to MCP servers and routes tool calls.
 
@@ -2001,13 +2008,13 @@ class MCPClientHub:
         if not approved:
             self.last_approval_path = "approval_denied"
             title = str(details.get("window_title") or "the window")
+            refusal = _deferred_refusal_text()
             return {
                 "success": False,
                 "data": None,
                 "display": "",
-                "error": (
-                    "The user said no. Nothing was thrown away: %s is still open with its unsaved changes." % title
-                ),
+                "error": "%s Nothing was thrown away: %s is still open with its unsaved changes."
+                % (refusal or "The user said no.", title),
                 "error_category": "APPROVAL_BLOCKED",
                 "blocked_tool": "computer",
                 "retryable": False,
@@ -2128,7 +2135,7 @@ class MCPClientHub:
                     "success": False,
                     "data": None,
                     "display": "",
-                    "error": "Tool '%s' was not approved by the user." % name,
+                    "error": _deferred_refusal_text() or "Tool '%s' was not approved by the user." % name,
                     "error_category": "APPROVAL_BLOCKED",
                     "blocked_tool": name,
                     "retryable": False,
@@ -2250,7 +2257,7 @@ class MCPClientHub:
                 "success": False,
                 "data": None,
                 "display": "",
-                "error": "Tool '%s' was not approved by the user." % name,
+                "error": _deferred_refusal_text() or "Tool '%s' was not approved by the user." % name,
                 "error_category": "APPROVAL_BLOCKED",
                 "blocked_tool": name,
                 "retryable": False,
