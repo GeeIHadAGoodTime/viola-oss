@@ -46,6 +46,8 @@ class _ActiveChatTask:
     # interrupt that write, so Stop leaves it alone.
     finalizing: bool = False
     stop_watch: asyncio.Task[None] | None = None
+    # When Stop last cancelled the task (monotonic seconds).
+    last_cancel_at: float = 0.0
 
 
 # A Stop that has not ended the turn by then is applied again (the first
@@ -767,14 +769,26 @@ def _stop_chat_turn(stream_id: str, active: _ActiveChatTask, *, reason: str) -> 
         active.stop_presses += 1
     executors = _cancel_turn_executors(stream_id, active.user_id)
     desktop = _release_desktop_control(active.user_id)
+    cancelling = getattr(active.task, "cancelling", None)
+    pending = callable(cancelling) and cancelling() > 0
+    since_cancel = time.monotonic() - active.last_cancel_at
     if active.task.done():
         task_action = "already finished"
     elif active.finalizing:
         # Another CancelledError now would interrupt the write of "Stopped.".
         task_action = "left alone (saving the stopped reply)"
+    elif pending and since_cancel < _STOP_RETRY_SECONDS:
+        # A cancellation sent moments ago may still be running its cleanup; a
+        # second one would interrupt it. If the turn is still alive once the
+        # retry interval has passed, the cancellation was swallowed and Stop
+        # cancels again (the old route never did).
+        task_action = "cancel already sent %.1fs ago; sent again only if the turn is still running after %.0fs" % (
+            since_cancel,
+            _STOP_RETRY_SECONDS,
+        )
     else:
         active.task.cancel()
-        cancelling = getattr(active.task, "cancelling", None)
+        active.last_cancel_at = time.monotonic()
         task_action = "cancel sent (cancelling=%s)" % (cancelling() if callable(cancelling) else "?")
     logger.info(
         "Chat Stop %s %d for stream %s: executor.cancel on %d run(s); desktop released: %s; task %s",
