@@ -171,19 +171,6 @@ def _push_tts_aec_reference(samples: np.ndarray, sample_rate: int) -> None:
         logger.debug("TTS AEC reference push failed: %s", exc)
 
 
-def _keep_duck_alive() -> None:
-    """A sentence is about to play: the music's duck must not time out under a long reading.
-
-    Through the global ducker (utils.audio_ducking); speech never fails because of it.
-    """
-    try:
-        from utils.audio_ducking import keep_duck_alive
-
-        keep_duck_alive()
-    except Exception as exc:  # noqa: BLE001, RUF100 - ducking must never break playback
-        logger.debug("Duck keep-alive unavailable: %s", exc)
-
-
 def _strip_emoji(text: str) -> str:
     """Remove emoji characters that would confuse the phonemizer."""
     cleaned = _EMOJI_RE.sub("", text)
@@ -1741,7 +1728,12 @@ class KokoroTTSEngine:
                     # because the capture guard is managed at this level).
                     # While this plays, the prefetch task synthesises the
                     # next sentence in parallel.
-                    _keep_duck_alive()
+                    try:
+                        from utils.audio_ducking import keep_duck_alive
+
+                        keep_duck_alive()
+                    except Exception as exc:  # noqa: BLE001, RUF100 - ducking must never break playback
+                        logger.debug("Duck keep-alive unavailable: %s", exc)
                     await asyncio.to_thread(
                         self._play_pcm_if_enabled, pcm, self.last_sample_rate, policy_marker=policy_marker
                     )
@@ -1976,7 +1968,12 @@ class KokoroTTSEngine:
 
                         # The music stays ducked for as long as she reads: the
                         # ducker's safety timer counts silence, not reply length.
-                        _keep_duck_alive()
+                        try:
+                            from utils.audio_ducking import keep_duck_alive
+
+                            keep_duck_alive()
+                        except Exception as exc:  # noqa: BLE001, RUF100 - ducking must never break playback
+                            logger.debug("Duck keep-alive unavailable: %s", exc)
                         await asyncio.to_thread(
                             self._play_pcm_if_enabled, pcm, self.last_sample_rate, policy_marker=marker
                         )
