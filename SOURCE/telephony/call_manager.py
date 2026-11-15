@@ -1767,38 +1767,58 @@ def _conference_leg_cost_usd(record: Any, *, now: float | None = None) -> float:
     return seconds / 60.0 * rate * (1 + _TELNYX_REGULATORY_SURCHARGE)
 
 
+def _non_carrier_cost_usd(record: Any) -> float | None:
+    """The measured non-carrier part of the estimate (GPU voice, STT, model, TTS).
+
+    Rounded to the microdollar, the unit the ledger stores, so a settle and a
+    later carrier reconcile add up to exactly the same figure. None when the
+    estimate's carrier part is unknown.
+    """
+    carrier_estimate = getattr(record, "estimated_carrier_cost_usd", None)
+    if carrier_estimate is None:
+        return None
+    estimate = max(0.0, float(getattr(record, "estimated_cost_usd", 0.0) or 0.0))
+    return round(max(0.0, estimate - max(0.0, float(carrier_estimate))), 6)
+
+
 def _billed_cost_usd(record: CallRecord) -> float:
     """Return the billable cost USD for a CallRecord.
 
-    A delivered carrier CDR is authoritative, including a legitimate zero.
-    Until that record arrives, retain the nonnegative measured estimate;
-    an unsuccessful outcome alone does not establish a carrier setup fee.
-    The primary call's CDR covers only the primary leg, so an owner-takeover
-    leg is added on top of either figure.
-
-    On an answered call the CDR replaces only the carrier part of the estimate
-    (owner decision, build 12): the bill plus the streaming and AMD items it
-    leaves out, plus the measured non-carrier parts (GPU voice, speech-to-text,
-    model, TTS). Before this, call 79907d19 was billed its 2.1 cent carrier bill
-    and dropped about 12 cents of GPU voice time. An unanswered call, or a record
-    whose carrier estimate is unknown, keeps the earlier rule unchanged.
+    True cost, one rule for every outcome (build 12, owner decision): the
+    carrier part plus the measured non-carrier part (GPU voice time this call
+    used, speech-to-text, model, TTS). The carrier part is the carrier's own
+    bill plus the streaming and AMD items it leaves out once that record has
+    arrived, and the estimate's carrier part until then. A record that arrives
+    after settle replaces only the carrier part (private phone_billing), so the
+    final charge does not depend on the order. Records whose carrier part is
+    unknown keep the earlier rule: a delivered CDR is authoritative, including
+    a legitimate zero, otherwise the measured estimate. The primary call's CDR
+    covers only the primary leg, so an owner-takeover leg is added on top.
     """
     carrier_cost = record.carrier_total_cost_usd
     estimate = max(0.0, float(record.estimated_cost_usd or 0.0))
     if carrier_cost is not None:
         base = max(0.0, float(carrier_cost))
-        carrier_estimate = getattr(record, "estimated_carrier_cost_usd", None)
-        if carrier_estimate is not None and bool(getattr(record, "carrier_answered", False)):
+        non_carrier = _non_carrier_cost_usd(record)
+        if non_carrier is not None:
             from telephony.cost_tracker import carrier_bill_with_unbilled_extras_usd
 
             billed_seconds = getattr(record, "carrier_billed_duration_seconds", None)
             if billed_seconds is None:
                 billed_seconds = getattr(record, "duration_seconds", 0.0)
-            base = carrier_bill_with_unbilled_extras_usd(base, billed_seconds)
-            base += max(0.0, estimate - max(0.0, float(carrier_estimate)))
+            base = carrier_bill_with_unbilled_extras_usd(base, billed_seconds) + non_carrier
     else:
         base = estimate
     return base + _conference_leg_cost_usd(record)
+
+
+def _accepts_keyword(func: Any, name: str) -> bool:
+    import inspect
+
+    try:
+        return name in inspect.signature(func).parameters
+    except (TypeError, ValueError):
+        return False
 
 
 def _recipient_state(record: Any) -> str:
@@ -3743,6 +3763,9 @@ class CallRecord:
     # with every estimate. The carrier's own bill replaces this part only; the
     # measured GPU voice, speech-to-text, model and TTS parts stay charged.
     estimated_carrier_cost_usd: float | None = None
+    # GPU worker seconds this call used: from its own warm-up start to its
+    # teardown (build 12). None when the GPU voice was not used or not measured.
+    gpu_worker_seconds: float | None = None
     # The moment the Telnyx media stream ended AND failed to recover, recorded by
     # ``_watch_telnyx_ws_disconnect``. Second honest end anchor for the same
     # window, covering the case where the media socket dies but the ``call.hangup``
@@ -6003,7 +6026,12 @@ class CallManager:
         if not callable(charge_floor) or not record.user_id:
             return
         try:
-            await charge_floor(record.user_id, record.call_id, _billed_cost_usd(record))
+            # The figure is already the whole call (both legs plus the measured
+            # non-carrier part), so the gate must not add its extras on top again.
+            if _accepts_keyword(charge_floor, "is_total"):
+                await charge_floor(record.user_id, record.call_id, _billed_cost_usd(record), is_total=True)
+            else:
+                await charge_floor(record.user_id, record.call_id, _billed_cost_usd(record))
         except Exception:  # noqa: BLE001, RUF100 - a failed top-up must not fail the carrier callback
             logger.exception("Call %s: owner-leg charge top-up failed", record.call_id)
 
@@ -7791,6 +7819,19 @@ class CallManager:
             # opening-turn observer may already have cancelled it). Guarantees the
             # warm-state task never leaks past the call on any exit path.
             await _cancel_remote_warm("call cleanup (finally)")
+            if remote_warm_started:
+                # True cost (build 12): the GPU time this call used, from its own
+                # warm-up start to now, not the worst-case prewarm figure. A worker
+                # that was already warm for another reason is still charged only
+                # from this call's own start.
+                record.gpu_worker_seconds = max(0.0, time.monotonic() - remote_warm_started)
+                if record._cost_tracker is not None:
+                    record._cost_tracker.set_gpu_worker_seconds(record.gpu_worker_seconds)
+                logger.info(
+                    "Call %s: GPU worker time used %.1fs (warm-up start to teardown)",
+                    record.call_id,
+                    record.gpu_worker_seconds,
+                )
             if record._late_greeting_task is not None:
                 record._late_greeting_task.cancel()
 
@@ -7878,12 +7919,16 @@ class CallManager:
             try:
                 billing = get_phone_billing()
                 if effective_user_id:
+                    end_kwargs: dict[str, Any] = {"status": record.status.value}
+                    non_carrier = _non_carrier_cost_usd(record)
+                    if non_carrier is not None and _accepts_keyword(billing.record_call_end, "non_carrier_cost_usd"):
+                        end_kwargs["non_carrier_cost_usd"] = non_carrier
                     await billing.record_call_end(
                         effective_user_id,
                         record.call_id,
                         billed_duration_seconds,
                         billed_cost_usd,
-                        status=record.status.value,
+                        **end_kwargs,
                     )
             except Exception:
                 logger.exception("Failed to record call end for billing")
@@ -8730,7 +8775,14 @@ class CallManager:
         from telephony.remote_voice import phone_voice_remote_enabled
 
         telnyx_cost = estimate_phone_carrier_cost_usd(record.duration_seconds, record.phone_number)
-        gpu_cost = estimate_phone_gpu_cost_usd(record.duration_seconds) if phone_voice_remote_enabled() else 0.0
+        if not phone_voice_remote_enabled():
+            gpu_cost = 0.0
+        elif record.gpu_worker_seconds is not None:
+            from telephony.cost_tracker import phone_gpu_usd_per_second
+
+            gpu_cost = record.gpu_worker_seconds * phone_gpu_usd_per_second()
+        else:
+            gpu_cost = estimate_phone_gpu_cost_usd(record.duration_seconds)
 
         # Estimate LLM tokens from transcript
         total_text = " ".join(str(e.get("text", "")) for e in record.transcript if isinstance(e, dict))
