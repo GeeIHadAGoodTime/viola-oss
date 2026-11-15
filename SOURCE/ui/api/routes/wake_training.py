@@ -215,6 +215,12 @@ def _get_active_model_path(user_id: str) -> str:
     return str(active or "")
 
 
+def _model_file_name(model_path: str) -> str:
+    """The file name of a stored model path, for display (either slash style)."""
+    text = str(model_path or "").strip()
+    return re.split(r"[\\/]", text)[-1] if text else ""
+
+
 def _set_active_model(user_id: str, model_path: str, *, model_name: str, is_default: bool) -> None:
     from ui.settings_manager import get_settings_manager
 
@@ -588,7 +594,9 @@ def register_wake_training_routes(context: ApiContext) -> None:
         return success_response(
             {
                 "models": _model_rows(user_id),
-                "active_model_path": _get_active_model_path(user_id),
+                # Shown in Settings > Customize. The stored path holds the Windows
+                # user name, so the page only gets the file name.
+                "active_model_path": _model_file_name(_get_active_model_path(user_id)),
             }
         )
 
