@@ -173,6 +173,7 @@ class PlaylistCursor:
             for idx, item in enumerate(self._upcoming):
                 if item.id == item_id:
                     self._current = self._upcoming.pop(idx)
+                    self._rearm_completion(self._current)
                     self.pending = True
                     self.version += 1
                     self._sync_state()
@@ -209,6 +210,7 @@ class PlaylistCursor:
                 if self._current is not None:
                     self._history.append(self._current)
                 self._current = selected
+                self._rearm_completion(selected)
                 self.pending = True
                 self.version += 1
                 self._sync_state()
@@ -216,12 +218,19 @@ class PlaylistCursor:
         return False
 
     def rewind(self) -> QueueItem | None:
+        """Make the last played track current again ("previous").
+
+        That track was completed once already. Bringing it back starts a new
+        play of it, so its completion record is re-armed; otherwise the next
+        "next" was refused as a double completion and replayed it.
+        """
         if not self._history:
             return None
         prev = self._history.pop()
         if self._current is not None:
             self._upcoming.insert(0, self._current)
         self._current = prev
+        self._rearm_completion(prev)
         self.pending = True
         self.version += 1
         self._sync_state()
@@ -367,6 +376,11 @@ class PlaylistCursor:
     # ------------------------------------------------------------------ #
     # Internal helpers
     # ------------------------------------------------------------------ #
+
+    @staticmethod
+    def _rearm_completion(item: QueueItem) -> None:
+        """A user-chosen track starts a new play; it may be completed again."""
+        get_queue_history().rearm_completion(item.id)
 
     def _sync_state(self) -> None:
         if not self._state_manager:
