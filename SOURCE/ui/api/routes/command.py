@@ -319,6 +319,21 @@ def _speak_reply_now(
                 return full.speak()
 
             timeout = max(_SPEAK_REPLY_TIMEOUT_SECONDS, len(message) / 8.0)
+        elif streamed_reply is not None and streamed_reply.gate.read_in_full:
+            # An engine that cannot stream caps one speak() at 800 characters or
+            # 10 sentences (voice/synthesis/text_normalizer.py): "read it out
+            # loud" on this PC's pyttsx3 fallback said 832 of 3,012 characters
+            # (build-12 live check). Say it in parts that each fit.
+            parts = _whole_reading_parts(message)
+            whole_speak = speak
+
+            async def speak(_text: str) -> None:
+                for part in parts:
+                    spoken = whole_speak(part)
+                    if asyncio.iscoroutine(spoken):
+                        await spoken
+
+            timeout = max(_SPEAK_REPLY_TIMEOUT_SECONDS, len(message) / 8.0)
 
     async def _run() -> None:
         try:
@@ -343,6 +358,28 @@ def _speak_reply_now(
             log.debug("TTS feature usage instrumentation skipped")
 
     _reply_speech_tasks.create_task(_run())
+
+
+_READING_PART_CHARS = 600
+_READING_PART_SENTENCES = 8
+
+
+def _whole_reading_parts(text: str) -> list[str]:
+    """Split a full reading into parts that each stay under a whole-reply speak() cap."""
+    from services.llm.answer_stream import all_sentences
+
+    parts: list[str] = []
+    current: list[str] = []
+    size = 0
+    for sentence in all_sentences(text) or [text]:
+        if current and (size + len(sentence) + 1 > _READING_PART_CHARS or len(current) >= _READING_PART_SENTENCES):
+            parts.append(" ".join(current))
+            current, size = [], 0
+        current.append(sentence)
+        size += len(sentence) + 1
+    if current:
+        parts.append(" ".join(current))
+    return parts
 
 
 def _speak_reply(
@@ -522,8 +559,46 @@ class TypedTurn:
             envelope,
             channel_value=self.channel_value,
             user_id=self.user_id,
-            streamed_reply=self.streamed_reply,
+            streamed_reply=self.streamed_reply or _tools_only_reply(self.stream_id),
         )
+
+
+class _ToolsOnlyReply:
+    """The speech gate's view of a turn whose reply is not streamed live.
+
+    With no live reply (an engine that cannot stream, or a hook that may replace
+    the answer) the gate never saw the turn's tools, so the done tone and
+    read_aloud were lost: "set the volume to 30" spoke words on this PC's
+    pyttsx3 fallback (build-12 live check). The stream bus records every tool
+    event of the turn, so the gate is fed from that record at the end.
+    """
+
+    started = False
+
+    def __init__(self, gate: Any) -> None:
+        self.gate = gate
+
+    def finish(self, final_message: str | None, *, already_spoken: bool = False) -> str:
+        return ""
+
+
+def _tools_only_reply(stream_id: str | None) -> _ToolsOnlyReply | None:
+    if not stream_id:
+        return None
+    try:
+        from services.llm.answer_stream import FinalAnswerSpeechGate
+        from services.llm.stream_bus import get_stream_tool_events
+
+        events = get_stream_tool_events(stream_id)
+        if not events:
+            return None
+        gate = FinalAnswerSpeechGate(live=False, reason="not_streamed")
+        for event in events:
+            gate.feed({"tool": event})
+        return _ToolsOnlyReply(gate)
+    except Exception:  # noqa: BLE001, RUF100 - without the record the reply is spoken as before
+        log.debug("Tool record for the speech gate unavailable", exc_info=True)
+        return None
 
 
 def _get_command_service(context: ApiContext) -> Any:

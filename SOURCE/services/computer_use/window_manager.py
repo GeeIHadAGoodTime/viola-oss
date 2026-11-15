@@ -50,6 +50,8 @@ if sys.platform == "win32":
     _user32.GetWindowTextW.restype = ctypes.c_int
     _user32.GetWindowTextLengthW.argtypes = [ctypes.c_void_p]
     _user32.GetWindowTextLengthW.restype = ctypes.c_int
+    _user32.InternalGetWindowText.argtypes = [ctypes.c_void_p, ctypes.c_wchar_p, ctypes.c_int]
+    _user32.InternalGetWindowText.restype = ctypes.c_int
     _user32.IsWindowVisible.argtypes = [ctypes.c_void_p]
     _user32.IsWindowVisible.restype = ctypes.c_bool
     _user32.IsWindow.argtypes = [ctypes.c_void_p]
@@ -80,15 +82,23 @@ else:  # pragma: no cover - exercised on Linux/macOS only
 _DWMWA_CLOAKED = 14
 
 
+_TITLE_BUFFER_CHARS = 512
+
+
 def _get_window_title_fast(hwnd: int) -> str:
-    """Read window title via Win32 GetWindowTextW (microseconds)."""
+    """Read a window's title without sending it a message (microseconds, never blocks).
+
+    GetWindowTextLengthW/GetWindowTextW send WM_GETTEXT(LENGTH) to a window that
+    belongs to this process and wait for its thread to answer. Desktop control
+    runs inside Viola, on the server's event loop, so one of Viola's own windows
+    whose thread was not pumping messages froze that loop for good: no request
+    was served, Stop included (1.0.5 build-12 live check, during launch_app's
+    window list). InternalGetWindowText reads the stored title and sends nothing.
+    """
     if not hwnd:
         return ""
-    length = _user32.GetWindowTextLengthW(hwnd)
-    if length <= 0:
-        return ""
-    buf = ctypes.create_unicode_buffer(length + 1)
-    _user32.GetWindowTextW(hwnd, buf, length + 1)
+    buf = ctypes.create_unicode_buffer(_TITLE_BUFFER_CHARS)
+    _user32.InternalGetWindowText(hwnd, buf, _TITLE_BUFFER_CHARS)
     return buf.value
 
 

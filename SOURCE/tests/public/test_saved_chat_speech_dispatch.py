@@ -130,9 +130,18 @@ class SavedChatSpeechDispatch(unittest.IsolatedAsyncioTestCase):
                 "_folded",
                 "show_pending_questions",
                 "TypedTurn",
+                "_ToolsOnlyReply",
+                "_tools_only_reply",
+                "_whole_reading_parts",
             },
             ns,
-            {"_LOCALLY_SPOKEN_CHANNELS", "_SPEAK_REPLY_TIMEOUT_SECONDS", "_UI_ACTION_KEYS"},
+            {
+                "_LOCALLY_SPOKEN_CHANNELS",
+                "_SPEAK_REPLY_TIMEOUT_SECONDS",
+                "_UI_ACTION_KEYS",
+                "_READING_PART_CHARS",
+                "_READING_PART_SENTENCES",
+            },
         )
         self.enterContext(
             patch.dict(
