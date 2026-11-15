@@ -317,6 +317,15 @@ class AudioDucker:
             logger.debug("Fade skipped - same volume")
             return
 
+        if self._volume_change_is_slow():
+            # One volume change on this player is a slow page action (Spotify):
+            # seven of them took about 4 s on the build-11 laptop for a fade meant
+            # to take 0.3 s. Restore in one step, as the duck goes down in one.
+            logger.info("FADE_ONE_STEP: %d → %d (a volume change on this player is slow)", start_vol, end_vol)
+            if not self._fade_cancel.is_set():
+                self._set_final_volume(end_vol)
+            return
+
         steps = max(5, int(self.fade_duration * 20))  # 20 steps per second
         step_duration = self.fade_duration / steps
         start = float(start_vol)
@@ -373,6 +382,16 @@ class AudioDucker:
 
         # Ensure we reach exact target volume
         self._set_final_volume(end_vol)
+
+    def _volume_change_is_slow(self) -> bool:
+        """What the player's current backend declares; False when it does not say."""
+        try:
+            declared = getattr(self.music_player, "volume_change_is_slow", None)
+            # Only a real True counts (a stand-in player answers anything).
+            return callable(declared) and declared() is True
+        except Exception as exc:  # a missing declaration keeps the smooth fade
+            logger.debug("Volume speed declaration unavailable: %s", exc)
+            return False
 
     def _duck_down(self, end_vol: int, previous: threading.Thread | None) -> None:
         """Let a restore fade that was still running stop, then set the duck level."""

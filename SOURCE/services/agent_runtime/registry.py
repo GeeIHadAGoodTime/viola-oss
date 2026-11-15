@@ -28,6 +28,10 @@ logger = get_logger(__name__)
 AgentStatus = Literal["running", "idle", "completed", "failed", "killed"]
 AgentMode = Literal["fresh", "fork"]
 AgentRunner = Callable[[asyncio.Event], Awaitable[str]]
+# Called once for each agent that reaches its end (completed, failed or
+# killed), with the finished agent's read-only view. Set by whoever can tell
+# the user (``set_finish_listener``); the registry never speaks or draws.
+AgentFinishListener = Callable[["AgentTask"], None]
 
 _AGENT_ID_HEX_LENGTH = 8
 _MAX_ACTIVE_AGENTS_PER_USER = 10
@@ -86,6 +90,13 @@ class AgentTask:
     completed_at: datetime | None = None
     result: str | None = None
     error_detail: str | None = None
+    # How the user asked for the job: "voice", "typed", or None when not known.
+    origin: str | None = None
+    # True for a job the user started (not a scheduler run, not a helper of
+    # another agent). Only such a job is ever announced when it ends.
+    announce_when_done: bool = False
+    # True while a turn is still waiting on this agent for its reply.
+    turn_waiting: bool = False
 
 
 @dataclass(slots=True)
@@ -116,6 +127,13 @@ class _AgentRecord:
     is_foreground: bool = False
     background_signal: asyncio.Event | None = None
     background_auto_timer: asyncio.TimerHandle | None = None
+    origin: str | None = None
+    announce_when_done: bool = False
+    turn_waiting: bool = False
+    # The finish listener has been told about this agent's end, and whether a
+    # turn was still waiting on it then (see ``stop_waiting``).
+    finish_reported: bool = False
+    finish_reported_while_waiting: bool = False
 
     def snapshot(self) -> AgentTask:
         """Return an immutable view for callers."""
@@ -138,6 +156,9 @@ class _AgentRecord:
             completed_at=self.completed_at,
             result=self.result,
             error_detail=self.error_detail,
+            origin=self.origin,
+            announce_when_done=self.announce_when_done,
+            turn_waiting=self.turn_waiting,
         )
 
 
@@ -159,6 +180,7 @@ class AgentRegistry:
         self._retention = timedelta(seconds=retention_seconds)
         self._max_entries_per_user = max_entries_per_user
         self._clock = clock or (lambda: datetime.now(UTC))
+        self._finish_listener: AgentFinishListener | None = None
         if recover_interrupted_tasks:
             self._recover_interrupted_tasks_on_boot()
 
@@ -179,8 +201,14 @@ class AgentRegistry:
         fork_metadata: Mapping[str, Any] | None = None,
         subagent_type: str | None = None,
         name: str | None = None,
+        origin: str | None = None,
+        announce_when_done: bool = False,
     ) -> str:
-        """Start a background agent runner and return its short agent id."""
+        """Start a background agent runner and return its short agent id.
+
+        ``origin`` ("voice" or "typed") and ``announce_when_done`` are carried on
+        the record for the finish listener; the registry itself never acts on them.
+        """
         self._validate_user_id(user_id)
         normalized_agent_id = str(agent_id or "").strip() or self._new_agent_id()
         cancel_event = asyncio.Event()
@@ -201,6 +229,8 @@ class AgentRegistry:
             fork_metadata=copy.deepcopy(dict(fork_metadata or {})),
             subagent_type=str(subagent_type or "").strip() or None,
             name=str(name or "").strip() or None,
+            origin=str(origin or "").strip().lower() or None,
+            announce_when_done=bool(announce_when_done),
         )
 
         async with self._lock:
@@ -314,6 +344,8 @@ class AgentRegistry:
         subagent_type: str | None = None,
         name: str | None = None,
         auto_background_seconds: float | None = None,
+        origin: str | None = None,
+        announce_when_done: bool = False,
     ) -> tuple[str, asyncio.Event, asyncio.Event]:
         """Register a synchronous (foreground) subagent so it can be backgrounded mid-run.
 
@@ -351,6 +383,10 @@ class AgentRegistry:
             name=str(name or "").strip() or None,
             is_foreground=True,
             background_signal=background_signal,
+            origin=str(origin or "").strip().lower() or None,
+            announce_when_done=bool(announce_when_done),
+            # The caller awaits this agent until it ends or calls ``stop_waiting``.
+            turn_waiting=True,
         )
 
         async with self._lock:
@@ -418,6 +454,49 @@ class AgentRegistry:
         logger.info("Foreground agent backgrounded: user_id=%s agent_id=%s", user_id, agent_id)
         return True
 
+    def set_finish_listener(self, listener: AgentFinishListener | None) -> None:
+        """Install the one callback told about every agent's end (None removes it)."""
+        self._finish_listener = listener
+
+    async def stop_waiting(self, user_id: str, agent_id: str) -> bool:
+        """The turn that registered this foreground agent no longer waits on it.
+
+        Called by that turn when it returns without the agent's answer (the
+        agent was moved to the background). If the agent ended in the moment
+        between the turn giving up and this call, the listener was told while
+        the turn still looked like it was waiting, so it is told again now.
+        """
+        self._validate_user_id(user_id)
+        report: AgentTask | None = None
+        async with self._lock:
+            record = self._agents_by_user.get(user_id, {}).get(agent_id)
+            if record is None or not record.turn_waiting:
+                return False
+            record.turn_waiting = False
+            if record.finish_reported and record.finish_reported_while_waiting:
+                record.finish_reported_while_waiting = False
+                report = record.snapshot()
+        self._notify_finish(report)
+        return True
+
+    def _finish_snapshot_locked(self, record: _AgentRecord) -> AgentTask | None:
+        """The view to report for an agent that just ended, once per agent."""
+        if record.finish_reported:
+            return None
+        record.finish_reported = True
+        record.finish_reported_while_waiting = record.turn_waiting
+        return record.snapshot()
+
+    def _notify_finish(self, task: AgentTask | None) -> None:
+        listener = self._finish_listener
+        if task is None or listener is None:
+            return
+        try:
+            listener(task)
+        # Telling the user is a side effect; it must never break the registry.
+        except Exception:  # noqa: BLE001, RUF100
+            logger.warning("Agent finish listener failed: agent_id=%s", task.agent_id, exc_info=True)
+
     async def attach_runner_task(
         self,
         user_id: str,
@@ -476,7 +555,9 @@ class AgentRegistry:
             record.completed_at = self._now()
             if record.status in _ACTIVE_STATUSES:
                 record.status = "completed"
+            report = self._finish_snapshot_locked(record)
             self._gc_user_locked(user_id)
+        self._notify_finish(report)
         return True
 
     async def mark_failed_explicit(
@@ -499,8 +580,11 @@ class AgentRegistry:
                 record.background_auto_timer = None
             record.error_detail = error_detail
             record.completed_at = self._now()
-            record.status = "killed" if killed else "failed"
+            # A user's cancel already marked it killed; keep that.
+            record.status = "killed" if killed or record.status == "killed" else "failed"
+            report = self._finish_snapshot_locked(record)
             self._gc_user_locked(user_id)
+        self._notify_finish(report)
         return True
 
     async def _run_agent(self, record: _AgentRecord, runner: AgentRunner) -> None:
@@ -522,7 +606,9 @@ class AgentRegistry:
             current.completed_at = self._now()
             if current.status in _ACTIVE_STATUSES:
                 current.status = "completed"
+            report = self._finish_snapshot_locked(current)
             self._gc_user_locked(record.user_id)
+        self._notify_finish(report)
 
         logger.info(
             "Background agent completed: user_id=%s agent_id=%s status=%s",
@@ -538,7 +624,9 @@ class AgentRegistry:
                 return
             current.status = "killed"
             current.completed_at = self._now()
+            report = self._finish_snapshot_locked(current)
             self._gc_user_locked(record.user_id)
+        self._notify_finish(report)
 
         logger.info(
             "Background agent cancelled: user_id=%s agent_id=%s",
@@ -552,10 +640,13 @@ class AgentRegistry:
             current = self._agents_by_user.get(record.user_id, {}).get(record.agent_id)
             if current is None:
                 return
-            current.status = "failed"
+            # A user's cancel already marked it killed; keep that.
+            current.status = "killed" if current.status == "killed" else "failed"
             current.error_detail = error_detail
             current.completed_at = self._now()
+            report = self._finish_snapshot_locked(current)
             self._gc_user_locked(record.user_id)
+        self._notify_finish(report)
 
         logger.info(
             "Background agent error: user_id=%s agent_id=%s error=%s",

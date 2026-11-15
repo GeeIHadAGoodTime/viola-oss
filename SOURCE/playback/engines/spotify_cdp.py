@@ -86,6 +86,10 @@ class SpotifyCDPEngine(ProviderPlaybackEngine):
     from the Spotify DOM via JS evaluation.
     """
 
+    # Each volume change sets the page's slider (``SpotifyCDPController.set_volume``):
+    # 0.25 s per change on the build-11 laptop, 1.6 s for the first.
+    volume_change_is_slow = True
+
     def __init__(
         self,
         *,

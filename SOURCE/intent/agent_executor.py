@@ -10170,6 +10170,10 @@ class AgentExecutor:
                     helper_done.set()
                     self._live_helpers.pop(agent_id, None)
 
+        # Carried on the registry record so the end of a job the user is no
+        # longer waiting on can be announced the way they asked for it.
+        job_origin = self._agent_job_origin()
+        announce_when_done = self._depth == 0
         try:
             registry_start = getattr(agent_registry, "start", None)
             if run_in_background and not callable(registry_start):
@@ -10188,6 +10192,8 @@ class AgentExecutor:
                     parent_agent_id=getattr(self, "_current_agent_id", None) or getattr(self, "task_id", None),
                     subagent_type=effective_subagent_type,
                     name=str(tool_args.get("name") or "").strip() or None,
+                    origin=job_origin,
+                    announce_when_done=announce_when_done,
                 )
 
             else:
@@ -10202,6 +10208,8 @@ class AgentExecutor:
                     parent_agent_id=getattr(self, "task_id", None),
                     subagent_type=effective_subagent_type,
                     auto_background_seconds=_FOREGROUND_AUTO_BACKGROUND_SECONDS,
+                    origin=job_origin,
+                    announce_when_done=announce_when_done,
                 )
 
                 async def _registered_foreground_runner() -> str:
@@ -10241,6 +10249,11 @@ class AgentExecutor:
                 return_when=asyncio.FIRST_COMPLETED,
             )
             if runner_task not in done:
+                # This turn answers without the helper now; its end is the
+                # user's to hear about, not this turn's.
+                stop_waiting = getattr(agent_registry, "stop_waiting", None)
+                if callable(stop_waiting):
+                    await stop_waiting(user_id, agent_id)
                 return ToolResult(
                     ok=True,
                     data={
@@ -10469,6 +10482,8 @@ class AgentExecutor:
             parent_agent_id=transcript.parent_agent_id,
             subagent_type=transcript.agent_type,
             name=transcript.name,
+            origin=self._agent_job_origin(),
+            announce_when_done=self._depth == 0,
         )
         return ToolResult(
             ok=True,
@@ -12566,6 +12581,27 @@ class AgentExecutor:
                 )
             except Exception:
                 logger.debug("TTS fallback also failed for payment stream")
+
+    def _agent_job_origin(self) -> str | None:
+        """How the user asked for this turn's work: "voice", "typed", "remote", or None.
+
+        Read from the turn's own channel (``chat.channel.resolve_rest_channel``
+        turns a wake turn's ``"voice"`` into ``channel_type == "voice"``, the
+        Chat tab's into ``"chat_mode"`` and ``/v1/command`` into ``"web"``).
+        "typed" is a channel whose reply is spoken on this machine (the same set
+        ``_should_speak_reply`` uses); any other known channel (Telegram, phone,
+        email...) is "remote". A turn with no channel at all is None (unknown).
+        """
+        from core.reply_speech_settings import is_locally_spoken_channel
+
+        channel_type = self._get_origin_channel_type()
+        if not channel_type:
+            return None
+        if channel_type == "voice":
+            return "voice"
+        if is_locally_spoken_channel(channel_type):
+            return "typed"
+        return "remote"
 
     def _get_origin_channel_type(self) -> str | None:
         """Return the originating request channel for gate-card replies."""

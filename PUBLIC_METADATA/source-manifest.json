@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "3c7abd19119eca1fd9d60aaaa61a28eae90671df",
-  "sha256": "063785e34f817370140f86dd5df48a15bd4e3c7e2e15b2a2907fa0e1f9f24fbd",
+  "revision": "557f0d6b09abe0ba21735fc49b77c9ade3cb2547",
+  "sha256": "8e03aa1e4f2e18b554db32411c01e27fe490d080b75dd5af3c93a051a99fc18f",
   "files": [
     {
       "path": ".env.example",
@@ -785,8 +785,8 @@
     },
     {
       "path": "bootstrap/factory.py",
-      "sha256": "97347fdd148b9040dc1f7b13d3c918363ceab56fed013ccb607e5d08a967cc44",
-      "bytes": 80931
+      "sha256": "530d38789bce5e09365e09dffb158378e445ce8947b2719b78d15b6674b19cbb",
+      "bytes": 81622
     },
     {
       "path": "bootstrap/lazy_intent.py",
@@ -1090,8 +1090,8 @@
     },
     {
       "path": "core/live_call_state.py",
-      "sha256": "064d5f6bc4b628144c4f3c52ab6868a8ce076499690a82f88dff4f810efb946e",
-      "bytes": 4795
+      "sha256": "b2b868db1fa31b5125ca59f7bb0b7101d7cacac87baffa7d8b98b4ca36d2afdd",
+      "bytes": 4997
     },
     {
       "path": "core/logging_config.py",
@@ -1132,6 +1132,11 @@
       "path": "core/quiet_hours.py",
       "sha256": "17dc6d70597dea8b97c10299162d7ce311689e23a46bd3f1644c3bb8ae3b1df1",
       "bytes": 9928
+    },
+    {
+      "path": "core/reply_speech_settings.py",
+      "sha256": "1e19513c2b5fc820a2ebec15126f62e6c7bdb85043640fdc209f3e79df7d1c3b",
+      "bytes": 3108
     },
     {
       "path": "core/request_context.py",
@@ -1600,8 +1605,8 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "57363203eb88180e287ee7c0a0d2f2c6662715b7990e00660432fc5333de9558",
-      "bytes": 645085
+      "sha256": "2509705374c2686116bba7837b11151e1bb80d58becb0067444527403f32658a",
+      "bytes": 646900
     },
     {
       "path": "intent/agent_loop.py",
@@ -1950,8 +1955,8 @@
     },
     {
       "path": "intent/sensitive_values.py",
-      "sha256": "4666a1d7f8c3a51fad1172e2351e8c6b0c2c4ab28ef73079e931e780b0c75e24",
-      "bytes": 45735
+      "sha256": "54a20bcf97ad73bbc8a9b7607d1d82618ac4fce82808bb49e5634ee7c044267f",
+      "bytes": 26929
     },
     {
       "path": "intent/spin_detector.py",
@@ -2880,8 +2885,8 @@
     },
     {
       "path": "music/player/core.py",
-      "sha256": "b2d097a0ae54d24a32cc1478f2009513733b013288ae9f9519d8a790a341f9ec",
-      "bytes": 42974
+      "sha256": "28bff25f6bfec6d6b2cd03ed3eb06706322fca1db8f4f7b833d115f11fac6c8c",
+      "bytes": 43165
     },
     {
       "path": "music/player/fallback.py",
@@ -2895,8 +2900,8 @@
     },
     {
       "path": "music/player/playback.py",
-      "sha256": "ed88c83ca4f5d650ca0eda6cb11fd75a59fa7ed8088e0c2add4363f72f3d4ce4",
-      "bytes": 46294
+      "sha256": "2ed25bb258af8a111f34a0c502cd654007e28932379595c933ef38f3a047e7ee",
+      "bytes": 47457
     },
     {
       "path": "music/player/playback_state.py",
@@ -3385,8 +3390,8 @@
     },
     {
       "path": "playback/engine_manager.py",
-      "sha256": "4dc684bf9cf332f73acf547200a3ca4a7cfa7d1b2254d7182d6b5809647a99e1",
-      "bytes": 27473
+      "sha256": "171a14bf672b1d7242d78e6f42d622fb66c0498a621c5c79dddc2c39e759be91",
+      "bytes": 27984
     },
     {
       "path": "playback/engines/__init__.py",
@@ -3395,8 +3400,8 @@
     },
     {
       "path": "playback/engines/base.py",
-      "sha256": "d1f7b859d4d291cccf725426bd3e32665a9c74bd544a7435e7a5d06420fe644b",
-      "bytes": 8508
+      "sha256": "cb0cb5f0f7e5ba5770b96c25bfe9e43c8b7454e3e219ab556a0a2db058bb81bf",
+      "bytes": 8776
     },
     {
       "path": "playback/engines/browser.py",
@@ -3405,8 +3410,8 @@
     },
     {
       "path": "playback/engines/spotify_cdp.py",
-      "sha256": "0a862fafb1bf208cae664363aae4351a2bef4af411e76fae85d5b57cf46ff18f",
-      "bytes": 47696
+      "sha256": "8d0b7e83daa22443b5c102e40f179de7dbd662fd5378220226ddf124ba91071c",
+      "bytes": 47886
     },
     {
       "path": "playback/engines/youtube.py",
@@ -4005,8 +4010,8 @@
     },
     {
       "path": "services/agent_runtime/registry.py",
-      "sha256": "502a98d35fc5d4ac3a911f97806aa920efe4e67ae641987ebec1e69baad1bac2",
-      "bytes": 35868
+      "sha256": "f831c7db755903e986761c15463c7df130e4af2c0bf668df56eb6cb8fc3665c9",
+      "bytes": 40450
     },
     {
       "path": "services/alarm_ringer.py",
@@ -9545,8 +9550,8 @@
     },
     {
       "path": "ui/api/routes/command.py",
-      "sha256": "ab2061b047b78dbf45d9a3bc19618e4a62df99bcbe3567cd10943c905d4a3299",
-      "bytes": 40629
+      "sha256": "7cd84d6909fdd73dab1b2c7c5fe2244c6f3912bf80cc4f7c5e074ebc945771fb",
+      "bytes": 39788
     },
     {
       "path": "ui/api/routes/common.py",
@@ -13195,8 +13200,8 @@
     },
     {
       "path": "utils/audio_ducking.py",
-      "sha256": "abfce412b2c8ad845d4472063b38dffa9cbf14faad5439e27f142a5533063658",
-      "bytes": 22503
+      "sha256": "a0e1a4c6fae2a62d5b761c0c22a17afced88dd18aade689b5105e2a254eb8f83",
+      "bytes": 23559
     },
     {
       "path": "utils/audio_preprocessing.py",
@@ -13592,6 +13597,11 @@
       "path": "voice/__init__.py",
       "sha256": "525ea83ea6fa2564785745159d90ce63db0010b4f5d7a1e913222ffe2cda6abf",
       "bytes": 1873
+    },
+    {
+      "path": "voice/agent_finish_speech.py",
+      "sha256": "058cc07042b4af6f5be3c08099373b1faea643f0dfc59ac005a9e9c4fc9834dc",
+      "bytes": 10200
     },
     {
       "path": "voice/audio_manager.py",

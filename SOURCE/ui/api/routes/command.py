@@ -33,7 +33,8 @@ log = get_logger(__name__)
 # ``ui/qt_native/window_core.py`` both POST here with no channel, which the
 # route defaults to "http") and the web chat. Saved ChatMode threads have
 # their own completion route, which invokes this same policy with "chat_mode".
-_LOCALLY_SPOKEN_CHANNELS = frozenset({"http", "web", "chat_mode"})
+# The set itself is ``core.reply_speech_settings.LOCALLY_SPOKEN_CHANNELS``, shared
+# with the line that says a background task has finished.
 
 # Upper bound on one spoken reply, so a wedged synthesizer leaks one task and
 # not one per command. Well above any real reply; this is a backstop, not a
@@ -154,39 +155,22 @@ def _should_speak_reply(channel_value: Any, user_id: str) -> bool:
     speaks every response aloud, not just responses to voice commands"
     (``docs/user/SETTINGS.md``).
 
-    Every default below is passed from ``config.defaults`` rather than written
-    as a literal, and that is load-bearing rather than tidiness. All three keys
-    are user-scoped (``ui/settings_schema.py``), and for a user-scoped read with
-    a real signed-in principal ``SettingsManager.get`` resolves through
-    ``get_user_setting`` -> ``_read_setting_from_blob``, which returns THE
-    CALLER'S default when the user's blob has no row for the key -- it never
-    consults ``DEFAULT_SETTINGS``. So a literal here silently outranks the
-    shipped default for exactly the users whose blob is real: a hard-coded
-    ``False`` left every signed-in install mute while a signed-out one spoke,
-    and only the signed-out case (a device pseudo-identity, which does fall back
-    to the global blob) would show up in a cold-install test.
+    The three settings are read by ``core.reply_speech_settings`` (shared with
+    the line that says a background task has finished); its docstring explains
+    why every default there comes from ``config.defaults`` and never a literal.
 
     ``voice_muted`` is checked here because this is the first code that decides
     whether to speak from user settings, and a path that speaks straight
     through the user's own mute would be a new bug rather than a fixed one.
     """
-    if channel_key(channel_value) not in _LOCALLY_SPOKEN_CHANNELS:
+    from core.reply_speech_settings import is_locally_spoken_channel, read_reply_speech_settings
+
+    if not is_locally_spoken_channel(channel_key(channel_value)):
         return False
     if not is_desktop_surface():
         return False
-    from config.defaults import (
-        SPEAK_ALL_REPLIES_DEFAULT,
-        TTS_ENABLED_DEFAULT,
-        VOICE_MUTED_DEFAULT,
-    )
-    from ui.settings_manager import get_settings_manager
 
-    settings_mgr = get_settings_manager()
-    if not bool(settings_mgr.get("speak_all_replies", SPEAK_ALL_REPLIES_DEFAULT, user_id=user_id)):
-        return False
-    if bool(settings_mgr.get("voice_muted", VOICE_MUTED_DEFAULT, user_id=user_id)):
-        return False
-    return bool(settings_mgr.get("tts_enabled", TTS_ENABLED_DEFAULT, user_id=user_id))
+    return read_reply_speech_settings(user_id).typed_allowed
 
 
 def _new_streamed_reply(
@@ -244,7 +228,9 @@ def _new_streamed_reply(
 
 def _silent_stage_reply(channel_value: Any, stream_id: str | None, user_id: str) -> Any:
     """Live stage text for a reply on a local text surface that is not being spoken."""
-    if channel_key(channel_value) not in _LOCALLY_SPOKEN_CHANNELS or not is_desktop_surface():
+    from core.reply_speech_settings import is_locally_spoken_channel
+
+    if not is_locally_spoken_channel(channel_key(channel_value)) or not is_desktop_surface():
         return contextlib.nullcontext()
     from voice.stage_reply import stage_reply
 
