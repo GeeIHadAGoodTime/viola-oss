@@ -6688,8 +6688,10 @@ class AgentExecutor:
         task reported everything before it, and on a managed desktop it never saw
         the turns at all (the cloud runs them) and held only background calls.
         That is how "what is 7 times 6" came to log 187,714 input tokens and a
-        28-step helper logged 466,685 tokens at cost 0. The tracker stays the
-        source only for a task that observed no turn of its own.
+        28-step helper logged 466,685 tokens at cost 0. A task that
+        observed no model turn of its own (cancelled before its first turn)
+        reports zero tokens and zero cost: nothing was charged to it, and the
+        session totals are not its numbers.
         """
         own_turns = _normalize_model_totals(getattr(self, "_task_turn_usage", None))
         if own_turns:
@@ -6702,35 +6704,9 @@ class AgentExecutor:
         usage = _empty_task_usage()
         total_cost_usd = 0.0
         model_totals: dict[str, dict[str, int | float]] = {}
-        session_id = str(
-            getattr(self, "_session_cost_session_id", None)
-            or getattr(self, "_session_id", None)
-            or getattr(self, "task_id", "")
-            or ""
-        ).strip()
-        try:
-            if session_id:
-                from services.llm.session_cost_tracker import get_session_cost_tracker
-
-                tracker = get_session_cost_tracker(
-                    user_id=getattr(self, "_session_cost_user_id", None) or getattr(self, "_user_id", None),
-                    session_id=session_id,
-                )
-                snapshot = tracker.snapshot()
-                model_totals = _normalize_model_totals(snapshot.get("model_usage"))
-                usage = _task_usage_from_model_totals(model_totals)
-                total_cost_usd = float(snapshot.get("total_cost_usd") or 0.0)
-        except (
-            AttributeError,
-            ImportError,
-            OSError,
-            RuntimeError,
-            TypeError,
-            ValueError,
-        ):
-            logger.debug("Task usage summary cost snapshot skipped", exc_info=True)
 
         if usage["total_tokens"] <= 0:
+            # This task's own counters only (never the session tracker).
             fallback_usage = dict(getattr(self, "_last_usage", {}) or {})
             if getattr(self, "_llm_total_input_tokens_seen", 0):
                 fallback_usage["input_tokens"] = getattr(self, "_llm_total_input_tokens_seen", 0)
