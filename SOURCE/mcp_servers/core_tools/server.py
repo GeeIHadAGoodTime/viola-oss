@@ -4385,9 +4385,9 @@ async def user_settings(
 
 @server.tool(
     description=(
-        "Run a Viola command later or on a recurrence: schedule_action is the command text Viola runs then "
-        "(play some jazz, tell me a joke, check the weather), schedule_spec is when (ISO-8601 datetime or cron). "
-        "Reminder text to say or show the user is notify, not this. "
+        "Make Viola do something later or on a recurrence: schedule_action is the command Viola runs then, "
+        "as the user would say it (tell me a joke, what's the weather, play some jazz), schedule_spec is when "
+        "(ISO-8601 datetime or cron). Reminder text Viola only repeats to the user is notify. "
         "Actions: create, list, delete, update. "
         "Does not create calendar meetings or appointments with attendees; calendar covers events, while timer covers simple countdowns."
     ),
@@ -5709,10 +5709,10 @@ async def alarm(
 
 @server.tool(
     description=(
-        "Reminder text shown or spoken to the user at a time (message, when). "
-        "action='list' shows reminders and scheduled tasks (enabled_only=false adds "
-        "finished); action='delete' takes reminder: id or words. To run a command or "
-        "action later (play music, tell a joke, check something) use the schedule tool."
+        "Reminder text Viola repeats to the user at a time (message, when). "
+        "If Viola herself should do something then (tell a joke, the weather, music), "
+        "use the schedule tool. action='list' shows reminders and scheduled tasks "
+        "(enabled_only=false adds finished); action='delete' takes reminder: id or words."
     ),
     annotations=_CONFIRM,
     meta={"risk": "confirm"},
