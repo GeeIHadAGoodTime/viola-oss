@@ -15,6 +15,7 @@ from core.logging_config import get_logger
 from intent.tools.desktop import desktop_hotkey as _desktop_hotkey_tool, desktop_type_text as _desktop_type_text_tool
 from services.computer_use import (
     app_launcher,
+    desktop_worker,
     discard_guard,
     input as computer_input,
     safety,
@@ -340,6 +341,71 @@ async def _save_prompt_after_close(hwnd: int) -> dict[str, object] | None:
         if prompt is not None:
             return discard_guard.save_prompt_note(prompt)
     return None
+
+
+# These run on the server loop as before: analyze_screen awaits the vision model
+# through clients bound to that loop.
+_ACTIONS_ON_SERVER_LOOP: frozenset[str] = frozenset({"analyze_screen"})
+
+
+async def _run_computer_action(call: dict[str, Any]) -> str:
+    """Run one computer action on the desktop worker thread, within its time limit.
+
+    The server loop only awaits: a Win32 or UI Automation call into an app that
+    does not answer can no longer freeze Viola (Stop, /health/live and every
+    other request keep working). On timeout the step fails plainly, the desktop
+    control session and any held keys or buttons are released, and the next
+    action runs on a fresh worker.
+    """
+    action = str(call.get("action") or "")
+    if action in _ACTIONS_ON_SERVER_LOOP:
+        return await _computer_impl(**call)
+    progress: dict[str, Any] = {}
+    limit = desktop_worker.action_timeout(action, duration_ms=call.get("duration_ms"), ms=call.get("ms"))
+    try:
+        return await desktop_worker.run_desktop_action(
+            lambda: _computer_impl(**call, _progress=progress), timeout=limit
+        )
+    except desktop_worker.DesktopActionTimeout:
+        return _json(_not_responding(call, progress, limit))
+
+
+def _not_responding(call: dict[str, Any], progress: dict[str, Any], limit: float) -> dict[str, object]:
+    action = str(call.get("action") or "")
+    user_id = str(progress.get("user_id") or "") or _get_call_user_id()
+    session_id = str(progress.get("session_id") or "") or _get_call_session_id(user_id)
+    try:
+        # SendInput key/button releases: they never wait on another app.
+        _release_held_low_level_input(user_id)
+    except Exception:  # noqa: BLE001, RUF100 - releasing is best effort; the session is still freed
+        logger.debug("Releasing held input after a desktop timeout failed")
+    safety.abort_control_session(user_id=user_id, session_id=session_id)
+    app = str(
+        progress.get("target_app")
+        or call.get("app_executable")
+        or call.get("app_name")
+        or call.get("target_window")
+        or call.get("window_title")
+        or call.get("title")
+        or ""
+    ).strip()
+    who = app or "The app"
+    logger.warning(
+        "computer_use_action timed out action_type=%s target_app_executable=%s limit_s=%.0f",
+        action,
+        app,
+        limit,
+    )
+    return {
+        "ok": False,
+        "action": action,
+        "error_category": "COMPUTER_USE_APP_NOT_RESPONDING",
+        "target_app_executable": app,
+        "reason": (
+            "%s is not responding, so the %s step was stopped after %d seconds. It may have done part of the "
+            "step. Tell the user; trying again may work once the app responds." % (who, action, int(limit))
+        ),
+    }
 
 
 def _next_chain_status(user_id: str) -> dict[str, object]:
@@ -907,7 +973,68 @@ async def computer(
         Field(description="For mouse_move_angle: 'horizontal' (yaw) or 'vertical' (pitch)."),
     ] = "horizontal",
 ) -> str:
-    """Execute one computer-use action."""
+    """Execute one computer-use action off the server loop, within a time limit."""
+    call = {"action": action, "coordinate": coordinate, "x": x, "y": y, "width": width, "height": height, "end_coordinate": end_coordinate, "end_x": end_x, "end_y": end_y, "text": text, "target_window": target_window, "respect_focus": respect_focus, "key": key, "keys": keys, "button": button, "name": name, "coordinate_mode": coordinate_mode, "direction": direction, "amount": amount, "scroll_x": scroll_x, "scroll_y": scroll_y, "duration_ms": duration_ms, "ms": ms, "monitor_id": monitor_id, "window_handle": window_handle, "hwnd": hwnd, "window_title": window_title, "title": title, "app_executable": app_executable, "app_name": app_name, "bring_to_front": bring_to_front, "include_minimized": include_minimized, "include_window_titles": include_window_titles, "region": region, "volume_action": volume_action, "level": level, "percent": percent, "mute": mute, "step": step, "system_volume_word": system_volume_word, "question": question, "capture_mode": capture_mode, "ref": ref, "snapshot_id": snapshot_id, "background": background, "include_screenshot": include_screenshot, "include_vision": include_vision, "return_diff": return_diff, "dx": dx, "dy": dy, "degrees": degrees, "axis": axis}
+    return await _run_computer_action(call)
+
+
+async def _computer_impl(
+    *,
+    action: Any,
+    coordinate: Any = None,
+    x: Any = None,
+    y: Any = None,
+    width: Any = None,
+    height: Any = None,
+    end_coordinate: Any = None,
+    end_x: Any = None,
+    end_y: Any = None,
+    text: Any = "",
+    target_window: Any = "",
+    respect_focus: Any = True,
+    key: Any = "",
+    keys: Any = "",
+    button: Any = "left",
+    name: Any = "",
+    coordinate_mode: Any = "logical",
+    direction: Any = "down",
+    amount: Any = 5,
+    scroll_x: Any = 0,
+    scroll_y: Any = 0,
+    duration_ms: Any = 1000,
+    ms: Any = None,
+    monitor_id: Any = None,
+    window_handle: Any = None,
+    hwnd: Any = None,
+    window_title: Any = "",
+    title: Any = "",
+    app_executable: Any = "",
+    app_name: Any = "",
+    bring_to_front: Any = True,
+    include_minimized: Any = True,
+    include_window_titles: Any = True,
+    region: Any = "",
+    volume_action: Any = "get",
+    level: Any = None,
+    percent: Any = None,
+    mute: Any = None,
+    step: Any = 10,
+    system_volume_word: Any = "",
+    question: Any = "",
+    capture_mode: Any = "active_window",
+    ref: Any = "",
+    snapshot_id: Any = "",
+    background: Any = False,
+    include_screenshot: Any = True,
+    include_vision: Any = False,
+    return_diff: Any = True,
+    dx: Any = 0,
+    dy: Any = 0,
+    degrees: Any = 0.0,
+    axis: Any = "horizontal",
+    _progress: dict[str, Any] | None = None,
+) -> str:
+    """Execute one computer-use action (runs on the desktop worker thread)."""
     started = time.monotonic()
     target_app = ""
     user_id = ""
@@ -927,7 +1054,12 @@ async def computer(
             "target_window": target_window,
             "title": title,
         }
+        if _progress is not None:
+            _progress["user_id"] = user_id
+            _progress["session_id"] = session_id
         target_app = safety.resolve_action_target_app(action, **target_args)
+        if _progress is not None:
+            _progress["target_app"] = target_app
         if action not in _ACTIONS_WITHOUT_FOREGROUND_TARGET:
             safety.require_not_uac(action, target_app_executable=target_app)
         if safety.targets_viola_itself(action, **target_args):
@@ -1000,7 +1132,14 @@ async def computer(
                 monitor_id=monitor_id,
                 key_text=key_text_requested,
             )
-        except Exception as exc:  # noqa: BLE001, RUF100 - a failed screen read never blocks normal input
+        except discard_guard.ScreenReadTimeout:
+            # The window did not answer in time, so it is not known whether this
+            # press lands on "Don't save". Held, never let through.
+            discard_risk = discard_guard.unreadable_risk(
+                int(explicit_handle or 0) or discard_guard.foreground_window(), trigger="unreadable"
+            )
+            close_check_hwnd = 0
+        except Exception as exc:  # noqa: BLE001, RUF100 - a failed (not slow) read never blocks normal input
             logger.warning("Unsaved-work check failed for %s: %s", action, type(exc).__name__)
             discard_risk, close_check_hwnd = None, 0
         if discard_risk is not None and not safety.consume_discard_approval(

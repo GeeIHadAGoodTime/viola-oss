@@ -119,12 +119,18 @@ class DiscardRisk:
     other_tabs: tuple[str, ...]
     trigger: str
     control_name: str = ""
+    unreadable: bool = False
 
     def description(self) -> str:
         """Plain words for the approval card: what would be lost, in which window."""
         app = _app_label(self.app_executable)
         title = str(self.window_title or "").strip()
         where = "the %s window “%s”" % (app, title) if title else "the %s window" % app
+        if self.unreadable:
+            return (
+                "act in %s, which did not answer when Viola checked it for a save prompt; if one is open, "
+                "this could throw away unsaved changes" % where
+            )
         text = "throw away the unsaved changes in %s" % where
         if self.other_tabs:
             text += " (other tabs open in that window: %s)" % ", ".join(self.other_tabs)
@@ -138,6 +144,7 @@ class DiscardRisk:
             "other_tabs": list(self.other_tabs),
             "trigger": self.trigger,
             "control_name": self.control_name,
+            "screen_unreadable": self.unreadable,
             "planned_action": self.description(),
         }
 
@@ -220,8 +227,17 @@ def document_window(hwnd: int) -> int:
     return current
 
 
-def _run_bounded(work: Callable[[], Any], *, default: Any, label: str) -> Any:
-    """Run a UIA read in a daemon thread for at most _UIA_TIMEOUT_S (UIA can hang on a busy app)."""
+class ScreenReadTimeout(Exception):
+    """A screen read that decides whether an action discards work did not finish in time."""
+
+
+def _run_bounded(work: Callable[[], Any], *, default: Any, label: str, strict: bool = False) -> Any:
+    """Run a UIA read in a daemon thread for at most _UIA_TIMEOUT_S (UIA can hang on a busy app).
+
+    ``strict``: a read that decides whether work is thrown away raises
+    :class:`ScreenReadTimeout` instead of answering "nothing there", so the
+    action is held rather than let through.
+    """
     holder: dict[str, Any] = {"value": default}
 
     def _target() -> None:
@@ -241,6 +257,8 @@ def _run_bounded(work: Callable[[], Any], *, default: Any, label: str) -> Any:
     worker.join(timeout=_UIA_TIMEOUT_S)
     if worker.is_alive():
         logger.info("%s took longer than %.1fs; treated as unknown", label, _UIA_TIMEOUT_S)
+        if strict:
+            raise ScreenReadTimeout(label)
         return default
     return holder["value"]
 
@@ -266,7 +284,10 @@ def discard_buttons_in(hwnd: int) -> list[str]:
     if not hwnd or not _IS_WINDOWS:
         return []
     names = _run_bounded(
-        lambda: _uia_names_of_type(hwnd, _UIA_BUTTON_CONTROL_TYPE), default=[], label="Save prompt check"
+        lambda: _uia_names_of_type(hwnd, _UIA_BUTTON_CONTROL_TYPE),
+        default=[],
+        label="Save prompt check",
+        strict=True,
     )
     return [name for name in names if is_discard_name(name)]
 
@@ -299,7 +320,7 @@ def element_at_point(x: int, y: int) -> tuple[str, int]:
             handle = int(_user32.WindowFromPoint(point) or 0)
         return name, root_window(handle)
 
-    return _run_bounded(_read, default=("", 0), label="Element-at-point read")
+    return _run_bounded(_read, default=("", 0), label="Element-at-point read", strict=True)
 
 
 def cursor_position() -> tuple[int, int] | None:
@@ -400,6 +421,20 @@ def assess_key(hwnd: int) -> DiscardRisk | None:
     if prompt is None:
         return None
     return risk_for_window(prompt.window_handle, trigger="key", control_name=prompt.buttons[0])
+
+
+def unreadable_risk(hwnd: int, *, trigger: str) -> DiscardRisk:
+    """The screen could not be read in time: hold the action as if it could discard work."""
+    document = document_window(hwnd) if hwnd else 0
+    return DiscardRisk(
+        window_handle=document,
+        window_title=window_title(document),
+        app_executable=window_executable(document),
+        other_tabs=(),
+        trigger=trigger,
+        control_name="",
+        unreadable=True,
+    )
 
 
 def save_prompt_note(prompt: SavePrompt) -> dict[str, object]:
