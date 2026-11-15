@@ -4385,9 +4385,10 @@ async def user_settings(
 
 @server.tool(
     description=(
-        "Manage scheduled automations: reminders, recurring tasks, and one-shot future actions. "
-        "Covers requests to remind the user or run a Viola action at/after/before a clock time or on a recurrence. "
-        "Actions: create (cron or ISO-8601 datetime), list, delete, update. "
+        "Run a Viola command later or on a recurrence: schedule_action is the command text Viola runs then "
+        "(play some jazz, tell me a joke, check the weather), schedule_spec is when (ISO-8601 datetime or cron). "
+        "Reminder text to say or show the user is notify, not this. "
+        "Actions: create, list, delete, update. "
         "Does not create calendar meetings or appointments with attendees; calendar covers events, while timer covers simple countdowns."
     ),
     annotations=_CONFIRM,

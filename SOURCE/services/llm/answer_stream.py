@@ -85,7 +85,8 @@ QUICK_MUSIC_TOOLS = frozenset({"playback"})
 # (intent/pipeline_processors.py try_instant) and every speak site plays the tone
 # for it. Only commands of intent/instant_commands_patterns.py whose action the
 # playback tool also performs (intent/tools/music_tools.py playback_control_handler):
-# pause, resume, skip (next), previous, volume up/down, mute, unmute. Not
+# pause, resume, skip (next), previous, volume up/down, mute, unmute. A result
+# already marked "spoken" is never marked (skip's silent track change). Not
 # smart_stop ("stop" ends whatever is running, not only music), not the
 # full-screen commands (not a playback action).
 QUICK_MUSIC_INSTANT_COMMANDS = frozenset(

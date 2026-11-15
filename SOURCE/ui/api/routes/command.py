@@ -237,14 +237,6 @@ def _silent_stage_reply(channel_value: Any, stream_id: str | None, user_id: str)
     return stage_reply(stream_id, user_id=user_id)
 
 
-def _is_quick_music_action(data: Any) -> bool:
-    try:
-        from services.llm.answer_stream import is_quick_music_action
-    except Exception:  # noqa: BLE001, RUF100 - without the rule the reply is spoken as before
-        return False
-    return is_quick_music_action(data)
-
-
 def _speak_reply_now(
     context: ApiContext,
     envelope: Any,
@@ -276,12 +268,9 @@ def _speak_reply_now(
         return
     if not message:
         return
-    quick_music_action = _is_quick_music_action(data)
-    if already_spoken and not quick_music_action:
+    if already_spoken:
         # Something upstream already voiced this turn; speaking it again would
-        # double it. Same contract the voice handler reads. (A quick music
-        # action such as "next" is marked spoken so no words follow the track
-        # change; it still gets the done tone below.)
+        # double it. Same contract the voice handler reads.
         return
     engine = _reply_tts_engine(context)
     speak = getattr(engine, "speak", None) if engine is not None else None

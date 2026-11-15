@@ -57,8 +57,16 @@ def _is_quick_music_action(command: str, ok: Any, data: dict[str, Any]) -> bool:
     """An instant command that did a quick music action and it worked.
 
     A no-op ("Nothing is playing.") is not an action: its words are the answer.
+    A result already marked ``spoken`` is never one: "next" is a silent track
+    change on purpose (Jay, build 7: the new song is the answer), so it gets
+    neither words nor the tone.
     """
-    return bool(ok) and command in QUICK_MUSIC_INSTANT_COMMANDS and not data.get("noop")
+    return (
+        bool(ok)
+        and command in QUICK_MUSIC_INSTANT_COMMANDS
+        and not data.get("noop")
+        and not data.get("spoken")
+    )
 
 
 class IntentPipelineProcessors:
