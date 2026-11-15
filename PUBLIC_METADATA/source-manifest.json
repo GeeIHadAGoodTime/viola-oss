@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "b01fd8be616e42383a5d6c1425a2d5f6d42dc493",
-  "sha256": "979e0b39e018cf456d75cb6b9d2471ca131282573b1c6bf354f1eaae293b3f0e",
+  "revision": "525d325e9feb0f7703503d20f4ddbef5051487b2",
+  "sha256": "aa9146477a4e9860328d604aeeea387a3f959efae1c0c4b139a00ef83b4df545",
   "files": [
     {
       "path": ".env.example",
@@ -5765,8 +5765,8 @@
     },
     {
       "path": "telephony/call_history.py",
-      "sha256": "86a252dada0eaa4360037dc3cc479b6ceaba9eb88283d5ffb1123c11a7d60007",
-      "bytes": 18696
+      "sha256": "35e26ba3c4260f0fbab37fc53164705a0986c2e189cecf364a097fc0e0980921",
+      "bytes": 19386
     },
     {
       "path": "telephony/call_manager.py",
@@ -9770,8 +9770,8 @@
     },
     {
       "path": "ui/api/routes/weather.py",
-      "sha256": "0145422b3ce5cb508e99c943a6317ebfa97b3fb792c1f1a180d639dadfd2d05c",
-      "bytes": 16885
+      "sha256": "1850ecf494ce5463497cc1384f68b45616eab3a03488cbfe477fc49c0ef26607",
+      "bytes": 17603
     },
     {
       "path": "ui/api/routes/websocket_auth.py",
@@ -10150,13 +10150,13 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "5723f11aafb98c0dc8376305ae230d666cbe305bde9e59aa50edf297f1c8347d",
-      "bytes": 204445
+      "sha256": "53b8a527277932f4e0abc57f304fa1ee6e8f820e4bfef2ecedccf5b9510a7463",
+      "bytes": 205395
     },
     {
       "path": "ui/react-app/src/SmartDisplay.longAnswer.test.jsx",
-      "sha256": "cb87d7091b6771339ad4164ba5b93f6c178437ac01cbf59f437fe90f6669d8ac",
-      "bytes": 1240
+      "sha256": "efed2236b95de2d723a9d604a355ba94df8bd0148ec405cc3aa55fc0e0d9a090",
+      "bytes": 1500
     },
     {
       "path": "ui/react-app/src/SmartDisplay.overlayLifecycle.test.jsx",
@@ -10195,8 +10195,8 @@
     },
     {
       "path": "ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-      "sha256": "400f1c573420efed72a253463c4c0b8e5c5042a779b4f2e3f598dfaf6a030d20",
-      "bytes": 153984
+      "sha256": "700993a38681e7d8f51bae987b064f34611e3bb9ac708f6894a36d0fc3984760",
+      "bytes": 155177
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useEventBus.test.jsx",
@@ -10555,13 +10555,13 @@
     },
     {
       "path": "ui/react-app/src/components/AgentCard.jsx",
-      "sha256": "2d32e088ab307a513c07c4d2a775444969270f07a286122324e974bb10cf2e0b",
-      "bytes": 6471
+      "sha256": "afed0fdf68663f38240867e27ae05d11a22c529518046f212c986f6b2149accb",
+      "bytes": 6819
     },
     {
       "path": "ui/react-app/src/components/AgentCard.test.jsx",
-      "sha256": "fe1a1f91a055d341b1bed6ab4973bf50d03187e154eff2d89c959da2ec0f5ba7",
-      "bytes": 3646
+      "sha256": "313b21c2f8a16d94dbd74f714ef3feaa1de2b95a5ce6636f739c0840d40079b8",
+      "bytes": 4921
     },
     {
       "path": "ui/react-app/src/components/AgentDrawer.jsx",
@@ -10635,13 +10635,13 @@
     },
     {
       "path": "ui/react-app/src/components/CallHistoryList.jsx",
-      "sha256": "9b6200070dd4fd27b9d56756fb86c770a693adcdfebf3e46b22019a61032b1f7",
-      "bytes": 7180
+      "sha256": "29380abf1932e4385a1d2d9c7d6b2536d3201228e14e003a689d82fe674aa8ef",
+      "bytes": 7934
     },
     {
       "path": "ui/react-app/src/components/CallHistoryList.test.jsx",
-      "sha256": "baeac3ae5dd22048b53bff14afb091ec15fe985289f8cdaa06be29ce0c1679ad",
-      "bytes": 6520
+      "sha256": "2fdbddc9841d47a07e366bde4000277fd102bbefed37c20ed24a890309d8b116",
+      "bytes": 8074
     },
     {
       "path": "ui/react-app/src/components/CallHistoryRow.jsx",
@@ -10695,13 +10695,13 @@
     },
     {
       "path": "ui/react-app/src/components/ContentCard.jsx",
-      "sha256": "85e82ebbf62eac2327f74f89b00de550d7f60de7717e2a6df38648440f538818",
-      "bytes": 28689
+      "sha256": "8a55635dbf9036d73426cf6fa558ee8cec3b548813571ad9ccfe9d8e05403523",
+      "bytes": 28879
     },
     {
       "path": "ui/react-app/src/components/ContentCard.test.jsx",
-      "sha256": "799c50ccc2343eb84ae9c593c2b18ffbf5b0ec2a02f2bf097d27c0f18e2e8291",
-      "bytes": 6849
+      "sha256": "f0c59029be85beed0d4c736b8dd6cca2ae5b0404ee8326d5b0e831ae008c1184",
+      "bytes": 7931
     },
     {
       "path": "ui/react-app/src/components/CustomizeTab.jsx",
@@ -10815,13 +10815,13 @@
     },
     {
       "path": "ui/react-app/src/components/MemoryPanel.jsx",
-      "sha256": "9199284225ca87a90efcfa22ededa1dc667da8f7b1413466f42c5e4d8bc495b1",
-      "bytes": 51540
+      "sha256": "ce1f98a1b2df9cdc0e1fb16632de8bda71b6722e4fa5f8b7af25e02ed04ec775",
+      "bytes": 51565
     },
     {
       "path": "ui/react-app/src/components/MemoryPanel.test.jsx",
-      "sha256": "988ac5a87fa5da24206ff9f0e6547603dd0cba9c6ed307f225d585a4d98b7882",
-      "bytes": 7026
+      "sha256": "7c0483729fe3625f6c0cc8d41d0791d620a45eab4078bea7e29af9e83981be8a",
+      "bytes": 8763
     },
     {
       "path": "ui/react-app/src/components/MemoryPanel.workbench.test.jsx",
@@ -11010,8 +11010,8 @@
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.outputDevice.test.jsx",
-      "sha256": "02c05bb1891e7058a8aeea835f8913c5ee8b2186cc8ef6f2762667ad5d071860",
-      "bytes": 3479
+      "sha256": "95e8fd9e58f5aa6327375828bbea3649f468e81af67d1c9a660848596fa09348",
+      "bytes": 4053
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.sidebar.test.jsx",
