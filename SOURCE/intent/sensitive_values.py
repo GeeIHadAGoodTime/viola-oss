@@ -1015,11 +1015,41 @@ def _default_roots() -> list[Path]:
     return roots
 
 
+def _session_memory_files(user_id: str, memory_root: Path | None, newer_than: float) -> list[Path]:
+    """One account's per-task session memory files changed since *newer_than*.
+
+    ``users/<id>/memory/session_memory/*.md`` (``services/conversation/session_memory``)
+    holds the turn's own words (the task line, tool arguments and results), written
+    before an address in them may be known. Only this account's own folder.
+    """
+    try:
+        from services.memory.dir import account_root
+
+        folder = account_root(user_id, memory_root) / "memory" / "session_memory"
+        if not folder.is_dir():
+            return []
+        files: list[Path] = []
+        with os.scandir(folder) as entries:
+            for entry in entries:
+                if not entry.name.lower().endswith(".md"):
+                    continue
+                try:
+                    if entry.is_file() and entry.stat().st_mtime >= newer_than:
+                        files.append(Path(entry.path))
+                except OSError:
+                    continue
+        return files
+    except Exception:  # noqa: BLE001 - the clean-up must never take the app down
+        logger.debug("Session memory folder unavailable for the private-value clean-up", exc_info=True)
+        return []
+
+
 def scrub_recent_logs(
     roots: Iterable[Path] | Path | None = None,
     *,
     max_age_seconds: float = SCRUB_MAX_AGE_SECONDS,
     tail_bytes: int = SCRUB_TAIL_BYTES,
+    memory_root: Path | None = None,
 ) -> int:
     """Overwrite held private values with ``*`` (a bare number with ``9``) in log files changed recently.
 
@@ -1027,7 +1057,11 @@ def scrub_recent_logs(
     already scanned with the same values is scanned only from where the last pass
     stopped (the start of its last whole line); new values, or a file that shrank
     or was replaced, mean its tail is scanned again. Returns how many places were
-    overwritten. Uses every account's values.
+    overwritten. Uses every account's values for the log files.
+
+    The default pass (no *roots*) and a pass given *memory_root* also cover each
+    account's session memory files changed recently, by the same rules, each
+    with that account's own values only (never another account's folder).
     """
     global _SCRUB_COMPILED
     with _LOCK:
@@ -1039,8 +1073,10 @@ def scrub_recent_logs(
         else:
             compiled = _compile(rule for rules in _RULES.values() for rule in rules)
             _SCRUB_COMPILED = (version, compiled)
+        accounts = [(user, user_compiled) for user, user_compiled in _COMPILED_BY_USER.items() if user != _PROCESS_USER]
     if compiled is None:
         return 0
+    include_session_memory = roots is None or memory_root is not None
     if roots is None:
         root_list = _default_roots()
     elif isinstance(roots, Path):
@@ -1050,13 +1086,16 @@ def scrub_recent_logs(
     newer_than = time.time() - max_age_seconds
     total = 0
     with _SCRUB_LOCK:
-        files = _log_files(root_list, newer_than)
+        jobs: list[tuple[Path, _Compiled]] = [(path, compiled) for path in _log_files(root_list, newer_than)]
+        if include_session_memory:
+            for user, user_compiled in accounts:
+                jobs.extend((path, user_compiled) for path in _session_memory_files(user, memory_root, newer_than))
         # Forget files that are gone or no longer recent, so this cannot grow without bound.
-        current = {_file_key(path) for path in files}
+        current = {_file_key(path) for path, _rules in jobs}
         for key in [key for key in _SCANNED if key not in current]:
             del _SCANNED[key]
-        for path in files:
-            total += _scrub_file(path, compiled, tail_bytes, version)
+        for path, rules in jobs:
+            total += _scrub_file(path, rules, tail_bytes, version)
     if total:
         # A count only: the values themselves are never logged.
         logger.info("Private-value log clean-up: masked=%d in log files changed in the last 15 minutes", total)
