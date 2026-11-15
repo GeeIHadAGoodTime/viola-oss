@@ -5708,10 +5708,10 @@ async def alarm(
 
 @server.tool(
     description=(
-        "Send, schedule, list or delete reminders. action='list' answers what "
-        "reminders or scheduled tasks the user has (returns both); enabled_only=false adds "
-        "finished ones, only if asked. action='delete' takes reminder: an id or its words, "
-        "one at a time. Send: message, optional when, channel."
+        "Reminder text shown or spoken to the user at a time (message, when). "
+        "action='list' shows reminders and scheduled tasks (enabled_only=false adds "
+        "finished); action='delete' takes reminder: id or words. To run a command or "
+        "action later (play music, tell a joke, check something) use the schedule tool."
     ),
     annotations=_CONFIRM,
     meta={"risk": "confirm"},
