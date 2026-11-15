@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "b01fd8be616e42383a5d6c1425a2d5f6d42dc493",
-  "sha256": "979e0b39e018cf456d75cb6b9d2471ca131282573b1c6bf354f1eaae293b3f0e",
+  "revision": "3c4ba0bcde228f429ce4dae869e96ae987ff9256",
+  "sha256": "3f3a5b7f228811e17fb01a04fa05a0215ec2ab17d77668f132ffc7faeca48ade",
   "files": [
     {
       "path": ".env.example",
@@ -1600,8 +1600,8 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "9e4b4f5db975ed8298c49ca6fd0dac22581867f92ac0e8f49431491654e65a72",
-      "bytes": 643499
+      "sha256": "1b14e5c5a96e583e057eb367538a65e5f97d17cf9b5f47db431cebed0f6c9e4b",
+      "bytes": 644815
     },
     {
       "path": "intent/agent_loop.py",
@@ -4770,8 +4770,8 @@
     },
     {
       "path": "services/llm/stream_bus.py",
-      "sha256": "eb60222016bc819822c4edc0ec55db731523be07200b4d662330530f4308e8dc",
-      "bytes": 14956
+      "sha256": "7b2038717cc92f3342daba7284dea1b6b068b1a6af8442530afb620214b6b64f",
+      "bytes": 15229
     },
     {
       "path": "services/llm/stream_capture.py",
@@ -9495,8 +9495,8 @@
     },
     {
       "path": "ui/api/routes/chat_mode.py",
-      "sha256": "5adb6f3bb9473dd9d70e5d9cee6676ac081ed5ce4bff7e352af5bcb858e493d6",
-      "bytes": 44284
+      "sha256": "740ff122cc76fdec6adeda8c29387d06b74b64fa0993f589ec6bcfdd7667b553",
+      "bytes": 49952
     },
     {
       "path": "ui/api/routes/clock.py",
@@ -9510,8 +9510,8 @@
     },
     {
       "path": "ui/api/routes/command.py",
-      "sha256": "22d69c9fcba05d1dd37b8c47a41480fb2aa8d962f858313168d9ac6fd3762d2a",
-      "bytes": 33344
+      "sha256": "c6926f9e89e34563a6a944a7445faa4670bfa690921338cc8edc96e04ee21137",
+      "bytes": 37702
     },
     {
       "path": "ui/api/routes/common.py",
@@ -11760,8 +11760,8 @@
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatInput.jsx",
-      "sha256": "30359899bee778b7bce9005d6e4e7182e34e5f4d2cfda76def43280014c30a0e",
-      "bytes": 2948
+      "sha256": "85605e5cf0a8d31e8748a4304c0be3bef0533d7f9fc2185e215bf01ca0abd764",
+      "bytes": 3502
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatInput.test.jsx",
@@ -11789,9 +11789,14 @@
       "bytes": 19397
     },
     {
+      "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.enterQueue.test.jsx",
+      "sha256": "54302d92c5831dc9de80d7b54e1be5939cacf94eaaba245c92aa96f054c61b38",
+      "bytes": 7745
+    },
+    {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.jsx",
-      "sha256": "de1afe553e572cb351c0e9beb4ee0a3a4abab489c83fb0f1fd73b8a3013c7b71",
-      "bytes": 67975
+      "sha256": "7b791ec36042e9378cee65613ed696c71dff8b7293cd4d369f24afaebd2b7463",
+      "bytes": 69738
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.modelRecovery.test.jsx",
@@ -11840,8 +11845,8 @@
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/markdown.jsx",
-      "sha256": "8bcb591e681030238a50022b3ab06e55a8c215195e981f583c64e7b029ad1f7b",
-      "bytes": 6969
+      "sha256": "4a7e0f4d1be078b6c6016a587f5f16eaa030dfadcfe3ff2f4e3052c74484594f",
+      "bytes": 7424
     },
     {
       "path": "ui/react-app/src/components/stage/stageCommandContributions.js",
@@ -13780,8 +13785,8 @@
     },
     {
       "path": "voice/streamed_reply.py",
-      "sha256": "1742e62cf1383c272b7582c0dc0ddc42f205741e8a69f3b6aaaa1bf6147a3525",
-      "bytes": 12847
+      "sha256": "32caf434d7dcf6e75a5c5e31961ff32e27a22028bbbab5b3049c6d0c4df48f49",
+      "bytes": 13311
     },
     {
       "path": "voice/synthesis/__init__.py",
