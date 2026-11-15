@@ -30,10 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "4eb2b78e385b8e14c7490f9b7fe5c22e3cb444522212bf20db9d601d2a74174b",
-  "source_tree_sha256": "3f3a5b7f228811e17fb01a04fa05a0215ec2ab17d77668f132ffc7faeca48ade",
+  "source_manifest_sha256": "27cb2f777a6882b647f2a212ef6b7287ff4d1a88bcc9b14113021c4d07e111e8",
+  "source_tree_sha256": "057b7b7731ac5bf66c5a93aa5773c5d2815c0242033d9050da1e50455d4819b4",
   "source_file_count": 2818,
-  "source_revision": "3c4ba0bcde228f429ce4dae869e96ae987ff9256",
+  "source_revision": "946074bc4d60e1fa1f13529805b870ba6d8f915d",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "LICENSES/SPEECH_COMPONENT_NOTICES.md",
@@ -295,6 +295,7 @@
     "tests/public/test_phone_spoken_goodbye_recovery.py",
     "tests/public/test_queue_play_selection.py",
     "tests/public/test_request_tool_surface_boundary.py",
+    "tests/public/test_saved_chat_speech_dispatch.py",
     "tests/public/test_scheduler_one_shot_staleness.py",
     "tests/public/test_scheduler_poll_admission.py",
     "tests/public/test_source_contract.py",
@@ -662,7 +663,7 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "3c4ba0bcde228f429ce4dae869e96ae987ff9256",
+    "source_commit": "946074bc4d60e1fa1f13529805b870ba6d8f915d",
     "kind": "chat tab parity and stop"
   },
   "historical_bindings": [

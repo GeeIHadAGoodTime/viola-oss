@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "3c4ba0bcde228f429ce4dae869e96ae987ff9256",
-  "sha256": "3f3a5b7f228811e17fb01a04fa05a0215ec2ab17d77668f132ffc7faeca48ade",
+  "revision": "946074bc4d60e1fa1f13529805b870ba6d8f915d",
+  "sha256": "057b7b7731ac5bf66c5a93aa5773c5d2815c0242033d9050da1e50455d4819b4",
   "files": [
     {
       "path": ".env.example",
@@ -6415,8 +6415,8 @@
     },
     {
       "path": "tests/public/test_saved_chat_speech_dispatch.py",
-      "sha256": "a824628fdd6e8143921186ca46cdcd703816b012794b9b40a84ff183a586d48f",
-      "bytes": 12341
+      "sha256": "00ff715128045893291ec86785f8993b9a334b8bbaebb52e8308e30c506e8c57",
+      "bytes": 12966
     },
     {
       "path": "tests/public/test_scheduler_one_shot_staleness.py",
@@ -9495,8 +9495,8 @@
     },
     {
       "path": "ui/api/routes/chat_mode.py",
-      "sha256": "740ff122cc76fdec6adeda8c29387d06b74b64fa0993f589ec6bcfdd7667b553",
-      "bytes": 49952
+      "sha256": "3db4701d409f05dd5b3cd684c24def5353b67283f3f8e2e4c6a5f1679e2daf34",
+      "bytes": 50417
     },
     {
       "path": "ui/api/routes/clock.py",
