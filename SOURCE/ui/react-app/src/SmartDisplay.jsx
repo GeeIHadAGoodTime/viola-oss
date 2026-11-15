@@ -100,7 +100,7 @@ import SubtleDivider from './components/shared/SubtleDivider';
 import LoadingSkeleton from './components/shared/LoadingSkeleton';
 import ModalLoadingSpinner from './components/shared/ModalLoadingSpinner';
 import ProviderBadge from './components/shared/ProviderBadge';
-import AgentDrawer from './components/AgentDrawer';
+import TaskLine from './components/TaskLine';
 import { clampWakeThreshold } from './utils/wakeSensitivity';
 import {
   browserLeaveAction,
@@ -1160,7 +1160,6 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   const [isCommandLoading, setIsCommandLoading] = useState(false);
   const [activeCard, setActiveCard] = useState(null);
   const dismissCard = useCallback(() => setActiveCard(null), []);
-  const [agentDrawerExpanded, setAgentDrawerExpanded] = useState(true);
   const handleAgentResult = useCallback(({ content }) => {
     if (!mountedRef.current) return;
     // A long background-agent result (a 2,000-word essay on the laptop) goes on
@@ -1175,19 +1174,6 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
     ]);
   }, []);
   const agentRegistry = useAgentRegistry({ onAgentResult: handleAgentResult });
-  const activeAgentCount = agentRegistry.active.length;
-  const previousActiveAgentCountRef = useRef(activeAgentCount);
-
-  useEffect(() => {
-    if (activeAgentCount > 0 && previousActiveAgentCountRef.current === 0) {
-      setAgentDrawerExpanded(true);
-    }
-    previousActiveAgentCountRef.current = activeAgentCount;
-  }, [activeAgentCount]);
-
-  const handleToggleAgentDrawer = useCallback(() => {
-    setAgentDrawerExpanded(expanded => !expanded);
-  }, []);
 
   // Any modal/overlay open — drives both onboarding pause and hiding the
   // background content (viola-inner-card) from assistive tech + the display
@@ -4054,9 +4040,6 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
           onOpenBugReport={handleOpenBugReport}
           onCalendarModalOpenChange={setCalendarModalOpen}
           userSettings={userSettings}
-          activeAgentCount={activeAgentCount}
-          agentDrawerExpanded={agentDrawerExpanded}
-          onToggleAgentDrawer={handleToggleAgentDrawer}
         />
 
         <div
@@ -4272,17 +4255,14 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
             </div>
           </div>
         )}
+        <TaskLine
+          active={agentRegistry.active}
+          recentCompleted={agentRegistry.recent_completed}
+          streamStates={agentRegistry.streamStates}
+          onCancel={agentRegistry.cancelAgent}
+        />
         </div>
       </div>
-
-      <AgentDrawer
-        active={agentRegistry.active}
-        recentCompleted={agentRegistry.recent_completed}
-        streamStates={agentRegistry.streamStates}
-        expanded={agentDrawerExpanded}
-        onToggleExpanded={handleToggleAgentDrawer}
-        onCancel={agentRegistry.cancelAgent}
-      />
 
       <WorkbenchDropZone addToast={addToast} />
 
