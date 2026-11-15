@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "778d28193e8f1dc02d7cb81e1ace115f9b7dae51",
-  "sha256": "cd5cc07480100626a5e94d9acce640b3ca04cdfc1ca4e14e4aeaeb42d14b0728",
+  "revision": "3c7abd19119eca1fd9d60aaaa61a28eae90671df",
+  "sha256": "063785e34f817370140f86dd5df48a15bd4e3c7e2e15b2a2907fa0e1f9f24fbd",
   "files": [
     {
       "path": ".env.example",
@@ -1950,8 +1950,8 @@
     },
     {
       "path": "intent/sensitive_values.py",
-      "sha256": "ff12bbd1807c2691f3db1457e217f9ecb31a5258771802fc9689566efccd173a",
-      "bytes": 45686
+      "sha256": "4666a1d7f8c3a51fad1172e2351e8c6b0c2c4ab28ef73079e931e780b0c75e24",
+      "bytes": 45735
     },
     {
       "path": "intent/spin_detector.py",
