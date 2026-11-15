@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "d61afebc5657ba8c7165bf2533a7477ca17f17d7",
-  "sha256": "f0283665b169f80a1b70bac28d1b38384c2ddd4b374dd55d785499afd131f8c3",
+  "revision": "8613d9ae1b45c20cae6e1bb5dc149d4be541a8a2",
+  "sha256": "59321e80d91df09e957771e8baca966d5716e247be43e0173bad376fe824b58a",
   "files": [
     {
       "path": ".env.example",
@@ -720,8 +720,8 @@
     },
     {
       "path": "backend/music_adapter.py",
-      "sha256": "56fa7151873082376c433b77cee74f13971cd0396e4dc14d311d192ec67a7050",
-      "bytes": 34279
+      "sha256": "a4cb4247d313f7259a96eb1c6bd82914ca9ce015699dda6e3fc13190e6a8c2b5",
+      "bytes": 34825
     },
     {
       "path": "backend/observability_routes.py",
@@ -1425,8 +1425,8 @@
     },
     {
       "path": "diagnostics/queue_history.py",
-      "sha256": "dde514d11f0ad8350da1e0484f7a647f5330218ae625ca48a9e79963d24c78b3",
-      "bytes": 27038
+      "sha256": "f94d803e6913744b00d128e77b6f465196caf0612aa0960bb5d16985b9c95200",
+      "bytes": 27828
     },
     {
       "path": "diagnostics/runtime_metrics.py",
@@ -1605,8 +1605,8 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "8e17808bf4c465340b2cbc92fd969394ef4222e0960542feea949f986d421697",
-      "bytes": 650400
+      "sha256": "c8459038c25b4f17029bdb16d40243e72bda2716a8cb5a8917b1792a787cd5cd",
+      "bytes": 650998
     },
     {
       "path": "intent/agent_loop.py",
@@ -1775,8 +1775,8 @@
     },
     {
       "path": "intent/hooks/safety.py",
-      "sha256": "f6cedaf837e4e44cfe580104d1fa1255279b023fb79888eb7e2d4a31db0a7ca3",
-      "bytes": 5650
+      "sha256": "acde48f453b4f5a247096c863ba3aaf6c8552b9043fa389ced4b8dc6d2bffa4f",
+      "bytes": 5539
     },
     {
       "path": "intent/hooks/schema.py",
@@ -1955,8 +1955,8 @@
     },
     {
       "path": "intent/sensitive_values.py",
-      "sha256": "4666a1d7f8c3a51fad1172e2351e8c6b0c2c4ab28ef73079e931e780b0c75e24",
-      "bytes": 45735
+      "sha256": "97d4a45025fa93b15f092d93f91ec7774d7fb4be8a585deeeb68dafe7136ea6b",
+      "bytes": 47761
     },
     {
       "path": "intent/spin_detector.py",
@@ -2085,18 +2085,18 @@
     },
     {
       "path": "intent/tools/desktop.py",
-      "sha256": "9a16a65f23c5cb832cd23ff950424cbaf0351861bf507c506e324e4c2df89595",
-      "bytes": 57914
+      "sha256": "5fcae13f7f400c5cafe94b91f6b757bc703332886401a5d46dc588d7cac14ddc",
+      "bytes": 69896
     },
     {
       "path": "intent/tools/desktop_input_low.py",
-      "sha256": "8b05e6ecf698e3276b324cb67b7c9b156862def74c56de5b328716134df05647",
-      "bytes": 28950
+      "sha256": "07127d7edc63f9c3033259b62fbaeed1b46289444e7ff18c369ec27ba65cddf1",
+      "bytes": 31204
     },
     {
       "path": "intent/tools/desktop_refs.py",
-      "sha256": "b2092abfa11d89b9c94e64e3f9badf7470d63893086c36d8eec23cfd98c98462",
-      "bytes": 30210
+      "sha256": "a9c472d60ad05b0b549cdea4b74f319fcebb94225d761e772cd842a908e3f8b1",
+      "bytes": 30933
     },
     {
       "path": "intent/tools/email.py",
@@ -2150,8 +2150,8 @@
     },
     {
       "path": "intent/tools/notification_tools.py",
-      "sha256": "746da544d092fb1fe337853f7ad4ca25116c3912d995262893974ff36eef86f6",
-      "bytes": 16255
+      "sha256": "eed9686ea9657524d232b0badf921a720de7614acc34190e1f775f23f333bcdd",
+      "bytes": 17107
     },
     {
       "path": "intent/tools/phone_call.py",
@@ -2170,8 +2170,8 @@
     },
     {
       "path": "intent/tools/scheduling.py",
-      "sha256": "bb2040099e8c5177edcd19a9ca2b4308c481d9f5fc74856dfa2970a563c057db",
-      "bytes": 16560
+      "sha256": "fb008743c631afd41c5626d54fc36fd6754d4fc2cc7bb17f1367c82bdbc4770b",
+      "bytes": 17142
     },
     {
       "path": "intent/tools/search_tracks_tools.py",
@@ -2285,8 +2285,8 @@
     },
     {
       "path": "mcp_hub/client_hub.py",
-      "sha256": "d5030ca49b834b0d52db7519aa2edd8564653ab7cbf6bd37b60cfe161402b0d9",
-      "bytes": 138185
+      "sha256": "dd7f367b68764d7f157df8aeb3aceeaa1d564692eabaacc59c3bc576286ca3ac",
+      "bytes": 139389
     },
     {
       "path": "mcp_hub/compound_tools.py",
@@ -2390,8 +2390,8 @@
     },
     {
       "path": "mcp_servers/computer_use/server.py",
-      "sha256": "361f978b12faa0a3622fd5c8ed95c3cd7c9d1a86dae3950d203cd5e6f976266c",
-      "bytes": 69787
+      "sha256": "37d47a46de7e23e2f811b48eb8133fe127dab8a6f1a08be2d68f30cfbcc59633",
+      "bytes": 71043
     },
     {
       "path": "mcp_servers/core_tools/__init__.py",
@@ -2405,8 +2405,8 @@
     },
     {
       "path": "mcp_servers/core_tools/server.py",
-      "sha256": "18e9d0c5ad0b513f9a6f524799c44856337685b8de32c9868e1e22c64c663911",
-      "bytes": 268106
+      "sha256": "64253302c9cad1f8ea9516516d07e00ae6d2b4b78ae518d6915056841a7c6969",
+      "bytes": 269415
     },
     {
       "path": "mcp_servers/phone_tool_descriptions.py",
@@ -3155,8 +3155,8 @@
     },
     {
       "path": "music/queue/playlist_cursor.py",
-      "sha256": "9221f5b891058f03fd3f8cf2412924755f5f61c863211954e3368a7f3261827d",
-      "bytes": 15073
+      "sha256": "f87a83b6df358d994fc780876f93ff50b00cf93cad206b853013a4d9aa5a40c4",
+      "bytes": 15722
     },
     {
       "path": "music/queue_config.py",
@@ -4395,13 +4395,13 @@
     },
     {
       "path": "services/computer_use/input.py",
-      "sha256": "88913cd657c4a31e040a9646094c04fae5e1e285eebd2aa584792eca84f2f0ac",
-      "bytes": 21262
+      "sha256": "1c52e572365ccee12f1301faed396bf49c14f96ef7c894ad3d627fc55179c894",
+      "bytes": 22632
     },
     {
       "path": "services/computer_use/safety.py",
-      "sha256": "dd357e6eb39ad4b20641dded5e61128fa4d791f6c5c9c6387c7e1a3269891b76",
-      "bytes": 32362
+      "sha256": "b2214707295f28cf567e2a96325b6ffab889b00b20c967939d2ded9f894e1758",
+      "bytes": 35832
     },
     {
       "path": "services/computer_use/screen.py",
@@ -4520,8 +4520,8 @@
     },
     {
       "path": "services/conversation/session_memory.py",
-      "sha256": "225f0a0d21b2823906ece40c0b3492aa3a7245a5878fa75f828990d8e620a2f5",
-      "bytes": 14716
+      "sha256": "895230090d2c78c882c430a590ea22405b33d45b4c8f13a0772216c096bd485a",
+      "bytes": 16240
     },
     {
       "path": "services/conversation/state_manager.py",
@@ -5060,8 +5060,8 @@
     },
     {
       "path": "services/notifications/windows_toast.py",
-      "sha256": "29eddfb63d1e30d605bc2d90d2815b54885fbdc5448aa141db8cdfeefe14cf99",
-      "bytes": 7716
+      "sha256": "74bafa202159cdbc15c9f2dd62e80c0742d49b153b5cbfd858259842de30575a",
+      "bytes": 8802
     },
     {
       "path": "services/oauth/__init__.py",
@@ -5235,8 +5235,8 @@
     },
     {
       "path": "services/scheduler/service.py",
-      "sha256": "04bebf3f0887889ee1cca42ff7730ad912071bddf1cef0e8efc091b257944f78",
-      "bytes": 58917
+      "sha256": "d1c35ce98c0ff6c9e00edb5856f40d3a8afd12f61edeb9ec17ee2f6d79b782b8",
+      "bytes": 64079
     },
     {
       "path": "services/scheduler/store.py",
@@ -6540,8 +6540,8 @@
     },
     {
       "path": "tests/public/test_windows_toast_delivery_contract.py",
-      "sha256": "f7ca8b42c3b629e9c45d25dd23dac1fd09038415938a9ad675d8b43b536dadc5",
-      "bytes": 10332
+      "sha256": "918d70a465a2cf80c25d79d1c665d1c6d95819fc3d799abc0a32e676d012204c",
+      "bytes": 10586
     },
     {
       "path": "themes/viola-dark.css",
@@ -9535,8 +9535,8 @@
     },
     {
       "path": "ui/api/routes/chat_mode.py",
-      "sha256": "f0847755d6c8670caeb4911ef5809f3ccf3c955642c6a0454988625cf461cddb",
-      "bytes": 52285
+      "sha256": "a84c033f1f83cd37166acff386eb4a5b68aadaaad159a64e0955b8362a7d5db4",
+      "bytes": 52546
     },
     {
       "path": "ui/api/routes/clock.py",
@@ -9570,8 +9570,8 @@
     },
     {
       "path": "ui/api/routes/control.py",
-      "sha256": "fc8f9b21d5f16f67d3acea71af8c204a7c3c9e084fd0dd99a11d4cdbac469651",
-      "bytes": 68950
+      "sha256": "640b93bd8e9d4a7e40c060c80207c5a11f4947879f633b5bed8ad2c319b3843f",
+      "bytes": 69349
     },
     {
       "path": "ui/api/routes/cost.py",
