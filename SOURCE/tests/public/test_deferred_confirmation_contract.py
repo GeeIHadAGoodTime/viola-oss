@@ -254,7 +254,13 @@ class CalendarConfirmationContract(unittest.IsolatedAsyncioTestCase):
         next_hub.call_tool.return_value = {"success": True, "data": {"event_id": "synthetic-event"}}
         next_call = self._calendar_call()
         next_call.args.update(pending.params["confirmation_args"])
-        result = await next_executor.run("Yes, I confirm", next_call)
+        # A pending confirmation runs only on the user's own reply for the turn; the
+        # approval classifier is a model, so this contract scripts its reading of "Yes".
+        async def read_reply(_self, text, _action, _risk):
+            return "affirm" if text.strip().lower().startswith("yes") else "unclear"
+
+        with patch.object(ApprovalManager, "_classify_response", read_reply):
+            result = await next_executor.run("Yes, I confirm", next_call)
 
         assert next_executor.task_id != original_task
         assert result.ok is True
