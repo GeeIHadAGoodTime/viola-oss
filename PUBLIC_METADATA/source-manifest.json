@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "b01fd8be616e42383a5d6c1425a2d5f6d42dc493",
-  "sha256": "979e0b39e018cf456d75cb6b9d2471ca131282573b1c6bf354f1eaae293b3f0e",
+  "revision": "b44cb3641609c1cd1dbcb70ff873cc93c5365919",
+  "sha256": "02a5963f85278b332488404aa1bee013bb2db0258aab760d0da8e9dc5e23098c",
   "files": [
     {
       "path": ".env.example",
@@ -1095,8 +1095,8 @@
     },
     {
       "path": "core/logging_config.py",
-      "sha256": "04087915b3c03a09daea073913fa3d44bb8bd9f58b4732497b0821bafab0b30b",
-      "bytes": 17464
+      "sha256": "fa5e72f1f089e4b2d429e93c0a25da3b6798740e213d2627ea702daa1a2f94ce",
+      "bytes": 18327
     },
     {
       "path": "core/metrics.py",
@@ -1345,8 +1345,8 @@
     },
     {
       "path": "diagnostics/debug_events.py",
-      "sha256": "d02e0233a55b08d0d58295d56e6da4e2431636983de9dd1f0cfa7f780acbb1cf",
-      "bytes": 4669
+      "sha256": "c400cc63e4976fe432912dd1a588c3b6ed5e019caab49e03527187550ff6a8f3",
+      "bytes": 4837
     },
     {
       "path": "diagnostics/defense_metrics.py",
@@ -1370,8 +1370,8 @@
     },
     {
       "path": "diagnostics/diagnostic_spool.py",
-      "sha256": "779b1ffdeb347f7bf413694f7e8fd76cb179c02fad54c6f07e4367a559b92c8d",
-      "bytes": 15903
+      "sha256": "fcad41114053533f244d99349b9ab3aea09a3656023ddc190ae271c858d67320",
+      "bytes": 16071
     },
     {
       "path": "diagnostics/error_classification.py",
@@ -1400,8 +1400,8 @@
     },
     {
       "path": "diagnostics/observability_logging.py",
-      "sha256": "029a43f4324df252fe1461b4b69077ba46a83ee672500dae2fa02297ce039d1b",
-      "bytes": 20003
+      "sha256": "0fa00a6c918647db80821ca0ad0f35dc0898649620f6c9a0f7530d9fc41abc87",
+      "bytes": 20435
     },
     {
       "path": "diagnostics/operation_trace.py",
@@ -1445,8 +1445,8 @@
     },
     {
       "path": "diagnostics/startup_telemetry.py",
-      "sha256": "95b8fc22f95e10414a8d2b28f1585998ef52086c3755daab68b8e0c6db0f0778",
-      "bytes": 12597
+      "sha256": "84d67be8986748c1220ac6c2c44c5817a722662ec90233cf23b46d9c4ec2676a",
+      "bytes": 12693
     },
     {
       "path": "diagnostics/state_snapshot.py",
@@ -1600,13 +1600,13 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "9e4b4f5db975ed8298c49ca6fd0dac22581867f92ac0e8f49431491654e65a72",
-      "bytes": 643499
+      "sha256": "74e67f5f02fdef3dcc37c6256dba02f44223d4c8620f0d4c920439dcfd5f3a74",
+      "bytes": 644674
     },
     {
       "path": "intent/agent_loop.py",
-      "sha256": "82be6f5960b9d3316752873191f13ef96b1b20741dad9733f1088a82bb6ffa1c",
-      "bytes": 275430
+      "sha256": "de2c06f2d94e2c046b9b0104100a6e7c493abab6958e18aa4a43c028eadd37e9",
+      "bytes": 275902
     },
     {
       "path": "intent/agent_message_manager.py",
@@ -1695,8 +1695,8 @@
     },
     {
       "path": "intent/content_sanitizer.py",
-      "sha256": "f6d29d49223c6c4248bd84e9ef05ed71e61be3bc06452de55570d304255c5197",
-      "bytes": 63538
+      "sha256": "8083ca0757013f96d972776d592c931f8ed2b4cd6730c69cd4799c2275e18943",
+      "bytes": 65774
     },
     {
       "path": "intent/context_builder.py",
@@ -1890,8 +1890,8 @@
     },
     {
       "path": "intent/log_redaction.py",
-      "sha256": "ed13336a290caac3f6513f400db1d3f65d85550f0744a9044f8692c36e83a6bc",
-      "bytes": 27721
+      "sha256": "afdb2763f4ef31bfcc60c0bd4c903d95650b15de2e957455a9ede39658755b06",
+      "bytes": 27970
     },
     {
       "path": "intent/permissions/policy.py",
@@ -1910,8 +1910,8 @@
     },
     {
       "path": "intent/pipeline.py",
-      "sha256": "0e90cba28be5d692662ba1473901fcca77d5c35f3983c8227a1748e61a16d4b7",
-      "bytes": 113822
+      "sha256": "ca31b32e81f3fe59c9e777a0b243a696de6db21cd4f976c834e5a52117bc6422",
+      "bytes": 114608
     },
     {
       "path": "intent/pipeline_contracts.py",
@@ -1947,6 +1947,11 @@
       "path": "intent/runtime_context/providers.py",
       "sha256": "1fd8dadec89cce45f02ae55829ff329ec3cd04e31a430d60038bf921d33e2dd9",
       "bytes": 10659
+    },
+    {
+      "path": "intent/sensitive_values.py",
+      "sha256": "c191e9f7cc53624b977905eb453012a497450d15cba3ee8d01e1bbab2240824f",
+      "bytes": 26495
     },
     {
       "path": "intent/spin_detector.py",
@@ -2175,8 +2180,8 @@
     },
     {
       "path": "intent/tools/settings_tools.py",
-      "sha256": "fc0b58264fa0e2dcf18739ea1a80ac507b826843932a2c553c63331cf4619a95",
-      "bytes": 28008
+      "sha256": "c2819363e94133d8ed43daf1f2d5f834e9e3b4e2bb1f67c9b305782947144f1e",
+      "bytes": 28284
     },
     {
       "path": "intent/tools/shell.py",
@@ -12980,8 +12985,8 @@
     },
     {
       "path": "ui/settings_manager.py",
-      "sha256": "115cf43be354dc09c26ffba4c46dcdec8af9c6eab2258fc7043879d380b99fe1",
-      "bytes": 177044
+      "sha256": "64b380d71e9a03a191403cb9e24c47149c66867f73d282b3d67aad9f86fdf42b",
+      "bytes": 177717
     },
     {
       "path": "ui/settings_schema.py",
@@ -13100,8 +13105,8 @@
     },
     {
       "path": "utils/ai_debug_tracer.py",
-      "sha256": "4685a9351fd33947443b84230a3c499e6db8b12a1a14d4e933cfd3518db190c5",
-      "bytes": 26044
+      "sha256": "755248f8523af99c82a697de0d9b666d440b5ad510c011f54aeda196d9509a4c",
+      "bytes": 26116
     },
     {
       "path": "utils/api/__init__.py",
@@ -13430,8 +13435,8 @@
     },
     {
       "path": "viola_qt.py",
-      "sha256": "61345ef5fec3c4dd31543150e01328bab1ffc92990c741baaaafd1ba1a584e6d",
-      "bytes": 90562
+      "sha256": "a62aa7ef30baea0e144da82d4396ff56c089dbc37d478f50346f10526750079a",
+      "bytes": 90844
     },
     {
       "path": "viola_spoke.py",
