@@ -14,6 +14,7 @@ from __future__ import annotations
 import contextlib
 import contextvars
 import json
+import logging
 import os
 import threading
 import time
@@ -234,9 +235,18 @@ _USER_CANCELLED_RESULT = (
     "The user cancelled this when asked: %s. It did not run and nothing changed. "
     "Do not run it again and do not ask about it again in this turn."
 )
+# An unclear, empty or unreadable reply is not a cancellation: the model asks once
+# more (a fresh question, which cannot be accepted in the same turn).
 _USER_DID_NOT_CONFIRM_RESULT = (
-    "The user's reply did not confirm this: %s. It did not run and nothing changed. Do not run it in this turn."
+    "The user's reply did not clearly say yes or no, so nothing was done (%s). "
+    "Ask them once more, in one short sentence, to confirm or cancel this specific action."
 )
+# Set by _classify_response when the classifier could not answer (exception or
+# timeout), so a refusal can be logged as classifier_unavailable, not unclear.
+_CLASSIFIER_FAILED: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "viola_approval_classifier_failed", default=False
+)
+_CLASSIFIER_UNAVAILABLE_LOGGED_ATTR = "_viola_classifier_unavailable_logged"
 _DEFERRED_REFUSAL: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "viola_deferred_confirmation_refusal", default=None
 )
@@ -925,7 +935,8 @@ class ApprovalManager:
 
         - dangerous action, or untrusted content in the conversation: runs only
           when the user's message affirms it; deny, unclear, no message or a
-          classifier failure refuse it (fails closed);
+          classifier failure refuse it (fails closed). A denial tells the model
+          the user cancelled; anything else tells it to ask once more;
         - confirm-level action: refused when the user's message denies it;
           otherwise it runs as before (unclear or a classifier failure does
           not block).
@@ -941,7 +952,17 @@ class ApprovalManager:
         tracker = active_taint_tracker() if active_taint_tracker is not None else None
         tainted = bool(getattr(tracker, "is_tainted", False))
         user_words = str(getattr(tracker, "user_request", "") or "").strip()
-        decision = await self._classify_response(user_words, action_description, risk) if user_words else "unclear"
+        decision: str = "unclear"
+        if user_words:
+            token = _CLASSIFIER_FAILED.set(False)
+            try:
+                decision = await self._classify_response(user_words, action_description, risk)
+                if _CLASSIFIER_FAILED.get():
+                    decision = "classifier_unavailable"
+            except Exception:  # noqa: BLE001 - any classifier failure fails closed
+                decision = "classifier_unavailable"
+            finally:
+                _CLASSIFIER_FAILED.reset(token)
         affirmed = decision in ("strong_affirm", "affirm")
         must_affirm = tainted or risk == RiskLevel.DANGEROUS
         holds = affirmed if must_affirm else decision != "deny"
@@ -950,7 +971,15 @@ class ApprovalManager:
             logger.info("Pending confirmation for %s: the user's reply allows it (%s)", kind, decision)
             _DEFERRED_REFUSAL.set(None)
             return True
-        logger.warning("Pending confirmation for %s refused: the user's reply was %s, nothing ran", kind, decision)
+        level = logging.WARNING
+        if decision == "classifier_unavailable":
+            # Once per turn at WARNING (the turn's tracker remembers it).
+            if getattr(tracker, _CLASSIFIER_UNAVAILABLE_LOGGED_ATTR, False):
+                level = logging.INFO
+            else:
+                with contextlib.suppress(AttributeError, TypeError):
+                    setattr(tracker, _CLASSIFIER_UNAVAILABLE_LOGGED_ATTR, True)
+        logger.log(level, "Pending confirmation for %s refused: the user's reply was %s, nothing ran", kind, decision)
         template = _USER_CANCELLED_RESULT if decision == "deny" else _USER_DID_NOT_CONFIRM_RESULT
         _DEFERRED_REFUSAL.set(template % action_description)
         return False
@@ -1472,6 +1501,7 @@ class ApprovalManager:
                 "Approval classifier: background-LLM module unavailable (fail-closed): %s",
                 exc,
             )
+            _CLASSIFIER_FAILED.set(True)
             return "unclear"
 
         user_content = (
@@ -1496,6 +1526,7 @@ class ApprovalManager:
                 "Approval classifier call failed (fail-closed -> unclear): %s",
                 exc,
             )
+            _CLASSIFIER_FAILED.set(True)
             return "unclear"
 
         try:
