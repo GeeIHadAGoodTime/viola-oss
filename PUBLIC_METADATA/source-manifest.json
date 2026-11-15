@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "8613d9ae1b45c20cae6e1bb5dc149d4be541a8a2",
-  "sha256": "59321e80d91df09e957771e8baca966d5716e247be43e0173bad376fe824b58a",
+  "revision": "92d7b9eb6dcce935cd06aa7750c14914ef08d1f4",
+  "sha256": "c8b9aef49c483ea062a49839c6b2973c3ad339e7d4fef82ffc61731d94771497",
   "files": [
     {
       "path": ".env.example",
@@ -1645,8 +1645,8 @@
     },
     {
       "path": "intent/approval.py",
-      "sha256": "c79601a43973b2241c24b0d84ecad0648595b9160f6fbf81bff128fd69a4213e",
-      "bytes": 66808
+      "sha256": "7a5939464b78d7d1e63f6daf46a40a7b8d916f41e7503d72c9f8b417c43fc73d",
+      "bytes": 71245
     },
     {
       "path": "intent/capability_resolver.py",
@@ -2085,8 +2085,8 @@
     },
     {
       "path": "intent/tools/desktop.py",
-      "sha256": "5fcae13f7f400c5cafe94b91f6b757bc703332886401a5d46dc588d7cac14ddc",
-      "bytes": 69896
+      "sha256": "547b19f19f9faa0948cf704f48b54a4b48e4b1b3b057779677024e95245b9107",
+      "bytes": 73017
     },
     {
       "path": "intent/tools/desktop_input_low.py",
@@ -2280,13 +2280,13 @@
     },
     {
       "path": "mcp_hub/approval_bridge.py",
-      "sha256": "61aa20c93c686fa0b53f51852b7a5b69cc2e54534e603d1135191ea94b78b0b3",
-      "bytes": 72441
+      "sha256": "cced686327ba2fb6984cc7c3b5d77bbec8cfa3e449a6bd815e0a7392fa639d35",
+      "bytes": 72778
     },
     {
       "path": "mcp_hub/client_hub.py",
-      "sha256": "dd7f367b68764d7f157df8aeb3aceeaa1d564692eabaacc59c3bc576286ca3ac",
-      "bytes": 139389
+      "sha256": "3013085128a1f5ed5cc0b15e120cb8ff694ec46d98aaa06a0717ed5e14aab52d",
+      "bytes": 139747
     },
     {
       "path": "mcp_hub/compound_tools.py",
@@ -6240,8 +6240,8 @@
     },
     {
       "path": "tests/public/test_deferred_confirmation_cancellation.py",
-      "sha256": "4787e38288d184737e1e31db49ca23364901fb0a921f1c33ca8137519f4132d0",
-      "bytes": 8622
+      "sha256": "6c22f2b85edb9177cff16354f1e0cdd071f074353cdb603db1a3d63045f631b3",
+      "bytes": 9409
     },
     {
       "path": "tests/public/test_deferred_confirmation_contract.py",
@@ -10190,8 +10190,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "62201d422c7fba86fc7a20436510eef8a0e4d06e9d930fdd18916c7a87e01d11",
-      "bytes": 206128
+      "sha256": "9083f3cbae89f36904bdbe871cfd115e5bcef98ee56cd3322b0cdf3c6cd2b2ea",
+      "bytes": 205352
     },
     {
       "path": "ui/react-app/src/SmartDisplay.longAnswer.test.jsx",
@@ -10592,26 +10592,6 @@
       "path": "ui/react-app/src/components/AccountTab.usageCloudAuth.test.jsx",
       "sha256": "b7b0d452861f64d485a34dce5836ce5661361cd4bf1814723879e59460353e3d",
       "bytes": 8288
-    },
-    {
-      "path": "ui/react-app/src/components/AgentCard.jsx",
-      "sha256": "afed0fdf68663f38240867e27ae05d11a22c529518046f212c986f6b2149accb",
-      "bytes": 6819
-    },
-    {
-      "path": "ui/react-app/src/components/AgentCard.test.jsx",
-      "sha256": "313b21c2f8a16d94dbd74f714ef3feaa1de2b95a5ce6636f739c0840d40079b8",
-      "bytes": 4921
-    },
-    {
-      "path": "ui/react-app/src/components/AgentDrawer.jsx",
-      "sha256": "b7364aaa895146753cf5c1279402c4734ac2261984fc456183b168df55583673",
-      "bytes": 6068
-    },
-    {
-      "path": "ui/react-app/src/components/AgentDrawer.layout.test.jsx",
-      "sha256": "19332f922c3958ba1d8ae5247b940e47a328b3e5e9862702d9e3f5208d236b3d",
-      "bytes": 2082
     },
     {
       "path": "ui/react-app/src/components/BillingCapacityPanel.css",
@@ -11092,6 +11072,21 @@
       "path": "ui/react-app/src/components/SpokeWrapper.jsx",
       "sha256": "b981b8e21e30be873774b8bf32f105ab8d2301c9e1bf5c2f2d42ea765b5cf540",
       "bytes": 25009
+    },
+    {
+      "path": "ui/react-app/src/components/TaskLine.jsx",
+      "sha256": "0cf751f01ae8031e7a57fb5fb8978adc18ffb98cb1d92b1cbbd7a34d85d26dc6",
+      "bytes": 9572
+    },
+    {
+      "path": "ui/react-app/src/components/TaskLine.module.css",
+      "sha256": "b92e22f7e8a855fa1981782bf4fca14c84e2926e98dd7e1bc47716a08d3575f0",
+      "bytes": 1753
+    },
+    {
+      "path": "ui/react-app/src/components/TaskLine.test.jsx",
+      "sha256": "b2e2d96d4c8eb27f3828e2da5a1b34caa2ed33a5aff3df57394c710b077dc6c5",
+      "bytes": 10791
     },
     {
       "path": "ui/react-app/src/components/TimerCountdown.jsx",
@@ -11925,18 +11920,18 @@
     },
     {
       "path": "ui/react-app/src/components/topbar/TopBar.jsx",
-      "sha256": "b3edf9f5cc7167d25a1524a3ae923f9d4c3e339f387a7a4a4f60f264ea919dbf",
-      "bytes": 8995
+      "sha256": "5e7c98281840b0d93b61e0bb7f99d227d7291763d2d4e2d082f31f326d8fdfce",
+      "bytes": 8262
     },
     {
       "path": "ui/react-app/src/components/topbar/TopBar.module.css",
-      "sha256": "3ce64d1edf182301b81f1692b6b23a3a17eb1b31b58be96acaee72f9dce72559",
-      "bytes": 4984
+      "sha256": "d5919840837e695397543cb70f76b0e04aef6744beff092ac1172b35d9f33e78",
+      "bytes": 4651
     },
     {
       "path": "ui/react-app/src/components/topbar/TopBar.test.jsx",
-      "sha256": "8836d029a355457de02566843f00a061afeec7e886d1371dd975a391bbaf8671",
-      "bytes": 3192
+      "sha256": "0a5c14457d6a9e5710be3d397d6219a60bc3f8865244300985fe5995af145804",
+      "bytes": 3099
     },
     {
       "path": "ui/react-app/src/components/topbar/WeatherIcons.jsx",
@@ -11965,8 +11960,8 @@
     },
     {
       "path": "ui/react-app/src/components/voice/BottomRow.module.css",
-      "sha256": "57d5c20bcc1747efe84d69532ece89f7376d2fed80fbef56041a94ac16e047ae",
-      "bytes": 4915
+      "sha256": "891ab069769c090764230ec81a455086967f07d8985e25a4465dac82e3c4db38",
+      "bytes": 4924
     },
     {
       "path": "ui/react-app/src/components/voice/BottomRow.stageReply.test.jsx",
@@ -12575,8 +12570,8 @@
     },
     {
       "path": "ui/react-app/src/styles/animations.css",
-      "sha256": "cb5fc21ad0065d7f3e5b6f52584afa867dac862aacfe9a75004fa33ea6877348",
-      "bytes": 4582
+      "sha256": "d0b64ed250a129171dbd5bfe636ece66a376ca9111bf8e7dd086dbfc71a7fcc2",
+      "bytes": 4331
     },
     {
       "path": "ui/react-app/src/styles/cormorant-garamond-600-latin.woff2",
@@ -12627,6 +12622,16 @@
       "path": "ui/react-app/src/testHarness/onboardingGuestHarness.jsx",
       "sha256": "dfbf32af0435696e7b78ae7f0b2557238aaf625e32e5b82110026dd6d8ef1743",
       "bytes": 4846
+    },
+    {
+      "path": "ui/react-app/src/utils/agentTasks.js",
+      "sha256": "2df7989fd564e80eeac53acfe590b9532e9c687e004cf1397ba141aedda644cf",
+      "bytes": 1599
+    },
+    {
+      "path": "ui/react-app/src/utils/agentTasks.test.js",
+      "sha256": "fb3bb4360dffe35658bd369e4eb23218eae83dab5b6ca90ef367e6700ca6c1d5",
+      "bytes": 1393
     },
     {
       "path": "ui/react-app/src/utils/artProxy.js",
