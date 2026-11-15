@@ -154,17 +154,9 @@ def _should_speak_reply(channel_value: Any, user_id: str) -> bool:
     speaks every response aloud, not just responses to voice commands"
     (``docs/user/SETTINGS.md``).
 
-    Every default below is passed from ``config.defaults`` rather than written
-    as a literal, and that is load-bearing rather than tidiness. All three keys
-    are user-scoped (``ui/settings_schema.py``), and for a user-scoped read with
-    a real signed-in principal ``SettingsManager.get`` resolves through
-    ``get_user_setting`` -> ``_read_setting_from_blob``, which returns THE
-    CALLER'S default when the user's blob has no row for the key -- it never
-    consults ``DEFAULT_SETTINGS``. So a literal here silently outranks the
-    shipped default for exactly the users whose blob is real: a hard-coded
-    ``False`` left every signed-in install mute while a signed-out one spoke,
-    and only the signed-out case (a device pseudo-identity, which does fall back
-    to the global blob) would show up in a cold-install test.
+    The three settings are read by ``core.reply_speech_settings`` (shared with
+    the line that says a background task has finished); its docstring explains
+    why every default there comes from ``config.defaults`` and never a literal.
 
     ``voice_muted`` is checked here because this is the first code that decides
     whether to speak from user settings, and a path that speaks straight
@@ -174,19 +166,9 @@ def _should_speak_reply(channel_value: Any, user_id: str) -> bool:
         return False
     if not is_desktop_surface():
         return False
-    from config.defaults import (
-        SPEAK_ALL_REPLIES_DEFAULT,
-        TTS_ENABLED_DEFAULT,
-        VOICE_MUTED_DEFAULT,
-    )
-    from ui.settings_manager import get_settings_manager
+    from core.reply_speech_settings import read_reply_speech_settings
 
-    settings_mgr = get_settings_manager()
-    if not bool(settings_mgr.get("speak_all_replies", SPEAK_ALL_REPLIES_DEFAULT, user_id=user_id)):
-        return False
-    if bool(settings_mgr.get("voice_muted", VOICE_MUTED_DEFAULT, user_id=user_id)):
-        return False
-    return bool(settings_mgr.get("tts_enabled", TTS_ENABLED_DEFAULT, user_id=user_id))
+    return read_reply_speech_settings(user_id).typed_allowed
 
 
 def _new_streamed_reply(

@@ -59,6 +59,13 @@ def call_is_live(call_id: str) -> bool:
     return until is not None and time.monotonic() < until
 
 
+def any_call_live() -> bool:
+    """A call this device placed is on the line right now."""
+    now = time.monotonic()
+    with _lock:
+        return any(now < until for until in _live_until.values())
+
+
 def note_turn_placed_call(turn_id: str | None, call_id: str) -> None:
     """Everything this turn says from here is about its call."""
     if turn_id and call_id:

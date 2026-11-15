@@ -209,6 +209,11 @@ class EngineBackedBackend:
             self._engine.set_volume(self._handle, level)
         return level
 
+    @property
+    def volume_change_is_slow(self) -> bool:
+        """What the provider engine declares (see ``ProviderPlaybackEngine``)."""
+        return bool(getattr(self._engine, "volume_change_is_slow", False))
+
     def is_playing(self) -> bool:
         return bool(self._handle and self._handle.is_active())
 
@@ -655,6 +660,12 @@ class PlaybackEngineManager:
             if backend:
                 return backend.set_volume(level)
         return level
+
+    def active_backend(self, user_id: str | None = None) -> EngineBackedBackend | None:
+        """The backend ``set_volume`` would act on for this user, or None."""
+        uid = self._resolve_user_id(user_id)
+        with self._lock:
+            return self._get_session(uid).active_backend
 
     def active_provider(self, user_id: str | None = None) -> str | None:
         uid = self._resolve_user_id(user_id)

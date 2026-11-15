@@ -1182,6 +1182,16 @@ class BootstrapFactory:
 
             tts = LazyTTSEngine(lambda: cls.create_tts(config=settings))
             _boot_checkpoint("bootstrap-C-lazy-tts-wrapped")
+            # The desktop says when a background task the user stopped waiting
+            # on ends (1.0.5 build-11 laptop item 14). Not under pytest: the
+            # registry is process-wide, and a test's agents must not speak.
+            if not (getattr(settings, "pytest_in_progress", False) or getattr(settings, "test_mode", False)):
+                try:
+                    from voice.agent_finish_speech import install_agent_finish_speech
+
+                    install_agent_finish_speech(tts)
+                except Exception as exc:  # noqa: BLE001, RUF100 - a missing line must never stop startup
+                    logger.warning("Background task line not installed: %s", exc)
             from bootstrap.lazy_music import LazyMusicControllerAdapter
 
             def _create_music_after_bind() -> MusicControllerAdapterType | None:
