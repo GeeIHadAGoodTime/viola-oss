@@ -48,6 +48,9 @@ class _ActiveChatTask:
     stop_watch: asyncio.Task[None] | None = None
     # When Stop last cancelled the task (monotonic seconds).
     last_cancel_at: float = 0.0
+    # The turn's speech (ui.api.routes.command.TypedTurn) once it exists, so a
+    # Stop press silences it at the press, not when the cancellation lands.
+    turn: Any = None
 
 
 # A Stop that has not ended the turn by then is applied again (the first
@@ -547,6 +550,9 @@ async def _run_chat_command(
             stream_id=stream_id,
             show_on_stage=False,
         )
+        active_turn = _ACTIVE_CHAT_TASKS.get(stream_id)
+        if active_turn is not None:
+            active_turn.turn = turn
         # A yes/no asked in this chat is answered in this chat only: a new chat
         # must not consume a confirmation still pending in another one.
         with (
@@ -638,7 +644,12 @@ async def _run_chat_command(
         if active is not None:
             active.finalizing = True
         if turn is not None:
-            turn.cancel()
+            if _stop_was_pressed(stream_id):
+                # Usually already done at the press; this covers a press that
+                # landed before the turn's speech existed.
+                turn.stop_speaking()
+            else:
+                turn.cancel()
         with contextlib.suppress(Exception):
             if target_assistant_message_id:
                 await store.update_message(
@@ -724,6 +735,18 @@ def _cancel_turn_executors(stream_id: str, user_id: str) -> int:
         return 0
 
 
+def _silence_turn_speech(active: _ActiveChatTask) -> str:
+    """Stop pressed: this turn's speech ends now (its queue and the sentence playing)."""
+    turn = active.turn
+    if turn is None:
+        return "no speech yet"
+    try:
+        return str(turn.stop_speaking())
+    except Exception:  # noqa: BLE001, RUF100 - task.cancel() below still ends the turn
+        logger.debug("Chat stop: speech could not be silenced", exc_info=True)
+        return "silence failed"
+
+
 def _release_desktop_control(user_id: str) -> str:
     """Let go of the desktop: the control-session lock and any key or mouse button held down."""
     released: list[str] = []
@@ -767,6 +790,7 @@ def _stop_chat_turn(stream_id: str, active: _ActiveChatTask, *, reason: str) -> 
     """Stop one Chat tab turn: agent stop, desktop release, then task cancel. One log line."""
     if reason == "press":
         active.stop_presses += 1
+    speech = _silence_turn_speech(active)
     executors = _cancel_turn_executors(stream_id, active.user_id)
     desktop = _release_desktop_control(active.user_id)
     cancelling = getattr(active.task, "cancelling", None)
@@ -791,10 +815,11 @@ def _stop_chat_turn(stream_id: str, active: _ActiveChatTask, *, reason: str) -> 
         active.last_cancel_at = time.monotonic()
         task_action = "cancel sent (cancelling=%s)" % (cancelling() if callable(cancelling) else "?")
     logger.info(
-        "Chat Stop %s %d for stream %s: executor.cancel on %d run(s); desktop released: %s; task %s",
+        "Chat Stop %s %d for stream %s: speech: %s; executor.cancel on %d run(s); desktop released: %s; task %s",
         reason,
         active.stop_presses,
         stream_id,
+        speech,
         executors,
         desktop,
         task_action,

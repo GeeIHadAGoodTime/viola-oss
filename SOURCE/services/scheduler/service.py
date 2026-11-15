@@ -1260,13 +1260,16 @@ class SchedulerService:
         if tool == "notify":
             from intent.tools.notification_tools import deliver_notification_handler
 
+            from services.scheduler.actions import reminder_wording
+
             message = str(args.get("message") or schedule.label)
             spoken = False
             tts = getattr(self._intent_pipeline, "tts", None)
             speak = getattr(tts, "speak", None)
             if callable(speak):
                 try:
-                    await speak(message)
+                    # Said with the card's wording ("Reminder: Stretch"), not the bare word.
+                    await speak(reminder_wording(message))
                     spoken = True
                 except (RuntimeError, OSError, TypeError, ValueError) as exc:
                     logger.warning("Scheduled reminder TTS failed for schedule=%s: %s", schedule.id, exc)

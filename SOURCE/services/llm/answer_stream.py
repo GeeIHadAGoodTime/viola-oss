@@ -79,6 +79,24 @@ READ_ALOUD_TOOL = "read_aloud"
 # Quick music actions answered with the soft done tone instead of words when they
 # are everything the turn did and all of them succeeded (Jay's suggestion, build 11).
 QUICK_MUSIC_TOOLS = frozenset({"playback"})
+# The same actions when they come from an existing instant command (bare "pause",
+# "next", ...): those never reach the model, so no tool event ever reaches the
+# gate. The instant path marks a result that worked with QUICK_MUSIC_ACTION_FLAG
+# (intent/pipeline_processors.py try_instant) and every speak site plays the tone
+# for it. Only commands of intent/instant_commands_patterns.py whose action the
+# playback tool also performs (intent/tools/music_tools.py playback_control_handler):
+# pause, resume, skip (next), previous, volume up/down, mute, unmute. Not
+# smart_stop ("stop" ends whatever is running, not only music), not the
+# full-screen commands (not a playback action).
+QUICK_MUSIC_INSTANT_COMMANDS = frozenset(
+    {"pause", "resume", "skip", "previous", "volume_up", "volume_down", "mute", "unmute"}
+)
+QUICK_MUSIC_ACTION_FLAG = "quick_music_action"
+
+
+def is_quick_music_action(data: Any) -> bool:
+    """A command result marked as a quick music action that worked (done tone, no words)."""
+    return isinstance(data, dict) and data.get(QUICK_MUSIC_ACTION_FLAG) is True
 _FINISHED_TOOL_STATUSES = frozenset({"ok", "error", "unknown"})
 
 
@@ -686,6 +704,8 @@ __all__ = [
     "FinalAnswerText",
     "LONG_ANSWER_CHARS",
     "LONG_ANSWER_LINES",
+    "QUICK_MUSIC_ACTION_FLAG",
+    "QUICK_MUSIC_INSTANT_COMMANDS",
     "QUICK_MUSIC_TOOLS",
     "READ_ALOUD_TOOL",
     "all_sentences",
@@ -693,6 +713,7 @@ __all__ = [
     "answer_events_muted",
     "hold_reason",
     "is_long_answer",
+    "is_quick_music_action",
     "long_answer_lead",
     "observe_anthropic_stream_event",
     "observe_openai_responses_event",

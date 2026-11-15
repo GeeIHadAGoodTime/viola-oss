@@ -443,16 +443,31 @@ class AudioDucker:
         except Exception as e:
             logger.warning("Failed to set final volume: %s", e)
 
-    def _start_timeout_timer(self) -> None:
+    def keep_alive(self) -> bool:
+        """Speech is still going on: re-arm the safety timer of an active duck.
+
+        The safety net is meant for a duck nobody ends (a stuck voice turn),
+        not for a long reading: it counts MAX_DUCK_DURATION with no speech
+        activity, not since the duck began. A reading of more than 60 s used to
+        bring the music back to full volume while she was still reading, and
+        the reading's own un-duck then logged "Un-duck called without matching
+        duck". Does nothing when no duck is active. Returns True when re-armed.
+        """
+        with self._lock:
+            if self._duck_count <= 0:
+                return False
+            self._start_timeout_timer(quiet=True)
+            return True
+
+    def _start_timeout_timer(self, *, quiet: bool = False) -> None:
         """Start a safety timeout that auto-unducks if ducking persists too long."""
         self._cancel_timeout_timer()
-        self._timeout_timer = threading.Timer(
-            self.MAX_DUCK_DURATION,
-            self._on_timeout,
-        )
-        self._timeout_timer.daemon = True
-        self._timeout_timer.start()
-        logger.debug("Duck timeout safety net started (%ss)", self.MAX_DUCK_DURATION)
+        timer = threading.Timer(self.MAX_DUCK_DURATION, lambda: self._on_timeout(timer))
+        timer.daemon = True
+        self._timeout_timer = timer
+        timer.start()
+        if not quiet:
+            logger.debug("Duck timeout safety net started (%ss)", self.MAX_DUCK_DURATION)
 
     def _cancel_timeout_timer(self) -> None:
         """Cancel the safety timeout timer."""
@@ -460,15 +475,19 @@ class AudioDucker:
             self._timeout_timer.cancel()
             self._timeout_timer = None
 
-    def _on_timeout(self) -> None:
+    def _on_timeout(self, timer: threading.Timer | None = None) -> None:
         """Handle ducking timeout - force restore audio."""
-        logger.warning(
-            "⚠️ Audio ducking timeout (%ss) - forcing audio restore. "
-            "This may indicate a bug in voice command processing.",
-            self.MAX_DUCK_DURATION,
-        )
-        # Force reset duck count and restore volume
         with self._lock:
+            if timer is not None and timer is not self._timeout_timer:
+                # Re-armed (keep_alive) or cancelled while this one was firing.
+                return
+            self._timeout_timer = None
+            logger.warning(
+                "⚠️ Audio ducking timeout (%ss) - forcing audio restore. "
+                "This may indicate a bug in voice command processing.",
+                self.MAX_DUCK_DURATION,
+            )
+            # Force reset duck count and restore volume
             if self._duck_count > 0:
                 self._duck_count = 0
                 self._duck_applied = False
@@ -542,6 +561,17 @@ def player_level_for_user_volume(level: int) -> int:
 def get_global_ducker() -> AudioDucker | None:
     """Get the global audio ducker instance."""
     return _global_ducker
+
+
+def keep_duck_alive() -> None:
+    """Speech is still going on: re-arm the global ducker's safety timer. Never raises."""
+    try:
+        ducker = get_global_ducker()
+        keep_alive = getattr(ducker, "keep_alive", None)
+        if callable(keep_alive):
+            keep_alive()
+    except Exception as exc:  # noqa: BLE001, RUF100 - the safety timer must never break speech
+        logger.debug("Duck keep-alive failed: %s", exc)
 
 
 def duck_context() -> DuckingContext:

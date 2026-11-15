@@ -2130,12 +2130,17 @@ class VoiceCommandHandler:
             )
             return
 
-        if self.tts and message and not already_spoken and tts_enabled:
+        # A quick music action from an instant command ("next" is marked spoken
+        # so no words follow the track change) still gets the done tone.
+        from services.llm.answer_stream import is_quick_music_action
+
+        quick_music_action = is_quick_music_action(result)
+        if self.tts and message and (not already_spoken or quick_music_action) and tts_enabled:
             # Long answers say their lead and point at the card; a turn of quick
             # music actions that all worked gets the done tone, not words.
             from voice.streamed_reply import full_reading, play_done_tone, whole_reply_speech
 
-            spoken = whole_reply_speech(message, self.tts, streamed_reply)
+            spoken = whole_reply_speech(message, self.tts, streamed_reply, result=result)
             if spoken is None:
                 play_done_tone()
                 return

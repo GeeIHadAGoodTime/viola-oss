@@ -30,6 +30,7 @@ from services.llm.answer_stream import (
     SUMMARY_SUFFIX,
     FinalAnswerSpeechGate,
     all_sentences,
+    is_quick_music_action,
     spoken_reply,
 )
 from services.llm.stream_bus import (
@@ -69,14 +70,24 @@ def speaks_english(tts: Any) -> bool:
     return str(getattr(tts, "_speech_language", "en-us") or "en-us").lower().startswith("en")
 
 
-def whole_reply_speech(message: str | None, tts: Any, streamed_reply: StreamedReply | None = None) -> str | None:
+def whole_reply_speech(
+    message: str | None,
+    tts: Any,
+    streamed_reply: StreamedReply | None = None,
+    *,
+    result: Any = None,
+) -> str | None:
     """What to say for a reply spoken whole, after its turn ended.
 
     None: say nothing and play the soft done tone, because the turn only ran
-    quick music actions and all of them worked (voice.wake_chime.play_done_tone).
-    Otherwise the reply under the long-answer rule (services/llm/answer_stream),
-    whole when the turn called read_aloud.
+    quick music actions and all of them worked (voice.wake_chime.play_done_tone):
+    tools the speech gate saw, or an instant command whose ``result`` (the
+    command's data) is marked as one. Otherwise the reply under the
+    long-answer rule (services/llm/answer_stream), whole when the turn called
+    read_aloud.
     """
+    if is_quick_music_action(result):
+        return None
     gate = streamed_reply.gate if streamed_reply is not None else None
     if gate is not None and gate.done_tone:
         return None
@@ -169,6 +180,9 @@ class StreamedReply:
         self._closed = False
         self._attached = False
         self.speaking_task: asyncio.Future[Any] | None = None
+        # The engine has taken a sentence of this reply: its speech is the one
+        # running (an engine speaks one reply at a time), not one still waiting.
+        self._engine_took_text = False
         self.created_at = time.monotonic()
         self.first_sentence_at: float | None = None
         # The stage shows this reply as it is written, paced with the voice.
@@ -259,6 +273,7 @@ class StreamedReply:
             item = await self._queue.get()
             if item is None:
                 return
+            self._engine_took_text = True
             yield item
 
     async def speak(self) -> None:
@@ -290,6 +305,42 @@ class StreamedReply:
         self.gate.finish(None, already_spoken=True)
         self._end_queue()
         self._close_stream(None)
+
+    def silence(self) -> bool:
+        """The user pressed Stop: nothing more of this reply, and what is playing is cut.
+
+        Sentences already queued are dropped. When this reply is the speech the
+        engine is running now (it has taken this reply's text and the speaking
+        task is not finished), the engine's ``stop()`` cuts the audio at once.
+        A reply that has not started speaking calls nothing on the engine, so
+        another reply or a reminder that is playing is left alone.
+
+        Returns True when speech was cut.
+        """
+        task = self.speaking_task
+        speaking = bool(task is not None and not task.done() and self._engine_took_text)
+        while True:
+            try:
+                self._queue.get_nowait()
+            except asyncio.QueueEmpty:
+                break
+        self.gate.finish(None, already_spoken=True)
+        self._closed = True
+        # The end marker may have been among the dropped items; a waiting
+        # speak_streaming must still see the end of this reply.
+        self._queue.put_nowait(None)
+        self._close_stream(None)
+        if not speaking:
+            return False
+        stop = getattr(self._tts, "stop", None)
+        if not callable(stop):
+            return False
+        try:
+            stop()
+        except Exception:  # noqa: BLE001, RUF100 - a failed stop must never break the Stop press
+            logger.warning("Stop could not silence the reply being spoken", exc_info=True)
+            return False
+        return True
 
     def _end_queue(self) -> None:
         if not self._closed:

@@ -237,6 +237,14 @@ def _silent_stage_reply(channel_value: Any, stream_id: str | None, user_id: str)
     return stage_reply(stream_id, user_id=user_id)
 
 
+def _is_quick_music_action(data: Any) -> bool:
+    try:
+        from services.llm.answer_stream import is_quick_music_action
+    except Exception:  # noqa: BLE001, RUF100 - without the rule the reply is spoken as before
+        return False
+    return is_quick_music_action(data)
+
+
 def _speak_reply_now(
     context: ApiContext,
     envelope: Any,
@@ -268,9 +276,12 @@ def _speak_reply_now(
         return
     if not message:
         return
-    if already_spoken:
+    quick_music_action = _is_quick_music_action(data)
+    if already_spoken and not quick_music_action:
         # Something upstream already voiced this turn; speaking it again would
-        # double it. Same contract the voice handler reads.
+        # double it. Same contract the voice handler reads. (A quick music
+        # action such as "next" is marked spoken so no words follow the track
+        # change; it still gets the done tone below.)
         return
     engine = _reply_tts_engine(context)
     speak = getattr(engine, "speak", None) if engine is not None else None
@@ -284,7 +295,7 @@ def _speak_reply_now(
     else:
         # Long answers say their lead and point at the card; a turn of quick
         # music actions that all worked gets the done tone, not words.
-        spoken_text = whole_reply_speech(message, engine, streamed_reply)
+        spoken_text = whole_reply_speech(message, engine, streamed_reply, result=data)
         if spoken_text is None:
             play_done_tone()
             return
@@ -531,6 +542,22 @@ class TypedTurn:
         reply, self.streamed_reply = self.streamed_reply, None
         if reply is not None:
             reply.cancel()
+
+    def stop_speaking(self) -> str:
+        """The user pressed Stop: this turn says nothing more and its speech is cut now.
+
+        Only this turn's own speech: when its reply has not started speaking,
+        nothing is called on the engine (another reply or a reminder playing
+        goes on). Safe to call twice. Returns what was done, for the Stop log line.
+        """
+        reply, self.streamed_reply = self.streamed_reply, None
+        if reply is None:
+            return "no speech"
+        silence = getattr(reply, "silence", None)
+        if not callable(silence):
+            reply.cancel()
+            return "queue closed"
+        return "cut" if silence() else "not speaking yet; queue dropped"
 
     def finish_envelope(self, envelope: Any) -> dict[str, Any]:
         """Complete the reply text in place; return the on-screen actions it asked for."""
