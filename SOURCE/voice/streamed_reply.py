@@ -149,6 +149,7 @@ class StreamedReply:
         start_speaking: Callable[[StreamedReply], asyncio.Future[Any]] | None = None,
         live: bool = True,
         reason: str | None = None,
+        show_on_stage: bool = True,
     ) -> None:
         self._tts = tts
         self.user_id = user_id
@@ -171,7 +172,12 @@ class StreamedReply:
         self.created_at = time.monotonic()
         self.first_sentence_at: float | None = None
         # The stage shows this reply as it is written, paced with the voice.
-        self._stage = StageReplyRelay(user_id=user_id, spoken=True)
+        # The Chat tab shows its own thread, so its turns leave the stage alone.
+        self._stage = (
+            StageReplyRelay(user_id=user_id, spoken=True)
+            if show_on_stage
+            else StageReplyRelay(user_id=user_id, spoken=True, broadcast=_no_stage_broadcast)
+        )
 
     # -- wiring -----------------------------------------------------------
     @property
@@ -300,6 +306,10 @@ class StreamedReply:
             logger.debug("Streamed speech stream cleanup failed", exc_info=True)
 
 
+def _no_stage_broadcast(_user_id: str, _payload: dict[str, Any]) -> None:
+    return None
+
+
 def _default_start(reply: StreamedReply) -> asyncio.Future[Any]:
     return asyncio.ensure_future(reply.speak())
 
@@ -310,6 +320,7 @@ def new_streamed_reply(
     user_id: str,
     stream_id: str | None = None,
     start_speaking: Callable[[StreamedReply], asyncio.Future[Any]] | None = None,
+    show_on_stage: bool = True,
 ) -> StreamedReply | None:
     """A StreamedReply when this reply may be spoken live, else None (speak when complete)."""
     if not streamed_speech_enabled() or not can_stream_speech(tts):
@@ -317,7 +328,13 @@ def new_streamed_reply(
     if answer_replacing_hooks_registered(user_id):
         logger.info("Streamed speech off for this turn: a hook can replace the finished answer")
         return None
-    return StreamedReply(tts, user_id=user_id, stream_id=stream_id, start_speaking=start_speaking)
+    return StreamedReply(
+        tts,
+        user_id=user_id,
+        stream_id=stream_id,
+        start_speaking=start_speaking,
+        show_on_stage=show_on_stage,
+    )
 
 
 __all__ = [

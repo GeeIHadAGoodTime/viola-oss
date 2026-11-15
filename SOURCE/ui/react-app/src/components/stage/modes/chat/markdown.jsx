@@ -116,11 +116,21 @@ function renderTable(lines, key) {
   );
 }
 
+// Each line of a paragraph keeps its own line. The reply text arrives with
+// list markers already removed (services/command/command_service_core.py
+// renders markdown to plain text for this channel, one item per line), so
+// joining lines with spaces ran a bulleted answer together into one block
+// (1.0.5 build 11, bug 16).
 function flushParagraph(paragraph, output, keySeed) {
   if (!paragraph.length) return;
   output.push(
     <p key={`p-${keySeed}-${output.length}`}>
-      <InlineText text={paragraph.join(' ')} />
+      {paragraph.map((line, lineIndex) => (
+        <span key={lineIndex}>
+          {lineIndex > 0 && <br />}
+          <InlineText text={line} />
+        </span>
+      ))}
     </p>
   );
   paragraph.length = 0;

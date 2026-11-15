@@ -40,6 +40,18 @@ class _ActiveChatTask:
     user_id: str
     thread_id: str
     task: asyncio.Task[None]
+    # Stop presses so far; the turn is ending on the user's word.
+    stop_presses: int = 0
+    # The task is persisting its "Stopped." outcome: another cancel now would
+    # interrupt that write, so Stop leaves it alone.
+    finalizing: bool = False
+    stop_watch: asyncio.Task[None] | None = None
+
+
+# A Stop that has not ended the turn by then is applied again (the first
+# cancellation may have been swallowed by a layer that turned it into a result).
+_STOP_RETRY_SECONDS = 3.0
+_STOP_RETRY_LIMIT = 5
 
 
 class CreateThreadRequest(BaseModel):
@@ -499,9 +511,10 @@ async def _run_chat_command(
         get_stream_token_count,
         get_stream_tool_events,
     )
-    from ui.api.routes.command import _speak_reply
+    from ui.api.routes.command import TypedTurn
 
     model_token = None
+    turn: TypedTurn | None = None
     try:
         if model:
             from intent.ai_controller import _ctx_agent_model_override
@@ -522,14 +535,31 @@ async def _run_chat_command(
             origin="typed",
         )
         started = time.time()
+        # The same finish as POST /v1/command: speech gate around execute (done
+        # tone, read_aloud, long answers) and the on-screen actions a tool asked
+        # for. The Chat tab shows its own thread, so the stage is left alone.
+        turn = TypedTurn(
+            context,
+            channel_value=request.channel,
+            user_id=user_id,
+            stream_id=stream_id,
+            show_on_stage=False,
+        )
         # A yes/no asked in this chat is answered in this chat only: a new chat
         # must not consume a confirmation still pending in another one.
         with (
             command_stream_context(stream_id, metadata={"thread_id": thread_id}),
             confirmation_conversation_scope("chat:%s" % thread_id),
+            turn.running(),
         ):
             result = await command_service.execute(request)
+        if _stop_was_pressed(stream_id):
+            # The user pressed Stop and the turn came back anyway (a layer
+            # below turned the cancellation into a result): it still ends as
+            # stopped, not as an answer.
+            raise asyncio.CancelledError
         envelope = result.to_envelope()
+        ui_actions = turn.finish_envelope(envelope)
         assistant_text = _command_stream_message(envelope)
         if not assistant_text:
             assistant_text = str(result.error or "I could not produce a response.")
@@ -593,13 +623,20 @@ async def _run_chat_command(
             streaming_mode=streaming_mode,
             token_count=token_count,
             fallback=token_count == 0,
+            # ChatMode.jsx dispatches these (open the memory panel, a settings
+            # tab) when the reply ends; the reply itself is the only bubble.
+            ui_actions=to_json_value(ui_actions) if ui_actions else None,
         )
-        # Saved chats bypass POST /v1/command. Reuse its local typed-reply
-        # policy only after the answer is persisted and delivered; cancellation
+        # Speak only after the answer is persisted and delivered; cancellation
         # and failed generation must not start speech. The helper owns its task
         # and preserves mute, cloud-surface and already-spoken safeguards.
-        _speak_reply(context, envelope, channel_value=request.channel, user_id=user_id)
+        turn.speak(envelope)
     except asyncio.CancelledError:
+        active = _ACTIVE_CHAT_TASKS.get(stream_id)
+        if active is not None:
+            active.finalizing = True
+        if turn is not None:
+            turn.cancel()
         with contextlib.suppress(Exception):
             if target_assistant_message_id:
                 await store.update_message(
@@ -664,7 +701,101 @@ async def _run_chat_command(
             from intent.ai_controller import _ctx_agent_model_override
 
             _ctx_agent_model_override.reset(model_token)
-        _ACTIVE_CHAT_TASKS.pop(stream_id, None)
+        finished = _ACTIVE_CHAT_TASKS.pop(stream_id, None)
+        if finished is not None and finished.stop_watch is not None and finished.stop_watch is not asyncio.current_task():
+            finished.stop_watch.cancel()
+
+
+def _stop_was_pressed(stream_id: str) -> bool:
+    active = _ACTIVE_CHAT_TASKS.get(stream_id)
+    return bool(active is not None and active.stop_presses > 0)
+
+
+def _cancel_turn_executors(stream_id: str, user_id: str) -> int:
+    """The designed user stop (``AgentExecutor.cancel``) for this turn's agent run."""
+    try:
+        from intent.agent_executor import cancel_stream_executors
+
+        return cancel_stream_executors(stream_id, user_id=user_id)
+    except Exception:  # noqa: BLE001, RUF100 - task.cancel() below still ends the turn
+        logger.debug("Chat stop: executor lookup failed", exc_info=True)
+        return 0
+
+
+def _release_desktop_control(user_id: str) -> str:
+    """Let go of the desktop: the control-session lock and any key or mouse button held down."""
+    released: list[str] = []
+    try:
+        from services.computer_use import safety
+
+        if safety.abort_control_session(user_id=user_id):
+            released.append("control session")
+        safety.clear_low_level_held_keys(user_id=user_id)
+    except Exception:  # noqa: BLE001, RUF100 - a desktop that cannot be reached holds nothing
+        logger.debug("Chat stop: desktop control session release failed", exc_info=True)
+    import sys
+
+    # Only when desktop control ran in this process (its MCP server is in-process).
+    server = sys.modules.get("mcp_servers.computer_use.server")
+    if server is not None:
+        try:
+            prefix = "%s:" % user_id
+            held_keys: dict[str, list[str]] = getattr(server, "_HELD_LOW_LEVEL_KEYS", {})
+            held_buttons: dict[str, list[str]] = getattr(server, "_HELD_LOW_LEVEL_MOUSE_BUTTONS", {})
+            keys = [k for chain in list(held_keys) if chain.startswith(prefix) for k in held_keys.pop(chain, [])]
+            buttons = [
+                b for chain in list(held_buttons) if chain.startswith(prefix) for b in held_buttons.pop(chain, [])
+            ]
+            if keys or buttons:
+                from intent.tools import desktop_input_low
+
+                for key in reversed(keys):
+                    with contextlib.suppress(OSError, RuntimeError, ValueError):
+                        desktop_input_low.key_up(key)
+                for button in reversed(buttons):
+                    with contextlib.suppress(OSError, RuntimeError, ValueError):
+                        desktop_input_low.mouse_button_up(button)
+                released.append("%d held keys/buttons" % (len(keys) + len(buttons)))
+        except Exception:  # noqa: BLE001, RUF100 - releasing what is held is best effort
+            logger.debug("Chat stop: held input release failed", exc_info=True)
+    return ", ".join(released) or "nothing held"
+
+
+def _stop_chat_turn(stream_id: str, active: _ActiveChatTask, *, reason: str) -> None:
+    """Stop one Chat tab turn: agent stop, desktop release, then task cancel. One log line."""
+    if reason == "press":
+        active.stop_presses += 1
+    executors = _cancel_turn_executors(stream_id, active.user_id)
+    desktop = _release_desktop_control(active.user_id)
+    if active.task.done():
+        task_action = "already finished"
+    elif active.finalizing:
+        # Another CancelledError now would interrupt the write of "Stopped.".
+        task_action = "left alone (saving the stopped reply)"
+    else:
+        active.task.cancel()
+        cancelling = getattr(active.task, "cancelling", None)
+        task_action = "cancel sent (cancelling=%s)" % (cancelling() if callable(cancelling) else "?")
+    logger.info(
+        "Chat Stop %s %d for stream %s: executor.cancel on %d run(s); desktop released: %s; task %s",
+        reason,
+        active.stop_presses,
+        stream_id,
+        executors,
+        desktop,
+        task_action,
+    )
+    if active.stop_watch is None and not active.task.done():
+        active.stop_watch = asyncio.create_task(_stop_watch(stream_id, active))
+
+
+async def _stop_watch(stream_id: str, active: _ActiveChatTask) -> None:
+    """Apply Stop again while the turn is still running, every few seconds (a few times)."""
+    for _attempt in range(_STOP_RETRY_LIMIT):
+        await asyncio.sleep(_STOP_RETRY_SECONDS)
+        if active.task.done() or _ACTIVE_CHAT_TASKS.get(stream_id) is not active:
+            return
+        _stop_chat_turn(stream_id, active, reason="retry")
 
 
 def _not_found(name: str) -> HTTPException:
@@ -889,16 +1020,9 @@ def register_chat_mode_routes(context: ApiContext, toolbox: RouteToolbox) -> Non
             if active.task.done():
                 _ACTIVE_CHAT_TASKS.pop(stream_id, None)
                 return success_response({"cancelled": False})
-            if active.task.cancelling():
-                # Repeated Stop must not interrupt the first cancellation's
-                # awaited persistence/cleanup with another CancelledError.
-                return success_response({"cancelled": True})
-            cancel_requested = active.task.cancel()
-            if cancel_requested is False:
-                _ACTIVE_CHAT_TASKS.pop(stream_id, None)
-                return success_response({"cancelled": False})
             # Cancellation is requested, not yet completed. The task's
             # CancelledError handler persists the outcome and finalizes SSE.
+            _stop_chat_turn(stream_id, active, reason="press")
             return success_response({"cancelled": True})
 
         return await toolbox.record_and_call(_inner, route="/v1/chat/streams/{stream_id}/cancel", method="POST")
