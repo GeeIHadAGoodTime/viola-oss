@@ -108,7 +108,9 @@ _LOCAL_PLAYBACK_SINKS: weakref.WeakSet[RingBufferAECReferenceAdapter] = weakref.
 _LOCAL_PLAYBACK_SINKS_LOCK = threading.Lock()
 
 
-def push_local_playback_reference(samples: np.ndarray, sample_rate: int, *, voice: bool = True) -> int:
+def push_local_playback_reference(
+    samples: np.ndarray, sample_rate: int, *, voice: bool = True, speech: bool = True
+) -> int:
     """Hand PCM that Viola itself is playing to every live AEC reference adapter.
 
     The device loopback is the general reference: it hears whatever any process
@@ -124,6 +126,8 @@ def push_local_playback_reference(samples: np.ndarray, sample_rate: int, *, voic
         sample_rate: Sample rate of ``samples`` in Hz.
         voice: False for a sound that is not her speaking (the wake chime): the
             user talks straight after it, and that is not her voice coming back.
+        speech: False for a sound that is hers but not her talking (the alarm):
+            the wake check still scores it, but it holds no words of hers.
 
     Returns:
         Number of adapters that received the samples.
@@ -133,7 +137,7 @@ def push_local_playback_reference(samples: np.ndarray, sample_rate: int, *, voic
     try:
         # Kept apart from the canceller's queue: the wake path looks back at it.
         if voice:
-            get_own_playback().note_audio(samples, sample_rate)
+            get_own_playback().note_audio(samples, sample_rate, speech=speech)
     except Exception as exc:  # noqa: BLE001, RUF100 - playback must never fail because of this record
         logger.debug("Own playback record failed: %s", exc)
     with _LOCAL_PLAYBACK_SINKS_LOCK:

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "0741068789cb48ab938dc6c232fe2cebd2f0a2a7",
-  "sha256": "d198244eb6bc798696f3cb41132debbc45454930ddbda7fc0862a01c63027644",
+  "revision": "6d843575a19fd18a39ae3d82c51e6be5ebeb2bc2",
+  "sha256": "538af1fe6108c437fe4382005b53682d93ea53ca97090178b3bf9145eb75139c",
   "files": [
     {
       "path": ".env.example",
@@ -150,8 +150,8 @@
     },
     {
       "path": "audio_core/aec_reference_base.py",
-      "sha256": "7bdb632a6e5b9163cbd67b292ff4b1efcc37be0b6cfaaad3a4b52035c0496ec6",
-      "bytes": 28050
+      "sha256": "43c61fff0f89b30290666f33c0c8b725021c2543ef503424e7fdd721802afec2",
+      "bytes": 28247
     },
     {
       "path": "audio_core/calibration/__init__.py",
@@ -340,8 +340,8 @@
     },
     {
       "path": "audio_core/own_playback.py",
-      "sha256": "5114de409fbe9de90938728ada24f3dd0ec39c64e77dc30abe33370ba8787441",
-      "bytes": 8008
+      "sha256": "17ddf32c70e22117aa0290c4d2667ddadf23796800cc74a2087b597e3598aaf2",
+      "bytes": 8704
     },
     {
       "path": "audio_core/portaudio_guard.py",
@@ -1255,8 +1255,8 @@
     },
     {
       "path": "core/voice_command_handler.py",
-      "sha256": "97a6572efdf07e4520ae21d25f7081ca56d32d6ddcc240b3e91af73cb297d2e3",
-      "bytes": 122614
+      "sha256": "d25e5022a46cdca06d646220894172d7e8b5eb8ab8074435d863c7343ac199fd",
+      "bytes": 130077
     },
     {
       "path": "core/voice_orchestrator.py",
@@ -3990,8 +3990,8 @@
     },
     {
       "path": "services/alarm_ringer.py",
-      "sha256": "0c8e6226368669db7731e3e5e220e8e22d8d05692d7dd70e50626110299342b7",
-      "bytes": 15221
+      "sha256": "280e6a8ecf62408bbdf2884003ab9737efe0b5dce82b4f8ff8289276d1e7fc1a",
+      "bytes": 15392
     },
     {
       "path": "services/api_cache.py",
@@ -9965,8 +9965,8 @@
     },
     {
       "path": "ui/qt_native/surface_watchdog.py",
-      "sha256": "2e0b64d98cd7b77daf38b8c7265b07ccdb520fa22df73eb6158f59273c3055b5",
-      "bytes": 28568
+      "sha256": "c3a61257483b265e9af0fceae163da64180a58ac99933e90f04ff2a743830ca2",
+      "bytes": 12238
     },
     {
       "path": "ui/qt_native/touch_input.py",
@@ -9990,8 +9990,8 @@
     },
     {
       "path": "ui/qt_native/webview_window.py",
-      "sha256": "2fdbb5d55731904a49ac78e95da852d6cb6c95c972f30f2cc3e27148cff5f398",
-      "bytes": 261998
+      "sha256": "37a9666b28c1be912cf3df2f35d1b58512c692bb5a3b18ebda341aa5fcb41d2c",
+      "bytes": 261807
     },
     {
       "path": "ui/qt_native/widgets/connectivity_status.py",
@@ -10150,8 +10150,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "fc43229e5bfa3022f92245a905ca21a0f416931a2a101ae83af7f509ff062d4d",
-      "bytes": 204859
+      "sha256": "5723f11aafb98c0dc8376305ae230d666cbe305bde9e59aa50edf297f1c8347d",
+      "bytes": 204445
     },
     {
       "path": "ui/react-app/src/SmartDisplay.longAnswer.test.jsx",
@@ -13560,8 +13560,8 @@
     },
     {
       "path": "voice/continuous_capture.py",
-      "sha256": "a063c28fd2de3ea5024636fa2a22b5bd6a2a780dfd6149b78b1dfb1608316885",
-      "bytes": 29496
+      "sha256": "0ff3b53e5c0d54b1da8608de5c4efd25155e1dcc0a19eeddace82d6a4944a4e8",
+      "bytes": 32285
     },
     {
       "path": "voice/customer_composition.py",
@@ -14015,8 +14015,8 @@
     },
     {
       "path": "voice/wake_detector/own_speech.py",
-      "sha256": "31ce984bd14349a37261785acd15ecd304a642c76bcbdc01cdb5a609fd3b4da8",
-      "bytes": 10509
+      "sha256": "b39c5372361547cc1ab44ab9770fc3f238e665bc9909208137b088ea87b150d2",
+      "bytes": 12167
     },
     {
       "path": "voice/wake_detector/resampler.py",
