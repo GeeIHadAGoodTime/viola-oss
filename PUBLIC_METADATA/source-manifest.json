@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "4cb8001af32c4027a732d484fb3e45360cb09fbf",
-  "sha256": "6ab498254ba6a3e926f429578afb70363c20d92ed3ce953727a4bc1b1d692a50",
+  "revision": "0741068789cb48ab938dc6c232fe2cebd2f0a2a7",
+  "sha256": "d198244eb6bc798696f3cb41132debbc45454930ddbda7fc0862a01c63027644",
   "files": [
     {
       "path": ".env.example",
@@ -1880,8 +1880,8 @@
     },
     {
       "path": "intent/irreversible_actions.py",
-      "sha256": "760a1b15371a00fe1545ae656debf2694aa545f1116b51816f4181b586c2d242",
-      "bytes": 23812
+      "sha256": "b6ce25e3e9477b853ebf040644e7dd5d7a4001dd22b9f51b2d107bf6536ef535",
+      "bytes": 24229
     },
     {
       "path": "intent/json_utils.py",
@@ -2270,13 +2270,13 @@
     },
     {
       "path": "mcp_hub/approval_bridge.py",
-      "sha256": "61aa20c93c686fa0b53f51852b7a5b69cc2e54534e603d1135191ea94b78b0b3",
-      "bytes": 72441
+      "sha256": "5c336965fe4f0848c2bebbda7e842bb95bb01846eeb0ceabd34a2e5a672c77cc",
+      "bytes": 69523
     },
     {
       "path": "mcp_hub/client_hub.py",
-      "sha256": "d5030ca49b834b0d52db7519aa2edd8564653ab7cbf6bd37b60cfe161402b0d9",
-      "bytes": 138185
+      "sha256": "f21c87a37bad3caca51efe344339b2056fd75f2e86c3ee3164f348d1719c1d1c",
+      "bytes": 133228
     },
     {
       "path": "mcp_hub/compound_tools.py",
@@ -2380,8 +2380,8 @@
     },
     {
       "path": "mcp_servers/computer_use/server.py",
-      "sha256": "361f978b12faa0a3622fd5c8ed95c3cd7c9d1a86dae3950d203cd5e6f976266c",
-      "bytes": 69787
+      "sha256": "46e43642a8e6ead10fe5f7c8cde6f7239a224d764df8f6b60d92fb885adcbb7b",
+      "bytes": 53250
     },
     {
       "path": "mcp_servers/core_tools/__init__.py",
@@ -4350,23 +4350,13 @@
     },
     {
       "path": "services/computer_use/app_launcher.py",
-      "sha256": "462eb7d45188702dd43510cceeccc0c3d02f5f14c1600eb97d7f824b457bf217",
-      "bytes": 20442
+      "sha256": "a8ae362222fd9b258c3797f92a75d45f44b36ba40fe261f2589e5dc637fddeae",
+      "bytes": 19477
     },
     {
       "path": "services/computer_use/cloud_guard.py",
       "sha256": "d3cf6278c7e57e365bf2f6f0023d5d491033969cf49f44a6489cd8504afebf7f",
       "bytes": 3342
-    },
-    {
-      "path": "services/computer_use/desktop_worker.py",
-      "sha256": "5a32a9bcb4af611c399df15cf5f0023f3c8a4871d8b29a94e88aa4fd21b2699e",
-      "bytes": 7367
-    },
-    {
-      "path": "services/computer_use/discard_guard.py",
-      "sha256": "7cbcf9d11065cf79f30d339e90ada07b0906e521f2be0cb5cf936efdc9783383",
-      "bytes": 17789
     },
     {
       "path": "services/computer_use/input.py",
@@ -4375,8 +4365,8 @@
     },
     {
       "path": "services/computer_use/safety.py",
-      "sha256": "dd357e6eb39ad4b20641dded5e61128fa4d791f6c5c9c6387c7e1a3269891b76",
-      "bytes": 32362
+      "sha256": "c3652143a9db94cfe84385b86b0ea0af6761173b7f61d59c8d01672a130f4f65",
+      "bytes": 29458
     },
     {
       "path": "services/computer_use/screen.py",
@@ -4385,8 +4375,8 @@
     },
     {
       "path": "services/computer_use/window_manager.py",
-      "sha256": "4a9199253f35cfc906e8952ee1fb549e4e037e9a4e9b5160d308f3bf7b53d7d1",
-      "bytes": 45952
+      "sha256": "ff68e1133495b1246d43b1fd0128d3507cab3883ec8204cba429ddb09198aaeb",
+      "bytes": 45578
     },
     {
       "path": "services/connectivity.py",
@@ -9975,8 +9965,8 @@
     },
     {
       "path": "ui/qt_native/surface_watchdog.py",
-      "sha256": "c3a61257483b265e9af0fceae163da64180a58ac99933e90f04ff2a743830ca2",
-      "bytes": 12238
+      "sha256": "2e0b64d98cd7b77daf38b8c7265b07ccdb520fa22df73eb6158f59273c3055b5",
+      "bytes": 28568
     },
     {
       "path": "ui/qt_native/touch_input.py",
@@ -10000,8 +9990,8 @@
     },
     {
       "path": "ui/qt_native/webview_window.py",
-      "sha256": "37a9666b28c1be912cf3df2f35d1b58512c692bb5a3b18ebda341aa5fcb41d2c",
-      "bytes": 261807
+      "sha256": "2fdbb5d55731904a49ac78e95da852d6cb6c95c972f30f2cc3e27148cff5f398",
+      "bytes": 261998
     },
     {
       "path": "ui/qt_native/widgets/connectivity_status.py",
@@ -10160,8 +10150,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "5723f11aafb98c0dc8376305ae230d666cbe305bde9e59aa50edf297f1c8347d",
-      "bytes": 204445
+      "sha256": "fc43229e5bfa3022f92245a905ca21a0f416931a2a101ae83af7f509ff062d4d",
+      "bytes": 204859
     },
     {
       "path": "ui/react-app/src/SmartDisplay.longAnswer.test.jsx",
