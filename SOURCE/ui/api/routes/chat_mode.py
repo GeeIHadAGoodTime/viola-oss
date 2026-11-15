@@ -753,6 +753,10 @@ def _release_desktop_control(user_id: str) -> str:
     try:
         from services.computer_use import safety
 
+        # Typing (or a wait or hold) already running stops after its current
+        # piece, also when no agent run was found to cancel.
+        if safety.request_desktop_stop(user_id=user_id, reason="chat stop"):
+            released.append("typing stopped")
         if safety.abort_control_session(user_id=user_id):
             released.append("control session")
         safety.clear_low_level_held_keys(user_id=user_id)

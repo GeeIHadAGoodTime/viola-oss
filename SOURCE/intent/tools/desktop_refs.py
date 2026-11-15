@@ -295,16 +295,19 @@ def _try_uia_invoke(snapshot: WindowSnapshot, ref: str) -> bool:
     return False
 
 
-def _send_chars_to_hwnd(text: str, hwnd: int) -> bool:
-    """Type text into a specific HWND without focus-stealing."""
+def _send_chars_to_hwnd(text: str, hwnd: int) -> tuple[int, bool] | bool:
+    """Type text into a specific HWND without focus-stealing.
+
+    Sent in small pieces that honour the user's Stop: returns (characters sent,
+    stopped), or False when nothing could be sent.
+    """
     if not hwnd:
         return False
     try:
-        from intent.tools.desktop import _hwnd_wrapper
+        from intent.tools.desktop import _hwnd_wrapper, send_chars_in_pieces
 
         wrapper = _hwnd_wrapper(hwnd)
-        wrapper.send_chars(text, with_spaces=True)
-        return True
+        return send_chars_in_pieces(wrapper, text, with_spaces=True)
     except Exception as exc:
         logger.debug("send_chars to hwnd %d failed: %s", hwnd, exc)
         return False
@@ -716,7 +719,21 @@ def background_type_sync(text: str, hwnd: int) -> dict[str, Any]:
     WM_CHAR without complaint. So ``typed`` here is the length of what we
     asked for, and the result says as much.
     """
-    if _send_chars_to_hwnd(text, hwnd):
+    sent = _send_chars_to_hwnd(text, hwnd)
+    if isinstance(sent, tuple) and sent[1]:
+        typed = int(sent[0])
+        logger.info("background_type stopped by the user typed=%d of %d", typed, len(text))
+        return {
+            "ok": False,
+            "error": "Stopped by the user: %d of %d characters were typed before Stop." % (typed, len(text)),
+            "typed": typed,
+            "chars_requested": len(text),
+            "stopped": True,
+            "method": "send_chars_background",
+            "hwnd": hwnd,
+            "unverified": True,
+        }
+    if sent:
         return {
             "ok": True,
             "typed": len(text),

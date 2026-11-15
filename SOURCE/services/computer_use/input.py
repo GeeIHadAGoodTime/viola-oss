@@ -30,6 +30,24 @@ _IS_WINDOWS = sys.platform == "win32"
 _IS_DARWIN = sys.platform == "darwin"
 
 
+def _stop_requested() -> bool:
+    """True once the user has stopped the desktop action running here."""
+    from services.computer_use import safety
+
+    return safety.desktop_stop_requested()
+
+
+def _sleep_unless_stopped(seconds: float) -> bool:
+    """Sleep ``seconds``; return True as soon as the user stops (a wait or drag ends early)."""
+    from services.computer_use import safety
+
+    signal = safety.current_desktop_stop()
+    if signal is None:
+        time.sleep(max(0.0, seconds))
+        return False
+    return signal.wait(seconds)
+
+
 class _POINT(ctypes.Structure):
     _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
 
@@ -309,14 +327,17 @@ def _darwin_drag(start: tuple[int, int], end: tuple[int, int], *, duration_ms: i
     bounded_ms = max(0, min(int(duration_ms), 30000))
     steps = max(2, min(60, bounded_ms // 16 or 2))
     for step in range(1, steps + 1):
+        if _stop_requested():
+            # The user stopped: jump to the release below, no further move.
+            break
         fraction = step / steps
         point = quartz.CGPointMake(
             float(start[0] + (end[0] - start[0]) * fraction),
             float(start[1] + (end[1] - start[1]) * fraction),
         )
         _darwin_post(quartz, quartz.CGEventCreateMouseEvent(None, dragged, point, cg_button))
-        if bounded_ms:
-            time.sleep(bounded_ms / steps / 1000)
+        if bounded_ms and _sleep_unless_stopped(bounded_ms / steps / 1000):
+            break
     end_point = quartz.CGPointMake(float(end[0]), float(end[1]))
     _darwin_post(quartz, quartz.CGEventCreateMouseEvent(None, up, end_point, cg_button))
 
@@ -385,7 +406,8 @@ def _darwin_press_key(key: str) -> None:
     _darwin_post(quartz, up)
 
 
-def _darwin_type_text(text: str) -> None:
+def _darwin_type_text(text: str) -> int:
+    """Post the text in chunks; returns how many characters went out (fewer after a user Stop)."""
     quartz = _quartz()
     _require_darwin_trust()
     chunk = ""
@@ -401,14 +423,19 @@ def _darwin_type_text(text: str) -> None:
         chunk_units += units
     if chunk:
         chunks.append(chunk)
+    typed = 0
     for piece in chunks:
+        if _stop_requested():
+            break
         down = quartz.CGEventCreateKeyboardEvent(None, 0, True)
         _darwin_set_unicode_string(quartz, down, piece)
         _darwin_post(quartz, down)
         up = quartz.CGEventCreateKeyboardEvent(None, 0, False)
         _darwin_set_unicode_string(quartz, up, piece)
         _darwin_post(quartz, up)
+        typed += len(piece)
         time.sleep(0.01)
+    return typed
 
 
 # ---------------------------------------------------------------------------
@@ -528,9 +555,12 @@ def drag(
         mouse = _mouse_module()
         mouse.move(coords=start)
         mouse.press(button="left", coords=start)
-        if duration_ms > 0:
-            time.sleep(min(duration_ms, 30000) / 1000)
-        mouse.release(button="left", coords=end)
+        try:
+            if duration_ms > 0:
+                # A user Stop ends the hold early; the button is released either way.
+                _sleep_unless_stopped(min(duration_ms, 30000) / 1000)
+        finally:
+            mouse.release(button="left", coords=end)
     return {
         "ok": True,
         "physical_start": list(start),
@@ -630,7 +660,9 @@ def press_key(key: str) -> dict[str, object]:
 def type_text(text: str) -> dict[str, object]:
     """Type text into the focused control."""
     if _IS_DARWIN:
-        _darwin_type_text(str(text))
+        typed = _darwin_type_text(str(text))
+        if typed < len(str(text)) and _stop_requested():
+            return {"ok": True, "chars_typed": typed, "stopped": True}
         return {"ok": True, "chars_typed": len(text)}
     _require_windows()
     _keyboard_module().send_keys(str(text), with_spaces=True, pause=0.01)
@@ -640,5 +672,8 @@ def type_text(text: str) -> dict[str, object]:
 def wait(duration_ms: int) -> dict[str, object]:
     """Pause between actions."""
     bounded = max(0, min(int(duration_ms), 30000))
-    time.sleep(bounded / 1000)
+    started = time.monotonic()
+    if _sleep_unless_stopped(bounded / 1000):
+        waited = int((time.monotonic() - started) * 1000)
+        return {"ok": True, "duration_ms": waited, "requested_ms": bounded, "stopped": True}
     return {"ok": True, "duration_ms": bounded}

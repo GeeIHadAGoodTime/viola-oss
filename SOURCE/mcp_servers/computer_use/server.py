@@ -362,18 +362,31 @@ async def _run_computer_action(call: dict[str, Any]) -> str:
         return await _computer_impl(**call)
     progress: dict[str, Any] = {}
     limit = desktop_worker.action_timeout(action, duration_ms=call.get("duration_ms"), ms=call.get("ms"))
+    # Taken when the call arrives, before the worker starts it: a user Stop from
+    # here on reaches this action even if it has not begun to type yet.
+    stop = _new_stop_signal()
     try:
         return await desktop_worker.run_desktop_action(
-            lambda: _computer_impl(**call, _progress=progress), timeout=limit
+            lambda: _computer_impl(**call, _progress=progress, _stop=stop), timeout=limit
         )
     except desktop_worker.DesktopActionTimeout:
         return _json(_not_responding(call, progress, limit))
+
+
+def _new_stop_signal() -> safety.DesktopStopSignal:
+    try:
+        user_id = _get_call_user_id()
+    except Exception:  # noqa: BLE001, RUF100 - the device user owns the desktop
+        user_id = None
+    return safety.new_desktop_stop_signal(user_id=user_id)
 
 
 def _not_responding(call: dict[str, Any], progress: dict[str, Any], limit: float) -> dict[str, object]:
     action = str(call.get("action") or "")
     user_id = str(progress.get("user_id") or "") or _get_call_user_id()
     session_id = str(progress.get("session_id") or "") or _get_call_session_id(user_id)
+    # The abandoned worker must not carry on typing if the app wakes up.
+    safety.request_desktop_stop(user_id=user_id, reason="app not responding")
     try:
         # SendInput key/button releases: they never wait on another app.
         _release_held_low_level_input(user_id)
@@ -607,7 +620,16 @@ def _tool_result_payload(result: object) -> dict[str, object]:
     if isinstance(data, dict):
         # Carry the evidence of the failure (accepted-vs-requested event
         # counts, the target window we aimed at) rather than only its prose.
-        for key in ("events_requested", "events_accepted", "method", "target_hwnd", "target_source"):
+        for key in (
+            "events_requested",
+            "events_accepted",
+            "method",
+            "target_hwnd",
+            "target_source",
+            "typed",
+            "chars_requested",
+            "stopped",
+        ):
             if key in data:
                 failure[key] = data[key]
     if unverified:
@@ -1033,6 +1055,7 @@ async def _computer_impl(
     degrees: Any = 0.0,
     axis: Any = "horizontal",
     _progress: dict[str, Any] | None = None,
+    _stop: safety.DesktopStopSignal | None = None,
 ) -> str:
     """Execute one computer-use action (runs on the desktop worker thread)."""
     started = time.monotonic()
@@ -1041,6 +1064,9 @@ async def _computer_impl(
     screenshot_hash_prefix = ""
     success = False
     control_token: safety.ComputerUseControlSession | None = None
+    # Typing, waits, drags and holds look at this between small pieces of work.
+    stop_signal = _stop if _stop is not None else _new_stop_signal()
+    stop_token = safety.set_current_desktop_stop(stop_signal)
     try:
         assert_desktop_surface()
         user_id = _get_call_user_id()
@@ -1490,6 +1516,9 @@ async def _computer_impl(
             note = await _save_prompt_after_close(close_check_hwnd)
             if note is not None:
                 result.update(note)
+        if stop_signal.is_set() and isinstance(result, dict):
+            # The user pressed Stop while this action ran; it ended early.
+            result.setdefault("stopped", True)
         success = bool(result.get("ok", True))
         duration = int((time.monotonic() - started) * 1000)
         merged = _merge_action_metadata(
@@ -1518,6 +1547,7 @@ async def _computer_impl(
         logger.exception("computer_use_action failed")
         return _json(_envelope_from_exception(exc))
     finally:
+        safety.reset_current_desktop_stop(stop_token)
         safety.release_control_session(control_token)
         duration = int((time.monotonic() - started) * 1000)
         logger.info(

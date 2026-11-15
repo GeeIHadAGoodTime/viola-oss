@@ -14267,6 +14267,15 @@ class AgentExecutor:
         self._cancel_event.set()
         self._takeover_release_event.set()
         logger.info("Agent cancellation requested")
+        # Every user stop (Chat Stop, voice "stop", websocket agent_cancel) ends
+        # here. A desktop action already running on the desktop worker (typing
+        # in particular) does not see the turn end, so it is told directly.
+        try:
+            from services.computer_use import safety as desktop_safety
+
+            desktop_safety.request_desktop_stop(user_id=self._user_id, reason="agent cancel")
+        except Exception:  # noqa: BLE001, RUF100 - the agent stop above already happened
+            logger.debug("Agent cancel: desktop stop could not be signalled", exc_info=True)
 
     def request_user_takeover(self) -> None:
         """Pause agent progress so the user can interact with the browser."""

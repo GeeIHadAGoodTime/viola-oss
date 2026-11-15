@@ -37,6 +37,7 @@ import asyncio
 import ctypes
 import platform
 import time
+from collections.abc import Callable
 from ctypes import wintypes
 from dataclasses import dataclass, replace
 from typing import Literal
@@ -391,6 +392,38 @@ class InputDispatch:
 
 _EMPTY_DISPATCH = InputDispatch(requested=0, accepted=0)
 
+# How often a hold or a timed move looks at the user's Stop.
+_STOP_POLL_S = 0.05
+
+
+def _stop_check(should_stop: Callable[[], bool] | None) -> Callable[[], bool] | None:
+    """The given check, else the stop signal of the desktop action running here."""
+    if should_stop is not None:
+        return should_stop
+    try:
+        from services.computer_use import safety
+    except ImportError:  # pragma: no cover - ships together
+        return None
+    signal = safety.current_desktop_stop()
+    return signal.is_set if signal is not None else None
+
+
+async def _sleep_unless_stopped(seconds: float, should_stop: Callable[[], bool] | None) -> bool:
+    """Sleep ``seconds``; return True early (within about 50 ms) once the user stops."""
+    should_stop = _stop_check(should_stop)
+    if should_stop is None:
+        await asyncio.sleep(max(0.0, seconds))
+        return False
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + max(0.0, seconds)
+    while True:
+        if should_stop():
+            return True
+        remaining = deadline - loop.time()
+        if remaining <= 0:
+            return False
+        await asyncio.sleep(min(_STOP_POLL_S, remaining))
+
 
 def _input_desktop_blind_reason() -> str | None:
     """Name the reason an accepted event still reaches nobody, or None.
@@ -498,7 +531,9 @@ def mouse_button_up(button: Button = "left") -> InputDispatch:
     return _annotate_blind(_mouse_button_event(button, _BUTTON_UP_FLAGS, "up"))
 
 
-async def mouse_button_hold(button: Button, duration_ms: int) -> InputDispatch:
+async def mouse_button_hold(
+    button: Button, duration_ms: int, *, should_stop: Callable[[], bool] | None = None
+) -> InputDispatch:
     """Down + sleep + up. Use ``mouse_button_down``/``up`` directly when
     you need to hold across other actions.
 
@@ -510,7 +545,8 @@ async def mouse_button_hold(button: Button, duration_ms: int) -> InputDispatch:
     down = _mouse_button_event(button, _BUTTON_DOWN_FLAGS, "down")
     up = _EMPTY_DISPATCH
     try:
-        await asyncio.sleep(duration_ms / 1000.0)
+        # A user Stop ends the hold early; the button is released below either way.
+        await _sleep_unless_stopped(duration_ms / 1000.0, should_stop)
     finally:
         up = _mouse_button_event(button, _BUTTON_UP_FLAGS, "up")
     return _annotate_blind(down.merge(up))
@@ -532,7 +568,9 @@ def mouse_move_relative_step(dx: int, dy: int) -> InputDispatch:
     return _send_inputs(inp)
 
 
-async def mouse_move_relative(dx: int, dy: int, duration_ms: int = 0) -> InputDispatch:
+async def mouse_move_relative(
+    dx: int, dy: int, duration_ms: int = 0, *, should_stop: Callable[[], bool] | None = None
+) -> InputDispatch:
     """Move mouse by ``(dx, dy)`` raw units. Required for cursor-locked games.
 
     If ``duration_ms <= 0`` the motion is a single SendInput. Otherwise
@@ -554,13 +592,17 @@ async def mouse_move_relative(dx: int, dy: int, duration_ms: int = 0) -> InputDi
     rem_y = dy - (step_dy * num_steps)
     sleep_per_step = duration_ms / 1000.0 / num_steps
 
+    should_stop = _stop_check(should_stop)
     total = _EMPTY_DISPATCH
     for i in range(num_steps):
+        if should_stop is not None and should_stop():
+            # The user stopped: no further step of the sweep is sent.
+            break
         ddx = step_dx + (rem_x if i == num_steps - 1 else 0)
         ddy = step_dy + (rem_y if i == num_steps - 1 else 0)
         total = total.merge(mouse_move_relative_step(ddx, ddy))
-        if i < num_steps - 1:
-            await asyncio.sleep(sleep_per_step)
+        if i < num_steps - 1 and await _sleep_unless_stopped(sleep_per_step, should_stop):
+            break
     return _annotate_blind(total)
 
 
@@ -568,6 +610,8 @@ async def mouse_move_angle(
     degrees: float,
     axis: Axis = "horizontal",
     duration_ms: int = 0,
+    *,
+    should_stop: Callable[[], bool] | None = None,
 ) -> InputDispatch:
     """Sugar over ``mouse_move_relative`` for "rotate camera N degrees".
 
@@ -576,9 +620,9 @@ async def mouse_move_angle(
     """
     delta = int(float(degrees) * _DEFAULT_PIXELS_PER_DEGREE)
     if axis == "horizontal":
-        return await mouse_move_relative(delta, 0, duration_ms)
+        return await mouse_move_relative(delta, 0, duration_ms, should_stop=should_stop)
     if axis == "vertical":
-        return await mouse_move_relative(0, delta, duration_ms)
+        return await mouse_move_relative(0, delta, duration_ms, should_stop=should_stop)
     raise ValueError("axis must be 'horizontal' or 'vertical', got %r" % axis)
 
 
@@ -629,7 +673,7 @@ def key_up(key: str) -> InputDispatch:
     return _annotate_blind(_key_event(key, key_up_flag=True))
 
 
-async def key_hold(key: str, duration_ms: int) -> InputDispatch:
+async def key_hold(key: str, duration_ms: int, *, should_stop: Callable[[], bool] | None = None) -> InputDispatch:
     """Down + sleep + up. Matches Anthropic's ``hold_key`` shape.
 
     Reports press and release together: a refused press means no hold
@@ -639,7 +683,8 @@ async def key_hold(key: str, duration_ms: int) -> InputDispatch:
     down = _key_event(key, key_up_flag=False)
     up = _EMPTY_DISPATCH
     try:
-        await asyncio.sleep(duration_ms / 1000.0)
+        # A user Stop ends the hold early; the key is released below either way.
+        await _sleep_unless_stopped(duration_ms / 1000.0, should_stop)
     finally:
         up = _key_event(key, key_up_flag=True)
     return _annotate_blind(down.merge(up))
@@ -785,6 +830,17 @@ def type_char(c: str) -> InputDispatch:
     return _annotate_blind(_type_char_events(c))
 
 
+def require_typeable(text: str) -> None:
+    """Raise ``ValueError`` (as ``type_text`` does) when any character has no scan code.
+
+    Lets a caller that types a long text in pieces check the whole text first,
+    so this path still types the whole string once or nothing at all.
+    """
+    unsupported = [c for c in text if c not in _CHAR_TO_SCAN]
+    if unsupported:
+        raise ValueError("unsupported character %r for scancode typing" % unsupported[0])
+
+
 def type_text(text: str, *, char_delay_ms: int = 5) -> InputDispatch:
     """Type a string char by char via SendInput+scancode.
 
@@ -806,9 +862,7 @@ def type_text(text: str, *, char_delay_ms: int = 5) -> InputDispatch:
     and the returned dispatch is the only place that is visible: ``len`` of
     the requested string never was.
     """
-    unsupported = [c for c in text if c not in _CHAR_TO_SCAN]
-    if unsupported:
-        raise ValueError("unsupported character %r for scancode typing" % unsupported[0])
+    require_typeable(text)
     total = _EMPTY_DISPATCH
     for c in text:
         total = total.merge(_type_char_events(c))
@@ -866,6 +920,7 @@ __all__ = [
     "mouse_move_angle",
     "mouse_move_relative",
     "mouse_move_relative_step",
+    "require_typeable",
     "type_char",
     "type_text",
 ]
