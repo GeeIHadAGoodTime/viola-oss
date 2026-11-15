@@ -745,6 +745,16 @@ class ChatStreamRecoveryContract(unittest.IsolatedAsyncioTestCase):
                     and node.name in {"get_thread", "cancel_stream"}]
         for handler in handlers:
             handler.decorator_list = []
+        # The Stop policy the cancel route applies (module level in chat_mode.py).
+        stop_policy = [
+            node
+            for node in tree.body
+            if (isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name in {"_stop_chat_turn", "_stop_watch"})
+            or (
+                isinstance(node, ast.Assign)
+                and any(isinstance(t, ast.Name) and t.id in {"_STOP_RETRY_SECONDS", "_STOP_RETRY_LIMIT"} for t in node.targets)
+            )
+        ]
 
         async def record_and_call(function, **_):
             return await function()
@@ -761,8 +771,18 @@ class ChatStreamRecoveryContract(unittest.IsolatedAsyncioTestCase):
             "HTTPException": HTTPException,
             "HTTPStatus": HTTPStatus,
             "toolbox": SimpleNamespace(record_and_call=record_and_call),
+            "asyncio": asyncio,
+            "time": __import__("time"),
+            "logger": __import__("logging").getLogger("chat-mode-contract"),
+            # Agent-run stop and desktop release are inert boundaries here.
+            "_cancel_turn_executors": lambda stream_id, user_id: 0,
+            "_release_desktop_control": lambda user_id: "nothing held",
         }
-        nodes = [ast.ImportFrom(module="__future__", names=[ast.alias(name="annotations")], level=0), *handlers]
+        nodes = [
+            ast.ImportFrom(module="__future__", names=[ast.alias(name="annotations")], level=0),
+            *stop_policy,
+            *handlers,
+        ]
         exec(compile(ast.fix_missing_locations(ast.Module(body=nodes, type_ignores=[])), str(source), "exec"), self.namespace)
         self.tasks = []
 
@@ -776,7 +796,15 @@ class ChatStreamRecoveryContract(unittest.IsolatedAsyncioTestCase):
             await asyncio.Event().wait()
         task = asyncio.create_task(coroutine or waiting())
         self.tasks.append(task)
-        self.active[stream_id] = self.namespace_type(user_id=user, thread_id=thread, task=task)
+        self.active[stream_id] = self.namespace_type(
+            user_id=user,
+            thread_id=thread,
+            task=task,
+            stop_presses=0,
+            finalizing=False,
+            stop_watch=None,
+            last_cancel_at=0.0,
+        )
         return task
 
     async def get_thread(self):

@@ -3739,6 +3739,19 @@ class AgentExecutor:
         task_id = getattr(self, "task_id", None)
         if task_id:
             keys.append("task:%s" % task_id)
+        # The command stream this run belongs to, so the Chat tab's Stop can
+        # reach exactly its own turn's executor (cancel_stream_executors).
+        stream_id = getattr(self, "_registry_stream_id", None)
+        if stream_id is None:
+            try:
+                from services.llm.stream_bus import get_current_command_stream_id
+
+                stream_id = get_current_command_stream_id() or ""
+            except Exception:  # noqa: BLE001, RUF100 - no stream key only narrows what Stop can find
+                stream_id = ""
+            self._registry_stream_id = stream_id
+        if stream_id:
+            keys.append("stream:%s" % stream_id)
         return keys
 
     def _ensure_task_id(self) -> str:
@@ -14329,6 +14342,23 @@ def get_active_executor(
             continue
         return executor
     return None
+
+
+def cancel_stream_executors(stream_id: str | None, *, user_id: str | None = None) -> int:
+    """User stop for one command stream: ``cancel()`` every executor running under it.
+
+    Helpers a run started share its stream, so all of them stop. Only this
+    user's executors are touched. Returns how many were asked to stop.
+    """
+    if not stream_id:
+        return 0
+    cancelled = 0
+    for executor in list(_executor_stacks.get("stream:%s" % stream_id, ())):
+        if user_id and getattr(executor, "_user_id", None) and executor._user_id != user_id:
+            continue
+        executor.cancel()
+        cancelled += 1
+    return cancelled
 
 
 def _set_active_executor(

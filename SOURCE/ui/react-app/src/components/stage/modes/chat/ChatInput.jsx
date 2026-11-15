@@ -8,6 +8,7 @@ export default function ChatInput({
   onChange,
   onSend,
   onStop,
+  onQueue = () => {},
   onAttachFiles,
   streaming,
   disabled,
@@ -26,7 +27,21 @@ export default function ChatInput({
     node.style.height = `${Math.min(node.scrollHeight, 180)}px`;
   }, [value]);
 
-  const submit = () => {
+  // Enter never stops a reply. While one is running, Enter keeps the text as
+  // its own queued message (sent when the reply ends) and clears the box;
+  // Stop is the button only. Enter used to press Stop and leave the draft, so
+  // "pause" then "next" went out as "pausenext" (1.0.5 build 11, bug 7).
+  const submitFromKeyboard = () => {
+    if (!value.trim()) return;
+    if (streaming) {
+      onQueue(value);
+      return;
+    }
+    if (disabled) return;
+    onSend();
+  };
+
+  const pressButton = () => {
     if (streaming) {
       onStop();
       return;
@@ -38,7 +53,7 @@ export default function ChatInput({
   const handleKeyDown = (event) => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
-      submit();
+      submitFromKeyboard();
     }
   };
 
@@ -87,7 +102,7 @@ export default function ChatInput({
       <button
         type="button"
         className={`chat-send-button ${streaming ? 'is-stop' : ''}`}
-        onClick={submit}
+        onClick={pressButton}
         disabled={!streaming && (!value.trim() || disabled)}
         aria-label={streaming ? 'Stop response' : 'Send message'}
         title={streaming ? 'Stop response' : 'Send message'}
@@ -103,6 +118,7 @@ ChatInput.propTypes = {
   onChange: PropTypes.func.isRequired,
   onSend: PropTypes.func.isRequired,
   onStop: PropTypes.func.isRequired,
+  onQueue: PropTypes.func,
   onAttachFiles: PropTypes.func.isRequired,
   streaming: PropTypes.bool,
   disabled: PropTypes.bool,
