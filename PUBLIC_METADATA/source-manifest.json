@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "eaa2f7ebafa5130b050e077b6333fb4c421a0c3c",
-  "sha256": "ba2749b838806283cddeb3091429fca4be77efa165c1cdbe796bff229f82681e",
+  "revision": "365faf0335eed280c452e556817793296e095b2e",
+  "sha256": "d6ebce222897398c474e90186bfa0c08009e35ed00515f932eb70052d6108107",
   "files": [
     {
       "path": ".env.example",
@@ -4375,8 +4375,8 @@
     },
     {
       "path": "services/computer_use/window_manager.py",
-      "sha256": "ff68e1133495b1246d43b1fd0128d3507cab3883ec8204cba429ddb09198aaeb",
-      "bytes": 45578
+      "sha256": "d9d757631425bf8f1e1384afe422381ae0841971d353e46df96dc294747095c4",
+      "bytes": 46205
     },
     {
       "path": "services/connectivity.py",
@@ -6415,8 +6415,8 @@
     },
     {
       "path": "tests/public/test_saved_chat_speech_dispatch.py",
-      "sha256": "00ff715128045893291ec86785f8993b9a334b8bbaebb52e8308e30c506e8c57",
-      "bytes": 12966
+      "sha256": "16031ecd0e7f1609f6806698cb69299f950d28349bcbf4818142fa070def06e7",
+      "bytes": 13223
     },
     {
       "path": "tests/public/test_scheduler_one_shot_staleness.py",
@@ -9510,8 +9510,8 @@
     },
     {
       "path": "ui/api/routes/command.py",
-      "sha256": "c6926f9e89e34563a6a944a7445faa4670bfa690921338cc8edc96e04ee21137",
-      "bytes": 37702
+      "sha256": "ab2061b047b78dbf45d9a3bc19618e4a62df99bcbe3567cd10943c905d4a3299",
+      "bytes": 40629
     },
     {
       "path": "ui/api/routes/common.py",
