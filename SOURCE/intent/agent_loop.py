@@ -4197,6 +4197,13 @@ async def run_agent_loop(
                 tc_name = tc["tool"]
                 tc_args = tc.get("args", {})
                 tc_id = tc.get("tool_use_id", "")
+                if executor._cancelled:
+                    # The user pressed Stop while the model was choosing this
+                    # step: run nothing more (a desktop click after Stop is the
+                    # worst case). The cancellation check at the top of the
+                    # next iteration ends the run.
+                    tool_results_content.append(executor.synthetic_cancel_tool_result(tc_id))
+                    continue
                 _parallel_batch = _parallel_safe_batches_by_start.get(_tc_index)
                 if _parallel_batch is not None:
                     # F-032: thread the canonical hook dispatcher into
