@@ -553,6 +553,18 @@ def _spans(compiled: _Compiled, buffer: bytes) -> list[tuple[int, int]]:
     return spans
 
 
+_LETTER_BYTES = re.compile(rb"[A-Za-z]")
+_DIGIT_BYTES = re.compile(rb"[0-9]")
+
+
+def _overwrite(found: bytes) -> bytes:
+    """Same length. A bare number (a house number or ZIP code on its own) becomes 9s, so a
+    JSON line that held it as a number stays valid JSON; anything with letters becomes ``*``."""
+    if _LETTER_BYTES.search(found):
+        return b"*" * len(found)
+    return _DIGIT_BYTES.sub(b"9", found)
+
+
 def _scrub_file(path: Path, compiled: _Compiled, tail_bytes: int) -> int:
     try:
         with open(path, "rb") as handle:
@@ -583,7 +595,7 @@ def _scrub_file(path: Path, compiled: _Compiled, tail_bytes: int) -> int:
             for begin, end in sorted(set(spans)):
                 if end > begin:
                     handle.seek(start + begin)
-                    handle.write(b"*" * (end - begin))
+                    handle.write(_overwrite(buffer[begin:end]))
                     written += 1
     except OSError:
         logger.debug("Could not overwrite private values in a log file", exc_info=True)
@@ -610,7 +622,7 @@ def scrub_recent_logs(
     max_age_seconds: float = SCRUB_MAX_AGE_SECONDS,
     tail_bytes: int = SCRUB_TAIL_BYTES,
 ) -> int:
-    """Overwrite held private values with ``*`` in log files changed in the last *max_age_seconds*.
+    """Overwrite held private values with ``*`` (a bare number with ``9``) in log files changed recently.
 
     Same byte length, in place, only the last *tail_bytes* of each file. Returns
     how many places were overwritten. Uses every account's values.
