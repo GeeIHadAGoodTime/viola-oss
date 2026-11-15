@@ -534,10 +534,15 @@ async def save_delivery_address_handler(
         "state": region.upper() if len(region) == 2 else region,
         "zip": str(zip_code or "").strip(),
     }
+    resolved_user_id = _resolve_user_id(user_id)
+    # As given and as stored ("48.12" is stored "4812"): both are kept out of
+    # every log before anything below can log them.
+    from intent.sensitive_values import register_address
+
+    register_address(resolved_user_id, address, extra_streets=[str(street or "")])
     if not any(char.isdigit() for char in address["street"]):
         return ToolResult(ok=False, data=None, error="A delivery address needs a house number and street. Ask for them.")
 
-    resolved_user_id = _resolve_user_id(user_id)
     try:
         from ui.settings_manager import get_settings_manager
 

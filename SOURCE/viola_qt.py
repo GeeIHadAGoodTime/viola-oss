@@ -963,6 +963,13 @@ def _ensure_qt_file_logging() -> None:
             handler.addFilter(_RepeatCollapseFilter(handler))
         except ImportError:
             _LogFormatter = _logging.Formatter
+        try:
+            # The user's private values (a saved address), masked by value.
+            from intent.sensitive_values import install_filter as _install_private_value_filter
+
+            _install_private_value_filter(handler)
+        except ImportError:
+            pass
         handler.setFormatter(
             _LogFormatter(
                 "%(asctime)s [%(levelname)s] %(name)s: %(message)s",

@@ -85,6 +85,11 @@ from intent.post_answer_teardown import (
     schedule_post_answer_sync,
 )
 from intent.response_cleanup import strip_json_template as _strip_json_template
+from intent.sensitive_values import (
+    mask_json_line,
+    mask_value as mask_private_values,
+    note_task_finished as note_private_task_finished,
+)
 from intent.spin_detector import SpinDetector
 from intent.subagents.lifecycle import (
     SubagentNotification,
@@ -2102,6 +2107,10 @@ def _first_time_in_step_log(path: Path, schema_hash: str) -> bool:
 
 
 def _write_structured_log_line(path: Path, line: str) -> None:
+    # Every agent-steps line (step, task_complete, agent_stop) is masked here,
+    # at write time, with the private values known by then: the user's words,
+    # the reasoning and the final answer carry an address no pattern knows.
+    line = mask_json_line(line)
     try:
         if path.stat().st_size + len(line) > _STEP_LOG_MAX_BYTES:
             os.replace(path, path.with_name(path.stem + ".1" + path.suffix))
@@ -2643,7 +2652,9 @@ class AgentTaskLog:
 
         def _write() -> None:
             try:
-                _atomic_write_json_restricted(path, _mask_addresses_for_log(redact_card_data(snapshot)))
+                _atomic_write_json_restricted(
+                    path, mask_private_values(_mask_addresses_for_log(redact_card_data(snapshot)))
+                )
                 logger.debug("Agent task log written to %s", path)
             except Exception as exc:
                 logger.warning("Failed to write agent task log: %s", exc)
@@ -6169,6 +6180,9 @@ class AgentExecutor:
             _run_task_log_io(lambda: _append_structured_log_line(jsonl_dir, step_log_path, line))
         except Exception:
             logger.debug("JSONL task_complete write failed, continuing")
+        # An address registered during this task: overwrite what any writer put
+        # in the logs before it was known (in the background, in place).
+        note_private_task_finished()
 
         # Telemetry: record agent outcome
         try:
@@ -6831,8 +6845,12 @@ class AgentExecutor:
         row["web_search_requests"] += web_search_requests
         row["cost_usd"] += float(cost_usd)
 
-    def _user_own_words(self, user_text: str) -> str:
+    def _user_own_words(self, user_text: str, *, include_saved_address: bool = True) -> str:
         """What the user has said in this conversation, and the address they already saved.
+
+        ``include_saved_address=False`` leaves the saved address out: the
+        save_delivery_address gate adds it only for a correction of the same
+        street (``_saved_address_text``).
 
         Only frames the user wrote or spoke count. Compaction summaries are
         user-role frames too, but they carry another origin, and they can quote a
@@ -6853,16 +6871,24 @@ class AgentExecutor:
                     and (frame.origin or "") in _USER_AUTHORED_FRAME_ORIGINS
                 ):
                     parts.extend(block.text for block in frame.blocks if isinstance(block, TextBlock))
+        if include_saved_address:
+            saved = self._saved_address_text()
+            if saved:
+                parts.append(saved)
+        return "\n".join(parts)
+
+    def _saved_address_text(self) -> str:
+        """The address saved in Settings, as one line ("" when there is none)."""
         try:
             from intent.tools.settings_tools import delivery_address_text
             from ui.settings_manager import get_settings_manager
 
             saved = get_settings_manager().get("delivery_address", {}, user_id=self._get_effective_user_id())
             if isinstance(saved, dict):
-                parts.append(delivery_address_text(saved))
+                return delivery_address_text(saved)
         except (ImportError, LookupError, OSError, RuntimeError, TypeError, ValueError):
             logger.debug("Saved address unavailable for the user-words check", exc_info=True)
-        return "\n".join(parts)
+        return ""
 
     def _prompt_cache_key(self) -> str | None:
         """One opaque cache key per account, the same for every command.

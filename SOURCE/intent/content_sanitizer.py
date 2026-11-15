@@ -173,6 +173,19 @@ def _joined_number_runs(own: str) -> set[str]:
     return joined
 
 
+def _street_name_words(street: str) -> list[str]:
+    """The words that say which street it is: no house number, no "Lane" or "North"."""
+    words = _WORD_RE.findall(str(street or "").lower())
+    return [word for word in words if not word[:1].isdigit() and word not in _STREET_FILLER_WORDS]
+
+
+def _same_street_name(args: Mapping[str, Any], saved_address_text: str) -> bool:
+    """True when the call's street name is the saved one's (only the house number or a detail changed)."""
+    call_name = _street_name_words(str(args.get("street") or ""))
+    saved_name = _street_name_words(saved_address_text.split(",", 1)[0])
+    return bool(call_name) and call_name == saved_name
+
+
 def _words_not_from_user(args: Mapping[str, Any], own_words: str) -> list[str]:
     """Name the address fields whose words the user never said."""
     own = _DIGIT_GROUP_COMMA_RE.sub("", own_words.lower())
@@ -194,6 +207,25 @@ def _words_not_from_user(args: Mapping[str, Any], own_words: str) -> list[str]:
     if zip_code and zip_code[:5] not in own_numbers and not said_a_number_in_words:
         missing.append("ZIP code")
     return missing
+
+
+def _hold_private_values(args: Mapping[str, Any], own_words: str) -> None:
+    """Before the gate decides (and so also when it refuses), the call's address is kept out of every log.
+
+    The user's own words in this conversation go with it, so a number they
+    wrote as "77.5" is masked as written when the model passes "775".
+    """
+    try:
+        from core.user_context import get_current_or_device_user_id
+        from intent.sensitive_values import register_tool_call
+
+        try:
+            user_id = get_current_or_device_user_id()
+        except (LookupError, RuntimeError, OSError, ValueError):
+            user_id = ""
+        register_tool_call(user_id, args, own_words=own_words)
+    except Exception:  # noqa: BLE001 - masking must never change what the gate decides
+        logger.debug("Could not hold the address values for the log mask", exc_info=True)
 
 
 def canonicalize_tool_name_for_safety(tool_name: str | None) -> str:
@@ -885,6 +917,7 @@ class BrowserTaintTracker:
         # What the user has really said in this conversation, plus what they have
         # already saved. Empty for a helper: its task was written by the model.
         self._user_own_words: str = ""
+        self._saved_address_words: str = ""
         # Taint from anything but Viola's own memory. "Remember my address" often
         # checks memory first, and that alone must not stop the save: the word
         # check below still refuses any address the user did not say.
@@ -893,6 +926,10 @@ class BrowserTaintTracker:
     def set_user_own_words(self, text: str | None) -> None:
         """Record the words a USER_WORDS_ONLY_TOOLS call may be made of."""
         self._user_own_words = str(text or "")
+
+    def set_saved_address_words(self, text: str | None) -> None:
+        """The address already saved: it counts as the user's words only for a call on the same street."""
+        self._saved_address_words = str(text or "")
 
     def set_user_request(self, user_text: str | None) -> None:
         """Record the current user request (user-named file/site exemptions)."""
@@ -1102,7 +1139,9 @@ class BrowserTaintTracker:
         (consequential calls then still meet their confirm-or-cancel gate).
         """
         if tool_name and canonicalize_tool_name_for_safety(tool_name) in USER_WORDS_ONLY_TOOLS:
-            return self._check_user_words_only(tool_name, _tool_args_mapping(tool_args) or {})
+            user_words_args = _tool_args_mapping(tool_args) or {}
+            _hold_private_values(user_words_args, self._user_own_words)
+            return self._check_user_words_only(tool_name, user_words_args)
         if not self._tainted or not tool_name:
             return None
         args = _tool_args_mapping(tool_args) or {}
@@ -1194,7 +1233,11 @@ class BrowserTaintTracker:
                 "(prompt injection defense). Nothing was saved. Ask the user to say their address again in a "
                 "new request." % tool_name
             )
-        missing = _words_not_from_user(args, self._user_own_words)
+        own_words = self._user_own_words
+        if self._saved_address_words and _same_street_name(args, self._saved_address_words):
+            # A correction ("no, the house number is 77.5"): the saved city and ZIP stay the user's.
+            own_words = own_words + "\n" + self._saved_address_words
+        missing = _words_not_from_user(args, own_words)
         if missing:
             # Field names and sizes only, never the words: enough to tell an empty
             # "own words" (nothing counted as said) from one misheard field.

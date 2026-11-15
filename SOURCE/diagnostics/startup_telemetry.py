@@ -72,8 +72,11 @@ def _write_event(event: str, **fields: Any) -> None:
     try:
         path = _log_path()
         path.parent.mkdir(parents=True, exist_ok=True)
+        from intent.sensitive_values import mask_json_line
+
+        line = mask_json_line(json.dumps(payload, default=str, separators=(",", ":")) + "\n")
         with path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, default=str, separators=(",", ":")) + "\n")
+            handle.write(line)
     except Exception:
         # Startup telemetry must never break startup.
         return
