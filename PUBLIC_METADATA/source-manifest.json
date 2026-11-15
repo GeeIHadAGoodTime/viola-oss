@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "b01fd8be616e42383a5d6c1425a2d5f6d42dc493",
-  "sha256": "979e0b39e018cf456d75cb6b9d2471ca131282573b1c6bf354f1eaae293b3f0e",
+  "revision": "5c547ba864f648b92c0a5e48dcca33baa4c9879a",
+  "sha256": "254d860141b77f9e66bc080bd75d99238036ba50275416f33c3d862cb55b1cdc",
   "files": [
     {
       "path": ".env.example",
@@ -2135,8 +2135,8 @@
     },
     {
       "path": "intent/tools/music_tools.py",
-      "sha256": "0ea41e23b032c0e4fa34ddb946251ff5fe2ec20718961f836a95cc33a0a824ca",
-      "bytes": 82546
+      "sha256": "acf325556d5c54dc2316171374242c4dbf2e9b68ecbc6086bc003bcc6fe64fed",
+      "bytes": 82693
     },
     {
       "path": "intent/tools/notification_tools.py",
@@ -3180,8 +3180,8 @@
     },
     {
       "path": "music/resolution/provider_router.py",
-      "sha256": "54d72369b5d3f9585aaa84cd19cb3dc31001ae7230aa84940e60f9ed4ab895ec",
-      "bytes": 33238
+      "sha256": "bad4996591987fe150c87fa1a1332e12c298155af76e1a86771f485de941b555",
+      "bytes": 33598
     },
     {
       "path": "music/resolution/provider_router_metadata.py",
@@ -3319,6 +3319,11 @@
       "bytes": 6341
     },
     {
+      "path": "music/track_display_cache.py",
+      "sha256": "cfcc1bfde98a2da7eae4b4e1f892667febc7ec916e140ca52be542653a31d6ed",
+      "bytes": 2772
+    },
+    {
       "path": "music/youtube_embed.py",
       "sha256": "3f2bfe41f410fff43d31c982e6c700a6aa0e4c04836bba6466cccc72d3147744",
       "bytes": 2946
@@ -3385,8 +3390,8 @@
     },
     {
       "path": "playback/engines/spotify_cdp.py",
-      "sha256": "31f365eca5b8a0a55aff60478fec0e54c542a68aa479fdbb88a4559e0cab26da",
-      "bytes": 44392
+      "sha256": "4f18f6d67fda6ddcf2f9a29fc15b0210d347ff4001a3c9a474be9e79abb5e4da",
+      "bytes": 45574
     },
     {
       "path": "playback/engines/youtube.py",
@@ -9590,8 +9595,8 @@
     },
     {
       "path": "ui/api/routes/lifecycle.py",
-      "sha256": "cbc87ca1383392ce919b0663acb99cfd5d12f0651ced74c0e7ccf85e56546eab",
-      "bytes": 48399
+      "sha256": "9c18fe647650370d40b5bb0498558163290c3d95d410cb162aba2d8b2aec4b08",
+      "bytes": 49544
     },
     {
       "path": "ui/api/routes/llm_stream.py",
@@ -9660,8 +9665,8 @@
     },
     {
       "path": "ui/api/routes/rating.py",
-      "sha256": "0446a6e2562f3a0f1b90b557b3c1e870fc5458dbd6b65170aad271d82a6e9736",
-      "bytes": 13316
+      "sha256": "4a64f3cc459fa740eec68908cdd593c191adc434ada7e9cf5c80a6c7966df1a5",
+      "bytes": 13694
     },
     {
       "path": "ui/api/routes/regression_stubs.py",
@@ -10150,8 +10155,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "5723f11aafb98c0dc8376305ae230d666cbe305bde9e59aa50edf297f1c8347d",
-      "bytes": 204445
+      "sha256": "c50aaf3a2958eaaea8b1919b989119789f2dfd36be4f62272565e522b9256a7b",
+      "bytes": 204764
     },
     {
       "path": "ui/react-app/src/SmartDisplay.longAnswer.test.jsx",
