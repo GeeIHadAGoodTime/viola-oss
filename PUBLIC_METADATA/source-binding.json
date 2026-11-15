@@ -30,10 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "98ebc278fc25a1529f36651bee94332ce6d0ee608f5697e4d5abd0701fcf2c76",
-  "source_tree_sha256": "979e0b39e018cf456d75cb6b9d2471ca131282573b1c6bf354f1eaae293b3f0e",
+  "source_manifest_sha256": "9b5bbf42d39ca4de7b5b8afcd2af5c11727f09aef637ad9a88b741b81d5aea47",
+  "source_tree_sha256": "95275cfca2cde4b78eabca91213b29cb979b7dbeec2dbe2a5ba845b9e6675248",
   "source_file_count": 2817,
-  "source_revision": "b01fd8be616e42383a5d6c1425a2d5f6d42dc493",
+  "source_revision": "2995aeaf73c467525a34c28fcdb27f85eb2e1d99",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "LICENSES/SPEECH_COMPONENT_NOTICES.md",
@@ -660,8 +660,8 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "b01fd8be616e42383a5d6c1425a2d5f6d42dc493",
-    "kind": "coming soon switches"
+    "source_commit": "2995aeaf73c467525a34c28fcdb27f85eb2e1d99",
+    "kind": "phone voicemail message and call cost"
   },
   "historical_bindings": [
     {

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "b01fd8be616e42383a5d6c1425a2d5f6d42dc493",
-  "sha256": "979e0b39e018cf456d75cb6b9d2471ca131282573b1c6bf354f1eaae293b3f0e",
+  "revision": "2995aeaf73c467525a34c28fcdb27f85eb2e1d99",
+  "sha256": "95275cfca2cde4b78eabca91213b29cb979b7dbeec2dbe2a5ba845b9e6675248",
   "files": [
     {
       "path": ".env.example",
@@ -2145,8 +2145,8 @@
     },
     {
       "path": "intent/tools/phone_call.py",
-      "sha256": "c92f58bc27896a13bbd4e242fa2a9795612ecf608e4af07d12b8021bf96da04f",
-      "bytes": 79904
+      "sha256": "42fd5a0f328af6e73abf53fa2a285e82a26c74480e1e069fa89562476d949354",
+      "bytes": 80432
     },
     {
       "path": "intent/tools/playlist_tools.py",
@@ -5770,8 +5770,8 @@
     },
     {
       "path": "telephony/call_manager.py",
-      "sha256": "ca1546c17477b0d248477f783c0e883864f19c1bb45b3a6324ed790f93b80674",
-      "bytes": 401692
+      "sha256": "546d2f849a8049f4093b2a60ed3bb7be6ea17b5430df9388a598dd6a3cc05af8",
+      "bytes": 404040
     },
     {
       "path": "telephony/call_queue.py",
@@ -5785,8 +5785,8 @@
     },
     {
       "path": "telephony/call_tools.py",
-      "sha256": "69764cf61cbe8d8f284573c9df0e4035b22e21bca8c62b3f9a878f836ad91221",
-      "bytes": 72064
+      "sha256": "71cec1b8e072f0e7f382c518bf562f52cfe22d377ebbf1132447901e024df833",
+      "bytes": 74115
     },
     {
       "path": "telephony/caller_validation.py",
@@ -5835,8 +5835,8 @@
     },
     {
       "path": "telephony/end_call_hangup.py",
-      "sha256": "9af6f262be79fc7ee2cc970c55873a931b2691196dfd4b8adff1d9fc45858d2a",
-      "bytes": 8695
+      "sha256": "ccf38a1f2e512d875bd1af899efb0aafdce70d6446ee2dac38b2827918247afa",
+      "bytes": 9200
     },
     {
       "path": "telephony/espeak_tts_service.py",
@@ -5940,8 +5940,8 @@
     },
     {
       "path": "telephony/phone_self_echo_guard.py",
-      "sha256": "3f13a46afb4153e8835f78fe77a2947c682af4848668e23d8ef7959c1f7de39a",
-      "bytes": 21223
+      "sha256": "f475fd495c272e520ad12f83be999542dee352b8546ff9d1031c4d678f5058f1",
+      "bytes": 22068
     },
     {
       "path": "telephony/phone_simulator.py",
@@ -6085,8 +6085,8 @@
     },
     {
       "path": "telephony/voicemail_detection.py",
-      "sha256": "adb58e4f4b035ccee85b0b6e67dc048de7f3affbf66afd8e7205e59832172f5b",
-      "bytes": 30919
+      "sha256": "2d8aaf95c0f144ceec1d66865725f0260dd0503a39f0fca8f2605eae679d1563",
+      "bytes": 46125
     },
     {
       "path": "tests/customer_speech/test_real_cjk_pronunciation.py",
