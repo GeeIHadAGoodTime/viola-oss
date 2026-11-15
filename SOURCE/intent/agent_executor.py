@@ -4855,6 +4855,9 @@ class AgentExecutor:
             post_turn_memory_extraction=False,
         )
         checkpoint_for_memory = checkpoint if isinstance(checkpoint, TaskCheckpoint) else None
+        if self._cancelled or result.error == "cancelled":
+            self._schedule_turn_address_check(event_text, str(getattr(self, "task_id", "") or "continuation"))
+            return result
         await self._run_post_turn_memory_extraction(
             user_text=event_text,
             final_answer=str(result.answer or ""),
@@ -4947,6 +4950,8 @@ class AgentExecutor:
         tools_called: list[str],
         model_visible_messages: list[dict[str, Any]] | None = None,
     ) -> None:
+        # A helper agent's task text is written by the model, not the user: no
+        # memory extraction and no address check for it.
         if getattr(self, "_current_agent_id", None):
             return
         transcript = self._post_turn_memory_transcript(user_text, final_answer, model_visible_messages)
@@ -4955,15 +4960,35 @@ class AgentExecutor:
         try:
             from services.memory.extract_memories import extract_memories_after_turn
 
+            # user_text: the same hidden pass also reports any address the user
+            # gave, so a street Viola only asked about is masked in the logs too.
             await extract_memories_after_turn(
                 user_id=str(self._get_effective_user_id()),
                 transcript=transcript,
                 task_id=task_id,
                 tools_called=tools_called,
                 model_visible_messages=model_visible_messages,
+                user_text=user_text,
             )
         except (OSError, RuntimeError, TimeoutError, ValueError) as exc:
             logger.debug("Post-turn memory extraction skipped: %s", exc)
+
+    def _schedule_turn_address_check(self, user_text: str, task_id: str) -> None:
+        """A turn that ended by cancellation or an error: the address check on the user's words, detached.
+
+        Synchronous on purpose: it is called on the cancel path, which must stay
+        as fast as it is (no await), and the check runs as its own task so the
+        turn's cancellation cannot kill it. No memory extraction. Helper agents
+        stay out (their task text is the model's).
+        """
+        if getattr(self, "_current_agent_id", None):
+            return
+        try:
+            from services.memory.extract_memories import schedule_address_check
+
+            schedule_address_check(user_id=str(self._get_effective_user_id()), user_text=user_text, task_id=task_id)
+        except Exception:  # noqa: BLE001 - never change how a stop or a failure ends the turn
+            logger.debug("Address check for an ended turn skipped", exc_info=True)
 
     async def run(
         self,
@@ -5070,13 +5095,21 @@ class AgentExecutor:
         self._agent_plan_policy = self._resolve_agent_plan_policy()
         self._apply_agent_chain_cap(self._agent_plan_policy, user_text)
 
-        managed_budget_gate = await self._check_managed_llm_spend_cap_async()
+        try:
+            managed_budget_gate = await self._check_managed_llm_spend_cap_async()
+        except asyncio.CancelledError:
+            # Stopped before the first model call: the user's words are logged already.
+            if post_turn_memory_extraction:
+                self._schedule_turn_address_check(user_text, "")
+            raise
         if not managed_budget_gate.allowed:
             self._record_agent_gate_denial_telemetry(
                 gate_name="managed_llm_spend_cap",
                 current_usage=managed_budget_gate.spent_cents,
                 limit_value=managed_budget_gate.budget_cents,
             )
+            if post_turn_memory_extraction:
+                self._schedule_turn_address_check(user_text, "")
             return AgentResult(
                 ok=False,
                 answer=self._managed_llm_budget_message(managed_budget_gate),
@@ -5471,6 +5504,11 @@ class AgentExecutor:
             # hot-path uses the cached Fernet on TaskTrace + BlobStore.
             try:
                 await self._task_trace.warm_up_keys_async()
+            except asyncio.CancelledError:
+                # Stopped before the first model call: the user's words are logged already.
+                if post_turn_memory_extraction:
+                    self._schedule_turn_address_check(user_text, task_id)
+                raise
             except Exception as _warm_exc:
                 # LOUD, never a warning buried in the log: losing the trace
                 # loses this run's oracle and strips trace context off any bug
@@ -5667,7 +5705,10 @@ class AgentExecutor:
                     )
             finally:
                 _reset_active_taint_tracker(_taint_scope)
-            if post_turn_memory_extraction:
+            if post_turn_memory_extraction and (self._cancelled or agent_result.error == "cancelled"):
+                # Stopped: the address check only, no memory extraction.
+                self._schedule_turn_address_check(user_text, task_id)
+            elif post_turn_memory_extraction:
                 await self._run_post_turn_memory_extraction(
                     user_text=user_text,
                     final_answer=str(agent_result.answer or ""),
@@ -5682,6 +5723,8 @@ class AgentExecutor:
 
         except asyncio.CancelledError:
             outcome = "cancelled"
+            if post_turn_memory_extraction:
+                self._schedule_turn_address_check(user_text, task_id)
             logger.warning(
                 "Agent loop cancelled (asyncio.CancelledError) after %d iterations",
                 iterations,
@@ -5718,6 +5761,8 @@ class AgentExecutor:
             raise
         except Exception as exc:
             outcome = "error"
+            if post_turn_memory_extraction:
+                self._schedule_turn_address_check(user_text, task_id)
             # M7 Bug B: repair orphaned tool_use blocks before saving
             # checkpoint, so a resumed session starts with clean history.
             if self._use_native:
