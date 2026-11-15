@@ -85,6 +85,11 @@ from intent.post_answer_teardown import (
     schedule_post_answer_sync,
 )
 from intent.response_cleanup import strip_json_template as _strip_json_template
+from intent.sensitive_values import (
+    mask_json_line,
+    mask_value as mask_private_values,
+    note_task_finished as note_private_task_finished,
+)
 from intent.spin_detector import SpinDetector
 from intent.subagents.lifecycle import (
     SubagentNotification,
@@ -2102,6 +2107,10 @@ def _first_time_in_step_log(path: Path, schema_hash: str) -> bool:
 
 
 def _write_structured_log_line(path: Path, line: str) -> None:
+    # Every agent-steps line (step, task_complete, agent_stop) is masked here,
+    # at write time, with the private values known by then: the user's words,
+    # the reasoning and the final answer carry an address no pattern knows.
+    line = mask_json_line(line)
     try:
         if path.stat().st_size + len(line) > _STEP_LOG_MAX_BYTES:
             os.replace(path, path.with_name(path.stem + ".1" + path.suffix))
@@ -2643,7 +2652,9 @@ class AgentTaskLog:
 
         def _write() -> None:
             try:
-                _atomic_write_json_restricted(path, _mask_addresses_for_log(redact_card_data(snapshot)))
+                _atomic_write_json_restricted(
+                    path, mask_private_values(_mask_addresses_for_log(redact_card_data(snapshot)))
+                )
                 logger.debug("Agent task log written to %s", path)
             except Exception as exc:
                 logger.warning("Failed to write agent task log: %s", exc)
@@ -6169,6 +6180,9 @@ class AgentExecutor:
             _run_task_log_io(lambda: _append_structured_log_line(jsonl_dir, step_log_path, line))
         except Exception:
             logger.debug("JSONL task_complete write failed, continuing")
+        # An address registered during this task: overwrite what any writer put
+        # in the logs before it was known (in the background, in place).
+        note_private_task_finished()
 
         # Telemetry: record agent outcome
         try:

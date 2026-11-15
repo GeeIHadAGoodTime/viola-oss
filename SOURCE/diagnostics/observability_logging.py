@@ -461,9 +461,17 @@ def configure_observability(
     ai_debug_handler.setFormatter(RedactingFormatter(fmt="%(asctime)s | %(levelname)-8s | %(message)s"))
     handlers.append(ai_debug_handler)
 
+    # The user's private values (a saved address) are masked by value on every
+    # handler, also for records from loggers that bypass core.logging_config.
+    try:
+        from intent.sensitive_values import install_filter as _install_private_value_filter
+    except ImportError:
+        _install_private_value_filter = None
     root_logger = logging.getLogger()
     root_logger.handlers.clear()
     for handler in handlers:
+        if _install_private_value_filter is not None:
+            _install_private_value_filter(handler)
         root_logger.addHandler(handler)
     root_logger.setLevel(logging.DEBUG)
 

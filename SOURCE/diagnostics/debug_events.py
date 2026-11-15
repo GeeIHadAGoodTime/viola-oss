@@ -111,6 +111,10 @@ class _RotatingJsonWriter:
             "ingest_ts": time.time(),
         }
         data = json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
+        # The user's private values (a saved address), masked by value.
+        from intent.sensitive_values import mask_json_line
+
+        data = mask_json_line(data)
 
         with self._lock:
             projected = self._current_size() + len(data.encode("utf-8")) + 1

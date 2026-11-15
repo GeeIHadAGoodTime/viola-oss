@@ -340,6 +340,10 @@ def _encode(envelope: dict[str, Any]) -> str | None:
     record = {_ENVELOPE_MARKER: 1, "attempts": int(envelope.get("attempts", 0)), "payload": payload}
     try:
         line = json.dumps(record, default=str, ensure_ascii=False)
+        # The user's private values (a saved address), masked by value.
+        from intent.sensitive_values import mask_json_line
+
+        line = mask_json_line(line)
     except (TypeError, ValueError):
         log.debug("diagnostic-spool: payload not serializable; dropping")
         return None

@@ -196,6 +196,25 @@ def _words_not_from_user(args: Mapping[str, Any], own_words: str) -> list[str]:
     return missing
 
 
+def _hold_private_values(args: Mapping[str, Any], own_words: str) -> None:
+    """Before the gate decides (and so also when it refuses), the call's address is kept out of every log.
+
+    The user's own words in this conversation go with it, so a number they
+    wrote as "77.5" is masked as written when the model passes "775".
+    """
+    try:
+        from core.user_context import get_current_or_device_user_id
+        from intent.sensitive_values import register_tool_call
+
+        try:
+            user_id = get_current_or_device_user_id()
+        except (LookupError, RuntimeError, OSError, ValueError):
+            user_id = ""
+        register_tool_call(user_id, args, own_words=own_words)
+    except Exception:  # noqa: BLE001 - masking must never change what the gate decides
+        logger.debug("Could not hold the address values for the log mask", exc_info=True)
+
+
 def canonicalize_tool_name_for_safety(tool_name: str | None) -> str:
     """Return the policy name for a tool, stripping external MCP namespaces."""
     if not tool_name:
@@ -1102,7 +1121,9 @@ class BrowserTaintTracker:
         (consequential calls then still meet their confirm-or-cancel gate).
         """
         if tool_name and canonicalize_tool_name_for_safety(tool_name) in USER_WORDS_ONLY_TOOLS:
-            return self._check_user_words_only(tool_name, _tool_args_mapping(tool_args) or {})
+            user_words_args = _tool_args_mapping(tool_args) or {}
+            _hold_private_values(user_words_args, self._user_own_words)
+            return self._check_user_words_only(tool_name, user_words_args)
         if not self._tainted or not tool_name:
             return None
         args = _tool_args_mapping(tool_args) or {}

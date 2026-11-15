@@ -18,7 +18,7 @@ import os
 import tempfile
 import threading
 import time
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
 from typing import Literal, Protocol, TypeVar, overload
 
@@ -2643,6 +2643,7 @@ class SettingsManager:
         blocks here always re-reads the cache/DB *after* the first writer's
         commit, rather than working from a pre-lock snapshot.
         """
+        _hold_private_setting_values(user_id, updates)
         with self._lock_for_user_settings_write(user_id):
             cached = self._user_settings_cache.get(user_id)
             if cached is not None:
@@ -2813,6 +2814,7 @@ class SettingsManager:
         save_immediately: bool,
         trusted_system_write: bool = False,
     ) -> bool:
+        _hold_private_setting_values(None, updates)
         # RLock spans snapshot, merge and save, preventing concurrent writers
         # from replacing each other's keys. Readers see only published blobs.
         with self._save_lock:
@@ -3755,6 +3757,18 @@ class SettingsManager:
 
 # Use standardized singleton pattern
 get_settings_manager = create_singleton_getter("settings_manager", SettingsManager)
+
+
+def _hold_private_setting_values(user_id: str | None, updates: Mapping[str, object]) -> None:
+    """A delivery address written from anywhere (Settings screen, tool) is kept out of every log by value."""
+    if "delivery_address" not in updates:
+        return
+    try:
+        from intent.sensitive_values import note_settings_write
+
+        note_settings_write(user_id, updates)
+    except Exception:  # noqa: BLE001 - masking must never block a settings write
+        logger.debug("Could not hold the delivery address for the log mask", exc_info=True)
 
 
 def save_delivery_address(

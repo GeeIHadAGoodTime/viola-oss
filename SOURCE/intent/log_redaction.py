@@ -737,5 +737,12 @@ def redact_diagnostic_payload(blob: Any) -> Any:
     if isinstance(redacted, set):
         return {redact_diagnostic_payload(item) for item in redacted}
     if isinstance(redacted, str):
-        return mask_secrets_in_text(redacted, include_card_data=False)
+        return _mask_private_values(mask_secrets_in_text(redacted, include_card_data=False))
     return redacted
+
+
+def _mask_private_values(text: str) -> str:
+    """The user's own private values (a saved address), masked by value: see intent/sensitive_values.py."""
+    from intent.sensitive_values import mask
+
+    return str(mask(text))

@@ -591,8 +591,10 @@ class AIDebugTracer:
             filename = f"ai_trace_{trace.trace_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
             filepath = self.log_dir / filename
 
+            from intent.sensitive_values import mask_value
+
             with open(filepath, "w", encoding="utf-8") as f:
-                json.dump(asdict(trace), f, indent=2, default=str)
+                json.dump(mask_value(asdict(trace)), f, indent=2, default=str)
 
             if self.debug_level == DebugLevel.AGGRESSIVE:
                 logger.debug("[AI-DEBUG] Trace saved: %s", filepath)
