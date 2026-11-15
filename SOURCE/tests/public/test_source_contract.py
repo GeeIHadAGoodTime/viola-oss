@@ -452,15 +452,19 @@ class CurrentTrackRatingContract(unittest.IsolatedAsyncioTestCase):
                 rating.spotify.set_spotify_track_saved.assert_called_once_with('synthetic',saved,user_id='user-synthetic')
                 getattr(rating,method).assert_called_once()
 
-    async def test_spotify_failure_is_reported_and_not_saved_locally(self):
+    async def test_spotify_failure_still_saves_the_rating_locally(self):
         from types import SimpleNamespace
         track=SimpleNamespace(id='spotify:track:synthetic',video_id=None,title='Synthetic',artist=None)
-        result,rating=await self._rate(SimpleNamespace(current_track=track),'liked',
-                                       spotify_track_id='synthetic',spotify_error='web player not ready')
-        self.assertFalse(result['ok'])
-        self.assertEqual(result['error'],'web player not ready')
-        self.assertEqual(result['spotify'],{'track_id':'synthetic','saved':None,'error':'web player not ready'})
-        rating.thumbs_up.assert_not_called();rating.thumbs_down.assert_not_called();rating.remove_rating.assert_not_called()
+        for value,method in [('liked','thumbs_up'),('disliked','thumbs_down'),(None,'remove_rating')]:
+            with self.subTest(value=value):
+                result,rating=await self._rate(SimpleNamespace(current_track=track),value,
+                                               spotify_track_id='synthetic',spotify_error='web player not ready')
+                self.assertTrue(result['ok'],result)
+                self.assertNotIn('error',result)
+                self.assertEqual(result['spotify'],{'track_id':'synthetic','saved':None,'error':'web player not ready'})
+                getattr(rating,method).assert_called_once()
+                if value=='liked':
+                    self.assertIn('could not add it to your Spotify Liked Songs',result['message'])
 
     async def test_missing_track_and_invalid_rating_do_not_mutate_ratings(self):
         from types import SimpleNamespace

@@ -6,6 +6,7 @@
 import { forwardRef } from 'react';
 import PropTypes from 'prop-types';
 import { THEME } from '../../config';
+import { stageTitle } from '../../utils/trackTitle';
 import styles from './MediaArea.module.css';
 
 // Placeholder image for when no album art is available — uses transparent fill
@@ -120,7 +121,7 @@ const MediaArea = forwardRef(({
           />
           <div className={styles.albumArtOverlay}>
             <div className={styles.albumArtTitle}>
-              {nowPlaying?.title || ''}
+              {nowPlaying ? stageTitle(nowPlaying) : ''}
             </div>
             {nowPlaying?.artist && (
               <div className={styles.albumArtArtist}>

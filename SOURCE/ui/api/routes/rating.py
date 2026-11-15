@@ -39,6 +39,7 @@ async def _sync_spotify_liked_songs(current_track: object, rating_value: object)
         return {"track_id": track_id, "saved": None, "error": str(exc)}
     return {"track_id": track_id, "saved": saved}
 
+
 log = get_logger(__name__)
 
 
@@ -125,9 +126,7 @@ def register_rating_routes(context: ApiContext, toolbox: RouteToolbox) -> None:
                     state = state_reader() if callable(state_reader) else None
                     if state:
                         current_track = (
-                            state.get("now_playing")
-                            if isinstance(state, dict)
-                            else getattr(state, "now_playing", None)
+                            state.get("now_playing") if isinstance(state, dict) else getattr(state, "now_playing", None)
                         )
 
                 if not current_track:
@@ -159,38 +158,43 @@ def register_rating_routes(context: ApiContext, toolbox: RouteToolbox) -> None:
                     if expected_track_id != video_id:
                         return error_response("rating_track_changed", status_code=409)
 
-                rating_system = get_rating_system()
-                spotify_sync = await _sync_spotify_liked_songs(current_track, rating_value)
-                if spotify_sync is not None and spotify_sync.get("error"):
-                    # The Spotify library is the user's real list; do not
-                    # report a like that did not reach it.
-                    return {
-                        "ok": False,
-                        "video_id": video_id,
-                        "rating": rating_value,
-                        "spotify": spotify_sync,
-                        "error": spotify_sync["error"],
-                    }
+                if rating_value not in ("liked", "disliked", None):
+                    return error_response(f"Invalid rating value: {rating_value}", status_code=400)
 
+                # The rating is Viola's own and is saved first, so it always
+                # succeeds locally. Mirroring it into Spotify's Liked Songs is
+                # best effort: Spotify answering an error (for example HTTP
+                # 429 to the web player's token) must not undo or block it.
+                rating_system = get_rating_system()
                 if rating_value == "liked":
                     rating_system.thumbs_up(video_id=video_id, title=title, artist=artist)
                     log.info("👍 Song rated (liked): %s - %s (%s)", title, artist, video_id)
-                    return _with_spotify({"ok": True, "video_id": video_id, "rating": "liked"}, spotify_sync)
                 elif rating_value == "disliked":
                     rating_system.thumbs_down(video_id=video_id, title=title, artist=artist)
-                    log.info(
-                        "👎 Song rated (disliked): %s - %s (%s)",
-                        title,
-                        artist,
-                        video_id,
-                    )
-                    return _with_spotify({"ok": True, "video_id": video_id, "rating": "disliked"}, spotify_sync)
-                elif rating_value is None:
+                    log.info("👎 Song rated (disliked): %s - %s (%s)", title, artist, video_id)
+                else:
                     rating_system.remove_rating(video_id)
                     log.info("🔄 Rating removed: %s - %s (%s)", title, artist, video_id)
-                    return _with_spotify({"ok": True, "video_id": video_id, "rating": None}, spotify_sync)
-                else:
-                    return error_response(f"Invalid rating value: {rating_value}", status_code=400)
+
+                try:
+                    spotify_sync = await _sync_spotify_liked_songs(current_track, rating_value)
+                except Exception as exc:
+                    spotify_sync = {"track_id": None, "saved": None, "error": str(exc)}
+                payload = {"ok": True, "video_id": video_id, "rating": rating_value}
+                if spotify_sync is not None and spotify_sync.get("error"):
+                    log.warning(
+                        "Spotify Liked Songs update failed for %s (rating %s, saved in Viola): %s",
+                        video_id,
+                        rating_value,
+                        spotify_sync["error"],
+                    )
+                    if rating_value == "liked":
+                        payload["message"] = "Liked in Viola, but I could not add it to your Spotify Liked Songs."
+                    elif rating_value is None:
+                        payload["message"] = (
+                            "Rating cleared in Viola, but I could not remove it from your Spotify Liked Songs."
+                        )
+                return _with_spotify(payload, spotify_sync)
             except Exception as exc:
                 log.debug("Operation failed: %s", exc)
                 return handle_route_error(exc, "set_rating")

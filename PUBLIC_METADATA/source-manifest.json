@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "6d843575a19fd18a39ae3d82c51e6be5ebeb2bc2",
-  "sha256": "538af1fe6108c437fe4382005b53682d93ea53ca97090178b3bf9145eb75139c",
+  "revision": "b0589e22510d738aa4ed4386b0ca916e7c848a3b",
+  "sha256": "bc82493c668fa9766a21e34d52717930b2f1638bd22d3a706a2991dbdf0faf95",
   "files": [
     {
       "path": ".env.example",
@@ -150,8 +150,8 @@
     },
     {
       "path": "audio_core/aec_reference_base.py",
-      "sha256": "43c61fff0f89b30290666f33c0c8b725021c2543ef503424e7fdd721802afec2",
-      "bytes": 28247
+      "sha256": "7bdb632a6e5b9163cbd67b292ff4b1efcc37be0b6cfaaad3a4b52035c0496ec6",
+      "bytes": 28050
     },
     {
       "path": "audio_core/calibration/__init__.py",
@@ -340,8 +340,8 @@
     },
     {
       "path": "audio_core/own_playback.py",
-      "sha256": "17ddf32c70e22117aa0290c4d2667ddadf23796800cc74a2087b597e3598aaf2",
-      "bytes": 8704
+      "sha256": "5114de409fbe9de90938728ada24f3dd0ec39c64e77dc30abe33370ba8787441",
+      "bytes": 8008
     },
     {
       "path": "audio_core/portaudio_guard.py",
@@ -1255,8 +1255,8 @@
     },
     {
       "path": "core/voice_command_handler.py",
-      "sha256": "d25e5022a46cdca06d646220894172d7e8b5eb8ab8074435d863c7343ac199fd",
-      "bytes": 130077
+      "sha256": "97a6572efdf07e4520ae21d25f7081ca56d32d6ddcc240b3e91af73cb297d2e3",
+      "bytes": 122614
     },
     {
       "path": "core/voice_orchestrator.py",
@@ -1650,8 +1650,8 @@
     },
     {
       "path": "intent/command_executor.py",
-      "sha256": "f83c120c061c9e9096879c6f799f7206b75251d795ef8d677c363d38fd0d9f3f",
-      "bytes": 119210
+      "sha256": "41cd2d6c295761250788f4d59d7831a8097e2454e1122cdd71e967e779dcb2f2",
+      "bytes": 119546
     },
     {
       "path": "intent/commands/__init__.py",
@@ -2120,8 +2120,8 @@
     },
     {
       "path": "intent/tools/media_tools.py",
-      "sha256": "a3fea509653094ebf1aa0a2fda5cbfd9683c7e1beb4869ff8ac7ab8f996999c1",
-      "bytes": 42333
+      "sha256": "6409b2a7e052095e24a3d627c8a1fda6004157d49e03cd5861a57d49cba40bb7",
+      "bytes": 43553
     },
     {
       "path": "intent/tools/memory.py",
@@ -2135,8 +2135,8 @@
     },
     {
       "path": "intent/tools/music_tools.py",
-      "sha256": "0ea41e23b032c0e4fa34ddb946251ff5fe2ec20718961f836a95cc33a0a824ca",
-      "bytes": 82546
+      "sha256": "cfd9d2bde9359b6f1c6e495faf799e0da41d5df0a4e3816cff64a9ace2b8c4d3",
+      "bytes": 83994
     },
     {
       "path": "intent/tools/notification_tools.py",
@@ -2475,13 +2475,18 @@
     },
     {
       "path": "models/player.py",
-      "sha256": "dc67efa576a2fc946bd561e30614454b53e7d050cccafd430233f657b27dc17f",
-      "bytes": 11522
+      "sha256": "4ea39d16b1bcebac188d0646a5dedf585fbf50266615ca340e0108c91f3d896d",
+      "bytes": 12378
     },
     {
       "path": "models/state_manager.py",
       "sha256": "c48e3ccdedeb514ace64d2d8218b5d4200a6c6139f64102a2a924ccf0931d4c6",
       "bytes": 16042
+    },
+    {
+      "path": "models/track_title.py",
+      "sha256": "9598141faf13d7eebdcda6d586e0ff4dfa9c8e4f516eed02111adc1b1b88b7ce",
+      "bytes": 1030
     },
     {
       "path": "models/transactions.py",
@@ -2930,8 +2935,8 @@
     },
     {
       "path": "music/playlists/playlist_player.py",
-      "sha256": "be2393a5df6d8e6d0fc45de68874e9d48a48949741c70265ba4837b8a22141c5",
-      "bytes": 10686
+      "sha256": "2025a60a87ccf2b2530c270d2e89291037a02b0dc624933fadb2806c56ed6c03",
+      "bytes": 10949
     },
     {
       "path": "music/playlists/playlist_store.py",
@@ -3180,8 +3185,8 @@
     },
     {
       "path": "music/resolution/provider_router.py",
-      "sha256": "54d72369b5d3f9585aaa84cd19cb3dc31001ae7230aa84940e60f9ed4ab895ec",
-      "bytes": 33238
+      "sha256": "6ddc61980afa90176d4e503ff4af65ab0c89c44cb7ceca2a0761eff842ad9d5e",
+      "bytes": 34264
     },
     {
       "path": "music/resolution/provider_router_metadata.py",
@@ -3319,6 +3324,16 @@
       "bytes": 6341
     },
     {
+      "path": "music/spotify/oembed.py",
+      "sha256": "7b4e35f89b46d2234c26c367c0dea46cfcee86d91c967924f5a710c71710dc93",
+      "bytes": 1558
+    },
+    {
+      "path": "music/track_display_cache.py",
+      "sha256": "25f8efc2fd9f0f172b78523daf9909f1dae19dc6c65527a205f1127f61f2d352",
+      "bytes": 2533
+    },
+    {
       "path": "music/youtube_embed.py",
       "sha256": "3f2bfe41f410fff43d31c982e6c700a6aa0e4c04836bba6466cccc72d3147744",
       "bytes": 2946
@@ -3385,8 +3400,8 @@
     },
     {
       "path": "playback/engines/spotify_cdp.py",
-      "sha256": "31f365eca5b8a0a55aff60478fec0e54c542a68aa479fdbb88a4559e0cab26da",
-      "bytes": 44392
+      "sha256": "0a862fafb1bf208cae664363aae4351a2bef4af411e76fae85d5b57cf46ff18f",
+      "bytes": 47696
     },
     {
       "path": "playback/engines/youtube.py",
@@ -3990,8 +4005,8 @@
     },
     {
       "path": "services/alarm_ringer.py",
-      "sha256": "280e6a8ecf62408bbdf2884003ab9737efe0b5dce82b4f8ff8289276d1e7fc1a",
-      "bytes": 15392
+      "sha256": "0c8e6226368669db7731e3e5e220e8e22d8d05692d7dd70e50626110299342b7",
+      "bytes": 15221
     },
     {
       "path": "services/api_cache.py",
@@ -6440,8 +6455,8 @@
     },
     {
       "path": "tests/public/test_source_contract.py",
-      "sha256": "4798ac1f49f2b5ef1154e245c1e0ca61e8dc35e13136ec168c1b4cc79015c555",
-      "bytes": 56247
+      "sha256": "bccbcf550ae1d9a3a4d5a378e580e8fda910054305958f3380114e41f68c9b30",
+      "bytes": 56481
     },
     {
       "path": "tests/public/test_speech_volume_wiring.py",
@@ -9440,8 +9455,8 @@
     },
     {
       "path": "ui/api/models.py",
-      "sha256": "817af49677c15801cf84e850b32ed45b7f45bf742bc4622b3ade4f97bbddfbd3",
-      "bytes": 5406
+      "sha256": "0334168d4d3fa0115133c6fbcf8a2be4c34026236e210b5838bb9e41274b75b7",
+      "bytes": 5527
     },
     {
       "path": "ui/api/routes/__init__.py",
@@ -9530,8 +9545,8 @@
     },
     {
       "path": "ui/api/routes/control.py",
-      "sha256": "2e9e956bfc7b9bc4c32a9c7f2aa7c3879b366eb877f5a4745864509e9c2383de",
-      "bytes": 68791
+      "sha256": "fc8f9b21d5f16f67d3acea71af8c204a7c3c9e084fd0dd99a11d4cdbac469651",
+      "bytes": 68950
     },
     {
       "path": "ui/api/routes/cost.py",
@@ -9660,8 +9675,8 @@
     },
     {
       "path": "ui/api/routes/rating.py",
-      "sha256": "0446a6e2562f3a0f1b90b557b3c1e870fc5458dbd6b65170aad271d82a6e9736",
-      "bytes": 13316
+      "sha256": "4a64f3cc459fa740eec68908cdd593c191adc434ada7e9cf5c80a6c7966df1a5",
+      "bytes": 13694
     },
     {
       "path": "ui/api/routes/regression_stubs.py",
@@ -10150,8 +10165,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "5723f11aafb98c0dc8376305ae230d666cbe305bde9e59aa50edf297f1c8347d",
-      "bytes": 204445
+      "sha256": "c50aaf3a2958eaaea8b1919b989119789f2dfd36be4f62272565e522b9256a7b",
+      "bytes": 204764
     },
     {
       "path": "ui/react-app/src/SmartDisplay.longAnswer.test.jsx",
@@ -11360,8 +11375,8 @@
     },
     {
       "path": "ui/react-app/src/components/player/MediaArea.jsx",
-      "sha256": "0e25c3e6e52d30e9a33493165f42ffb5569c4cfba2357331b1440346e983a833",
-      "bytes": 7850
+      "sha256": "f03f517a92c7ef854380bad01acf1d3e4b894451c9654770232ea9b7168c72fe",
+      "bytes": 7920
     },
     {
       "path": "ui/react-app/src/components/player/MediaArea.module.css",
@@ -11390,8 +11405,8 @@
     },
     {
       "path": "ui/react-app/src/components/player/PlayerSection.jsx",
-      "sha256": "2f3eba5dc93e9060e0e3c9a5069cf628cf5215180e31d26a5508e99957863687",
-      "bytes": 7287
+      "sha256": "50febde35af8f576a95d458dcc4e1e35fbe610974a7f7a23067911d01bc8982f",
+      "bytes": 7373
     },
     {
       "path": "ui/react-app/src/components/player/PlayerSection.module.css",
@@ -11400,8 +11415,8 @@
     },
     {
       "path": "ui/react-app/src/components/player/PlayerSection.test.jsx",
-      "sha256": "2f301e176fb9727f6467f4fd9bf8af5a922c6e7789e8255f2b78bad6265ca15e",
-      "bytes": 4092
+      "sha256": "4bb038711da422a6ee67bc0fac10ed1c2b4c1976bb187101d5dd3eddc23c89a5",
+      "bytes": 5061
     },
     {
       "path": "ui/react-app/src/components/player/ProgressBar.jsx",
@@ -12784,6 +12799,16 @@
       "bytes": 668
     },
     {
+      "path": "ui/react-app/src/utils/trackTitle.js",
+      "sha256": "5e7471a19368182ee3590afa926007682ae239664f1f2fa6b0665cedfd676b8c",
+      "bytes": 1170
+    },
+    {
+      "path": "ui/react-app/src/utils/trackTitle.test.js",
+      "sha256": "fee1da48dae17e5c32c0154b283fafd969d6fba23b3de59d80347508659a48ad",
+      "bytes": 1096
+    },
+    {
       "path": "ui/react-app/src/utils/ttsPlayback.js",
       "sha256": "03a1ef027567ab9cc3f5f2e99205ce477ab761b08ce6fa2043a0fec29a218fb6",
       "bytes": 5290
@@ -13560,8 +13585,8 @@
     },
     {
       "path": "voice/continuous_capture.py",
-      "sha256": "0ff3b53e5c0d54b1da8608de5c4efd25155e1dcc0a19eeddace82d6a4944a4e8",
-      "bytes": 32285
+      "sha256": "a063c28fd2de3ea5024636fa2a22b5bd6a2a780dfd6149b78b1dfb1608316885",
+      "bytes": 29496
     },
     {
       "path": "voice/customer_composition.py",
@@ -14015,8 +14040,8 @@
     },
     {
       "path": "voice/wake_detector/own_speech.py",
-      "sha256": "b39c5372361547cc1ab44ab9770fc3f238e665bc9909208137b088ea87b150d2",
-      "bytes": 12167
+      "sha256": "31ce984bd14349a37261785acd15ecd304a642c76bcbdc01cdb5a609fd3b4da8",
+      "bytes": 10509
     },
     {
       "path": "voice/wake_detector/resampler.py",
