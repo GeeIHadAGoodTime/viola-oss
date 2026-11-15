@@ -837,6 +837,37 @@ def _schedule_job(key: str, job: _ExtractionJob) -> bool:
     return False
 
 
+def schedule_address_check(*, user_id: str, user_text: str, task_id: str = "") -> bool:
+    """The address check alone for a turn that ended by cancellation or an error; never awaits.
+
+    The user's words of such a turn are already in the logs (the pipeline line,
+    agent-steps, agent_tasks), but the turn never reaches the post-turn step. The
+    job starts as its own task on the running loop, so cancelling the turn's task
+    cannot stop it and Stop waits for nothing. No memory extraction. The
+    background call is accounted like every background call (its own spend
+    reservation and usage record), never on the turn's task.
+    """
+    own_text = str(user_text or "").strip()
+    if not own_text:
+        return False
+    try:
+        _schedule_job(
+            _extraction_key(user_id),
+            _ExtractionJob(
+                user_id=user_id,
+                transcript="",
+                task_id=task_id,
+                tools_called=(),
+                user_text=own_text,
+                extract_memory=False,
+            ),
+        )
+    except (RuntimeError, ValueError) as exc:  # no running loop, or no account
+        logger.debug("Address check for an ended turn not started: %s", type(exc).__name__)
+        return False
+    return True
+
+
 async def extract_memories_after_turn(
     *,
     user_id: str,
@@ -909,5 +940,6 @@ __all__ = [
     "extract_memories_after_turn",
     "model_visible_messages_to_transcript",
     "sanitize_memory_candidate_text",
+    "schedule_address_check",
     "turn_used_memory_write",
 ]
