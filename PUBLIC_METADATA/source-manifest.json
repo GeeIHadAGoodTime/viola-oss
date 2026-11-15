@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "04acb52e3432640d62a620de1327632487b13726",
-  "sha256": "9f9f1abb470073cbb8fa113cc571415d5c8417f6fa13a57955397ca3f0bc562a",
+  "revision": "ed78d143aa5de8eb9888dd26fd958edec2b29896",
+  "sha256": "1e205b79242631446fe81c51833bd5c57738291903142428aa4871c9fc0ebb03",
   "files": [
     {
       "path": ".env.example",
@@ -6480,8 +6480,8 @@
     },
     {
       "path": "tests/public/test_source_contract.py",
-      "sha256": "ab001035d5a7615b0b36a9002024de24cdeb593193b9bd8d4fc2a54c55741d07",
-      "bytes": 57660
+      "sha256": "98f74635c7f07557bfe5653af4109ccdb8842f6841fa9bc0254df4f9052fa51d",
+      "bytes": 57707
     },
     {
       "path": "tests/public/test_speech_volume_wiring.py",
