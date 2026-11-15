@@ -1269,7 +1269,9 @@ class SchedulerService:
             if callable(speak):
                 try:
                     # Said with the card's wording ("Reminder: Stretch"), not the bare word.
-                    await speak(reminder_wording(message))
+                    words = reminder_wording(message)
+                    logger.info("Scheduled reminder schedule=%s: saying %r", schedule.id, words)
+                    await speak(words)
                     spoken = True
                 except (RuntimeError, OSError, TypeError, ValueError) as exc:
                     logger.warning("Scheduled reminder TTS failed for schedule=%s: %s", schedule.id, exc)
