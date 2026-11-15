@@ -837,6 +837,13 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
     }
     return merged;
   }, [activeCallMeta, callBriefing, activeCallId, callAudioLatestCostUsd, callAudioRecipientState]);
+  // The desktop window's surface watchdog reads these before any page reload:
+  // a reload during a live call or a running task would wipe what is on screen.
+  useEffect(() => {
+    const root = document.documentElement;
+    root.setAttribute('data-viola-live-call', activeCallId ? '1' : '0');
+    root.setAttribute('data-viola-task-running', agentTaskActive ? '1' : '0');
+  }, [activeCallId, agentTaskActive]);
   const isPhoneMode = displayMode === 'phone_tab' || displayMode === 'phone_call';
   const refreshPhoneCallQueue = useCallback(async () => {
     try {

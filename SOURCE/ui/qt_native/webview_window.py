@@ -2989,6 +2989,9 @@ class ViolaWebViewWindow(QMainWindow):
             return False
         if getattr(self, "_browser_overlay_placed", False):
             return False  # the agent browser view may cover the corner
+        stack = getattr(self, "_content_stack", None)
+        if stack is not None and stack.currentIndex() != 0:
+            return False  # the video surface is showing instead of the page
         update_banner = getattr(self, "update_banner", None)
         return not (update_banner is not None and update_banner.isVisible())
 
