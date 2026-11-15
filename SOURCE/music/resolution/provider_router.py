@@ -658,12 +658,18 @@ class ProviderRouter:
         if track_id_for_uri:
             spotify_uri = "spotify:track:%s" % track_id_for_uri
             placeholder_url = "https://open.spotify.com/track/%s" % track_id_for_uri
+            # A track played before keeps its real title, artist and cover, so
+            # the stage never shows the raw URI while the page loads.
+            from music.track_display_cache import lookup as _known_track_display
+
+            known = _known_track_display(track_id_for_uri)
             item = QueueItem(
                 id=str(uuid.uuid4()),
-                title=query,  # caller may have richer metadata; runtime can update on poll
+                title=known.get("title") or query,  # runtime updates it from the page
                 url=placeholder_url,
                 source="spotify_cdp",
-                artist="",
+                artist=known.get("artist", ""),
+                artwork_url=known.get("artwork_url"),
                 provider="spotify",
                 playback_mode="spotify_cdp",
                 capabilities={

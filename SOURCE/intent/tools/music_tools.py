@@ -1850,9 +1850,8 @@ async def rate_track_handler(
         ui_rating = {"thumbs_up": "liked", "thumbs_down": "disliked"}.get(rating_value)
         data = await _post_runtime("/v1/rating", {"rating": ui_rating}, timeout=10.0)
         response_data = data.get("data") if isinstance(data.get("data"), dict) else {}
-        spotify_sync = data.get("spotify") or response_data.get("spotify")
-        if isinstance(spotify_sync, dict) and spotify_sync.get("error"):
-            return ToolResult(ok=False, data=data, error=str(spotify_sync["error"]))
+        # A Spotify error only means the optional Liked Songs mirror failed;
+        # the rating itself was saved, so it is not a failed rating.
         if data.get("ok"):
             rated_track_id = data.get("video_id") or response_data.get("video_id") or ""
             result_data: dict[str, Any] = {
@@ -1863,6 +1862,9 @@ async def rate_track_handler(
             }
             if rated_track_id:
                 result_data["track_id"] = rated_track_id
+            route_message = data.get("message") or response_data.get("message")
+            if rating_value != "thumbs_down" and isinstance(route_message, str) and route_message:
+                result_data["message"] = route_message
             if rating_value == "thumbs_down":
                 return await _skip_after_dislike(result_data)
             return ToolResult(ok=True, data=result_data)

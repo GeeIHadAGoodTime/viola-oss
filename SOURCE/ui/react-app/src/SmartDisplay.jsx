@@ -2633,8 +2633,13 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       // A queued click for a track we left must never rate the next track.
       if (ratingSessionRef.current !== session) return;
       try {
-        await api.setRating(actualRating, expectedTrackId);
+        const saved = await api.setRating(actualRating, expectedTrackId);
         settleRating(true);
+        // Saved in Viola but Spotify did not take it: keep the saved state
+        // on the button and say so plainly (never claim it reached Spotify).
+        if (saved && typeof saved.message === 'string' && saved.message) {
+          addToast({ message: saved.message, level: 'warning' });
+        }
         // Dislike means "not this one": same skip as the Next button.
         if (actualRating === 'disliked') runSkipAction();
       } catch (err) {

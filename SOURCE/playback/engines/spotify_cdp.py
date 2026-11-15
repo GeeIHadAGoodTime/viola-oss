@@ -17,6 +17,7 @@ from typing import Any
 
 from core.logging_config import get_logger
 from models.player import QueueItem
+from music.track_display_cache import looks_like_track_id, remember as remember_track_display, track_id_from_item
 
 from .base import (
     PlaybackCapabilities,
@@ -434,10 +435,28 @@ class SpotifyCDPEngine(ProviderPlaybackEngine):
         item = handle.item
         if item is None:
             return
+        if isinstance(current_track, str) and looks_like_track_id(current_track):
+            # Never show an id as the title: keep the last known good one.
+            self._logger.warning(
+                "SPOTIFY_TITLE_IS_ID source=poller_page_read value=%s item_title=%s",
+                current_track[:60],
+                (item.title or "")[:60],
+            )
+            current_track = None
         if isinstance(current_track, str) and current_track and item.title != current_track:
             item.title = current_track
         if isinstance(artist, str) and artist and item.artist != artist:
             item.artist = artist
+        try:
+            artwork = handle.artwork_url()
+        except Exception:
+            artwork = None
+        remember_track_display(
+            track_id_from_item(item),
+            title=item.title,
+            artist=item.artist,
+            artwork_url=artwork or item.artwork_url,
+        )
 
     def _adopt_direct_uri_metadata(self, item: QueueItem, played_meta: Any) -> None:
         """Populate human title/artist on a direct-URI play, at play start.
@@ -455,10 +474,18 @@ class SpotifyCDPEngine(ProviderPlaybackEngine):
             return
         title = str(played_meta.get("title") or "").strip()
         artist = str(played_meta.get("artist") or "").strip()
+        if title and looks_like_track_id(title):
+            self._logger.warning(
+                "SPOTIFY_TITLE_IS_ID source=direct_uri_metadata value=%s item_title=%s",
+                title[:60],
+                (item.title or "")[:60],
+            )
+            title = ""
         if title:
             item.title = title
         if artist:
             item.artist = artist
+        remember_track_display(track_id_from_item(item), title=title, artist=artist)
         if title or artist:
             self._logger.info(
                 "Spotify CDP direct-URI metadata adopted: title=%s artist=%s",
