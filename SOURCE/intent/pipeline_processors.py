@@ -17,6 +17,7 @@ from diagnostics.bus import get_diagnostics_bus
 from intent.pipeline_contracts import PipelineResult
 from intent.response_cleanup import strip_json_template as _strip_json_template
 from intent.types import RoutedCommand
+from services.llm.answer_stream import QUICK_MUSIC_ACTION_FLAG, QUICK_MUSIC_INSTANT_COMMANDS
 from services.llm.no_result import build_ai_no_result
 from services.llm.token_limits import configured_llm_max_tokens_cap
 
@@ -50,6 +51,22 @@ _LLM_FINAL_COMMANDS = frozenset(
         "skip",
     }
 )
+
+
+def _is_quick_music_action(command: str, ok: Any, data: dict[str, Any]) -> bool:
+    """An instant command that did a quick music action and it worked.
+
+    A no-op ("Nothing is playing.") is not an action: its words are the answer.
+    A result already marked ``spoken`` is never one: "next" is a silent track
+    change on purpose (Jay, build 7: the new song is the answer), so it gets
+    neither words nor the tone.
+    """
+    return (
+        bool(ok)
+        and command in QUICK_MUSIC_INSTANT_COMMANDS
+        and not data.get("noop")
+        and not data.get("spoken")
+    )
 
 
 class IntentPipelineProcessors:
@@ -140,6 +157,10 @@ class IntentPipelineProcessors:
             }
             if isinstance(result.get("error_state"), dict):
                 result_data["error_state"] = result["error_state"]
+            if _is_quick_music_action(command, result_ok, result_data):
+                # The playback tool's done tone, for the same action reached
+                # without the model (no tool event ever reaches the speech gate).
+                result_data[QUICK_MUSIC_ACTION_FLAG] = True
             return PipelineResult(
                 ok=result_ok,
                 intent=command,
