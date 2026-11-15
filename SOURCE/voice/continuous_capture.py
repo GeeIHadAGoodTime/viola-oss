@@ -73,6 +73,8 @@ MODE_WAKE = "wake"
 MODE_RECORD = "record"
 MODE_VAD_MONITOR = "vad_monitor"
 MODE_PAUSED = "paused"
+# Her audio reached the speaker this recently: a reply is playing.
+_UNMONITORED_PLAYING_S = 0.3
 
 _VALID_MODES = frozenset({MODE_WAKE, MODE_RECORD, MODE_VAD_MONITOR, MODE_PAUSED})
 
@@ -185,6 +187,11 @@ class ContinuousMicCapture:
         self._last_speech_at: float | None = None
         # Speech chunks needed for the next candidate (VAD_REARM_WINDOWS after a re-arm).
         self._interrupt_windows = VAD_INTERRUPT_WINDOWS
+        # The echo record of a reply no voice turn speaks (a typed reply, a
+        # reminder): True while one is being recorded; "settled" once she has
+        # been quiet long enough that her next sound is a new reply.
+        self._unmonitored_reply = False
+        self._unmonitored_settled = True
 
     # -------------------------------------------------------------------
     # Lifecycle
@@ -240,6 +247,9 @@ class ContinuousMicCapture:
             aec_proc = self._aec_processor
             aec_ref = self._aec_reference_source
             processed_feed = self._processed_feed_enabled
+
+        if current_mode != MODE_VAD_MONITOR:
+            self._watch_unmonitored_reply()
 
         if current_mode == MODE_VAD_MONITOR:
             if processed_feed:
@@ -366,12 +376,50 @@ class ContinuousMicCapture:
 
         if old_mode != mode:
             logger.debug("ContinuousMicCapture mode: %s -> %s", old_mode, mode)
+            if mode == MODE_VAD_MONITOR or old_mode == MODE_VAD_MONITOR:
+                # A voice turn owns the record of this reply; the next
+                # unmonitored one starts only after she has been quiet.
+                with self._mode_lock:
+                    self._unmonitored_reply = False
+                    self._unmonitored_settled = False
             if mode == MODE_VAD_MONITOR:
                 self._echo_window_action(start=True)
             elif old_mode == MODE_VAD_MONITOR:
                 self._echo_window_action(start=False)
 
-    def _echo_window_action(self, *, start: bool) -> None:
+    def _watch_unmonitored_reply(self) -> None:
+        """The `[AEC_REPLY]` line for a reply no voice turn speaks (a typed reply, a reminder).
+
+        1.0.5 build-11 laptop: the line was written only around a voice turn's
+        reply, so with typed questions (the tester's usual path, nobody talking)
+        the echo canceller could not be read at all (P1). Her own playback record
+        says when she talks; the record starts with her first sound and is logged
+        once she has been quiet for a pause. Called for every microphone chunk
+        outside the barge-in monitor. Never raises.
+        """
+        try:
+            from audio_core.own_playback import UTTERANCE_GAP_S, get_own_playback
+
+            since = get_own_playback().seconds_since_speech()
+            action: str | None = None
+            with self._mode_lock:
+                if self._unmonitored_reply:
+                    if since >= UTTERANCE_GAP_S:
+                        self._unmonitored_reply = False
+                        self._unmonitored_settled = True
+                        action = "report"
+                elif since >= UTTERANCE_GAP_S:
+                    self._unmonitored_settled = True
+                elif since < _UNMONITORED_PLAYING_S and self._unmonitored_settled:
+                    self._unmonitored_settled = False
+                    self._unmonitored_reply = True
+                    action = "start"
+            if action is not None:
+                self._echo_window_action(start=action == "start", outside_voice_turn=True)
+        except Exception:  # noqa: BLE001, RUF100 - a diagnostic must never break capture
+            logger.debug("Unmonitored reply echo record failed", exc_info=True)
+
+    def _echo_window_action(self, *, start: bool, outside_voice_turn: bool = False) -> None:
         """Start, or log, the echo canceller's record for the reply she is speaking.
 
         One `[AEC_REPLY]` line per spoken reply settles on a real laptop whether
@@ -397,7 +445,7 @@ class ContinuousMicCapture:
             logger.info(
                 "[AEC_REPLY] backend=%s while she spoke %.1fs: echo removed median %.1f dB (worst 10%% %.1f dB), "
                 "her voice at the mic %.0f dBFS, left after cancelling %.0f dBFS (loudest 10%% %.0f dBFS), "
-                "reference active %.0f%%, delay %s ms, barge-in candidates %d",
+                "reference active %.0f%%, delay %s ms, %s",
                 diagnostics.get("active_backend") or diagnostics.get("backend") or getattr(processor, "name", "?"),
                 summary["seconds_playing"],
                 summary["erle_median_db"],
@@ -407,7 +455,10 @@ class ContinuousMicCapture:
                 summary["residual_p90_dbfs"],
                 100.0 * summary["reference_active_share"],
                 f"{delay / 16:.0f}" if isinstance(delay, (int, float)) else "?",
-                candidates,
+                # No voice turn: no barge-in monitor ran, a wake is the only way in.
+                "no voice turn (typed reply or reminder)"
+                if outside_voice_turn
+                else "barge-in candidates %d" % candidates,
             )
         except Exception:  # noqa: BLE001, RUF100 - a diagnostic must never break capture
             logger.debug("Echo window %s failed", "start" if start else "report", exc_info=True)
