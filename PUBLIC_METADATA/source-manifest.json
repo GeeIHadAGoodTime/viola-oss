@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "b01fd8be616e42383a5d6c1425a2d5f6d42dc493",
-  "sha256": "979e0b39e018cf456d75cb6b9d2471ca131282573b1c6bf354f1eaae293b3f0e",
+  "revision": "a3fe4099fdb22d4764441265bdb971c564b19736",
+  "sha256": "31d55076d2f21c22836db3712752cb1540d33eee8cfaad9e7c78aaa15b03983a",
   "files": [
     {
       "path": ".env.example",
@@ -595,8 +595,8 @@
     },
     {
       "path": "auth/models.py",
-      "sha256": "eb3e7f0e072706c4724e44b14c11a5c5c894d5f250e1bb367abecb9117ddf50d",
-      "bytes": 25842
+      "sha256": "335e9a1108b41326839fd56d615be160f873cd582603d24f73823404b66a61a0",
+      "bytes": 26202
     },
     {
       "path": "auth/per_user_rate_limit.py",
@@ -3865,8 +3865,8 @@
     },
     {
       "path": "requirements_desktop.txt",
-      "sha256": "1a04d10c6a07d653ded69e920901284074a81aea65bdf8707443da057ddddc35",
-      "bytes": 8515
+      "sha256": "fd97868583ae957aa5629dc17bc264319e09001b50e476d5e8aebdab0f0e6b1c",
+      "bytes": 8508
     },
     {
       "path": "requirements_kokoro.txt",
@@ -3875,13 +3875,13 @@
     },
     {
       "path": "requirements_linux.txt",
-      "sha256": "a1af6f6f4ee4aec9fc6d86e9bf1c9201213a088cba02db02c325a13f652f0f89",
-      "bytes": 11672
+      "sha256": "6a61ecce570c0e3654c3e590880498eac1ccfc7eaf6a33c564c081c7eab1c4b7",
+      "bytes": 11665
     },
     {
       "path": "requirements_macos.txt",
-      "sha256": "28771fea50894d30750e6c28345476ced71a5602a58a278845ab069ca1ff72f8",
-      "bytes": 13147
+      "sha256": "a9cf3d61104fbf29e0c82c056bed5af2c82f2197ba07e1f2faffc693ed43fab4",
+      "bytes": 13140
     },
     {
       "path": "requirements_optional.txt",
@@ -6232,6 +6232,11 @@
       "path": "tests/public/test_disabled_tts_streaming.py",
       "sha256": "b49815c0ca158fd53026179e2fcb76093202166f94c746400812b823033570b2",
       "bytes": 28195
+    },
+    {
+      "path": "tests/public/test_email_validator_tuple_shape.py",
+      "sha256": "d0c8b77770ed8f8645c478ad36923b01c530fbb7f006e523f03ff16113aa4c94",
+      "bytes": 906
     },
     {
       "path": "tests/public/test_english_decimal_normalization.py",
