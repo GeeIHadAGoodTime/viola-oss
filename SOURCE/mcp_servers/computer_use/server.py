@@ -13,7 +13,15 @@ from pydantic import Field
 
 from core.logging_config import get_logger
 from intent.tools.desktop import desktop_hotkey as _desktop_hotkey_tool, desktop_type_text as _desktop_type_text_tool
-from services.computer_use import app_launcher, input as computer_input, safety, screen, window_manager
+from services.computer_use import (
+    app_launcher,
+    desktop_worker,
+    discard_guard,
+    input as computer_input,
+    safety,
+    screen,
+    window_manager,
+)
 from services.computer_use.cloud_guard import assert_desktop_surface, assert_local_user
 
 logger = get_logger(__name__)
@@ -140,15 +148,20 @@ def _focus_named_app(
     window_title: str,
     target_window: str,
     title: str,
+    handle: int | None = None,
 ) -> dict[str, object] | None:
     """Bring a named app's window to the front before an input action.
 
     Returns the focus result (with the window title) when an app or window
     was named, ``None`` when nothing was named. A failed focus is returned
     as-is so the caller refuses instead of typing into the wrong window.
+    A window handle (from list_windows, or the window Viola opened) wins over
+    names: two Notepad windows can carry the same title.
     """
     if action not in _FOCUS_NAMED_APP_FIRST_ACTIONS:
         return None
+    if handle:
+        return window_manager.focus_window(handle=int(handle))
     window = (window_title or title or "").strip()
     if action == "type":
         window = (target_window or window).strip()
@@ -161,6 +174,238 @@ def _focus_named_app(
     if window:
         return window_manager.focus_window(title=window)
     return window_manager.focus_window(app_executable=named_app)
+
+
+def _is_close_or_discard_request(action: str, *, key_text: str, name: str) -> bool:
+    if action == "key":
+        return discard_guard.is_close_chord(key_text)
+    if action == "click" and name:
+        return discard_guard.is_close_name(name) or discard_guard.is_discard_name(name)
+    return False
+
+
+def _choose_close_target(
+    action: str,
+    *,
+    app: str,
+    named_window: str,
+    explicit_handle: int | None,
+    key_text: str,
+    name: str,
+    user_id: str,
+    session_id: str,
+) -> tuple[dict[str, object] | None, int]:
+    """Pick the window a close or discard aimed at an app (not a window) means.
+
+    With several windows of that app open and no title or handle given, the
+    1.0.5 build-11 laptop closed an older Notepad than the one Viola had just
+    opened. Now: the window Viola opened in this conversation when there is
+    exactly one such; otherwise nothing is done and the titles come back.
+    Returns (refusal, handle to focus).
+    """
+    if explicit_handle or named_window or not app:
+        return None, 0
+    if not _is_close_or_discard_request(action, key_text=key_text, name=name):
+        return None, 0
+    try:
+        windows = discard_guard.app_windows(app)
+    except Exception:  # noqa: BLE001, RUF100 - an unreadable list leaves the old focus rule
+        logger.debug("Could not list the windows of %s before a close", app)
+        return None, 0
+    if len(windows) <= 1:
+        return None, 0
+    opened = safety.opened_windows(user_id=user_id, session_id=session_id)
+    mine = [window for window in windows if int(window.get("handle") or 0) in opened]
+    if len(mine) == 1:
+        return None, int(mine[0].get("handle") or 0)
+    listed = discard_guard.describe_windows(windows)
+    return (
+        {
+            "ok": False,
+            "action": action,
+            "error_category": discard_guard.AMBIGUOUS_WINDOW_ERROR_CATEGORY,
+            "target_app_executable": app,
+            "windows": listed,
+            "reason": (
+                "%d %s windows are open, so nothing was closed. Call again with window_handle set to the one "
+                "the user means (or window_title if the titles differ). If it is not clear which one, ask the "
+                "user, naming the titles." % (len(listed), app)
+            ),
+        },
+        0,
+    )
+
+
+def _physical_point(
+    *,
+    coordinate: list[int] | None,
+    x: int | None,
+    y: int | None,
+    coordinate_mode: str,
+    monitor_id: int | None,
+) -> tuple[int, int] | None:
+    if coordinate_mode.strip().lower() == "physical":
+        if x is None or y is None:
+            return None
+        return int(x), int(y)
+    logical = _coordinate_from_optional_xy(coordinate, x, y)
+    if logical is None:
+        return None
+    translated = computer_input.translate_coordinate(logical, monitor_id=monitor_id)
+    return int(translated[0]), int(translated[1])
+
+
+def _assess_discard(
+    action: str,
+    *,
+    name: str,
+    ref: str,
+    snapshot_id: str,
+    named_window: str,
+    explicit_handle: int | None,
+    coordinate: list[int] | None,
+    x: int | None,
+    y: int | None,
+    coordinate_mode: str,
+    monitor_id: int | None,
+    key_text: str,
+) -> tuple[discard_guard.DiscardRisk | None, int]:
+    """Would this action throw away unsaved work? Decided from what is on screen.
+
+    Returns (risk, window to check for a save prompt afterwards). The second
+    value is set for a close (ctrl+w, a "Close" button) so the result can say
+    when the close brought up a save prompt instead of closing.
+    """
+    if action == "click" and name:
+        hwnd = int(explicit_handle or 0)
+        if not hwnd and named_window:
+            hwnd = int(window_manager._resolve_hwnd_fast(named_window) or 0)
+        hwnd = hwnd or discard_guard.foreground_window()
+        risk = discard_guard.assess_named_click(name, hwnd)
+        return risk, (hwnd if risk is None and discard_guard.is_close_name(name) else 0)
+    if action == "click_ref" and ref:
+        from intent.tools.desktop_refs import get_snapshot
+
+        snapshot = get_snapshot(snapshot_id or None)
+        element = snapshot.by_ref(ref) if snapshot is not None else None
+        if element is None:
+            return None, 0
+        hwnd = int(getattr(snapshot, "window_hwnd", 0) or 0)
+        risk = discard_guard.assess_ref_click(element.name, hwnd)
+        return risk, (hwnd if risk is None and discard_guard.is_close_name(element.name) else 0)
+    if action in discard_guard.POINT_CLICK_ACTIONS:
+        point = _physical_point(coordinate=coordinate, x=x, y=y, coordinate_mode=coordinate_mode, monitor_id=monitor_id)
+        if point is None:
+            return None, 0
+        risk, element_name, hwnd = discard_guard.assess_point(*point)
+        return risk, (hwnd if risk is None and discard_guard.is_close_name(element_name) else 0)
+    if action in discard_guard.CURSOR_PRESS_ACTIONS:
+        cursor = discard_guard.cursor_position()
+        if cursor is None:
+            return None, 0
+        risk, _element_name, _hwnd = discard_guard.assess_point(*cursor, trigger="mouse_press")
+        return risk, 0
+    if action in discard_guard.KEY_ACTIONS:
+        hwnd = int(explicit_handle or 0)
+        if not hwnd and named_window:
+            hwnd = int(window_manager._resolve_hwnd_fast(named_window) or 0)
+        hwnd = hwnd or discard_guard.foreground_window()
+        risk = discard_guard.assess_key(hwnd)
+        closing = action == "key" and discard_guard.is_close_chord(key_text)
+        return risk, (hwnd if risk is None and closing else 0)
+    return None, 0
+
+
+def _discard_refusal(risk: discard_guard.DiscardRisk, *, action: str, target_app: str) -> safety.ComputerUseRefusal:
+    return safety.ComputerUseRefusal(
+        error_category=discard_guard.DISCARD_ERROR_CATEGORY,
+        reason=(
+            "This would %s. That cannot be undone, so nothing was done. It needs the user's own yes for this "
+            "window; an earlier yes for the app does not cover it." % risk.description()
+        ),
+        action=action,
+        target_app_executable=target_app,
+        details=risk.details(),
+    )
+
+
+async def _save_prompt_after_close(hwnd: int) -> dict[str, object] | None:
+    """After a close, did the window ask to save instead of closing?"""
+    for delay in (0.4, 0.6):
+        await asyncio.sleep(delay)
+        try:
+            prompt = await asyncio.to_thread(discard_guard.find_save_prompt, hwnd)
+        except Exception:  # noqa: BLE001, RUF100 - a failed read adds nothing to the result
+            logger.debug("Save prompt check after a close failed")
+            return None
+        if prompt is not None:
+            return discard_guard.save_prompt_note(prompt)
+    return None
+
+
+# These run on the server loop as before: analyze_screen awaits the vision model
+# through clients bound to that loop.
+_ACTIONS_ON_SERVER_LOOP: frozenset[str] = frozenset({"analyze_screen"})
+
+
+async def _run_computer_action(call: dict[str, Any]) -> str:
+    """Run one computer action on the desktop worker thread, within its time limit.
+
+    The server loop only awaits: a Win32 or UI Automation call into an app that
+    does not answer can no longer freeze Viola (Stop, /health/live and every
+    other request keep working). On timeout the step fails plainly, the desktop
+    control session and any held keys or buttons are released, and the next
+    action runs on a fresh worker.
+    """
+    action = str(call.get("action") or "")
+    if action in _ACTIONS_ON_SERVER_LOOP:
+        return await _computer_impl(**call)
+    progress: dict[str, Any] = {}
+    limit = desktop_worker.action_timeout(action, duration_ms=call.get("duration_ms"), ms=call.get("ms"))
+    try:
+        return await desktop_worker.run_desktop_action(
+            lambda: _computer_impl(**call, _progress=progress), timeout=limit
+        )
+    except desktop_worker.DesktopActionTimeout:
+        return _json(_not_responding(call, progress, limit))
+
+
+def _not_responding(call: dict[str, Any], progress: dict[str, Any], limit: float) -> dict[str, object]:
+    action = str(call.get("action") or "")
+    user_id = str(progress.get("user_id") or "") or _get_call_user_id()
+    session_id = str(progress.get("session_id") or "") or _get_call_session_id(user_id)
+    try:
+        # SendInput key/button releases: they never wait on another app.
+        _release_held_low_level_input(user_id)
+    except Exception:  # noqa: BLE001, RUF100 - releasing is best effort; the session is still freed
+        logger.debug("Releasing held input after a desktop timeout failed")
+    safety.abort_control_session(user_id=user_id, session_id=session_id)
+    app = str(
+        progress.get("target_app")
+        or call.get("app_executable")
+        or call.get("app_name")
+        or call.get("target_window")
+        or call.get("window_title")
+        or call.get("title")
+        or ""
+    ).strip()
+    who = app or "The app"
+    logger.warning(
+        "computer_use_action timed out action_type=%s target_app_executable=%s limit_s=%.0f",
+        action,
+        app,
+        limit,
+    )
+    return {
+        "ok": False,
+        "action": action,
+        "error_category": "COMPUTER_USE_APP_NOT_RESPONDING",
+        "target_app_executable": app,
+        "reason": (
+            "%s is not responding, so the %s step was stopped after %d seconds. It may have done part of the "
+            "step. Tell the user; trying again may work once the app responds." % (who, action, int(limit))
+        ),
+    }
 
 
 def _next_chain_status(user_id: str) -> dict[str, object]:
@@ -647,7 +892,8 @@ async def computer(
     ] = "",
     bring_to_front: Annotated[bool, Field(description="For launch_app, focus the launched window when found.")] = True,
     include_minimized: Annotated[
-        bool, Field(description="list_windows lists minimized windows too; set false to leave them out.")
+        bool,
+        Field(description="Accepted for compatibility. list_windows always lists minimized windows, marked minimized."),
     ] = True,
     include_window_titles: Annotated[bool, Field(description="Return window titles in list_windows.")] = True,
     region: Annotated[
@@ -727,7 +973,68 @@ async def computer(
         Field(description="For mouse_move_angle: 'horizontal' (yaw) or 'vertical' (pitch)."),
     ] = "horizontal",
 ) -> str:
-    """Execute one computer-use action."""
+    """Execute one computer-use action off the server loop, within a time limit."""
+    call = {"action": action, "coordinate": coordinate, "x": x, "y": y, "width": width, "height": height, "end_coordinate": end_coordinate, "end_x": end_x, "end_y": end_y, "text": text, "target_window": target_window, "respect_focus": respect_focus, "key": key, "keys": keys, "button": button, "name": name, "coordinate_mode": coordinate_mode, "direction": direction, "amount": amount, "scroll_x": scroll_x, "scroll_y": scroll_y, "duration_ms": duration_ms, "ms": ms, "monitor_id": monitor_id, "window_handle": window_handle, "hwnd": hwnd, "window_title": window_title, "title": title, "app_executable": app_executable, "app_name": app_name, "bring_to_front": bring_to_front, "include_minimized": include_minimized, "include_window_titles": include_window_titles, "region": region, "volume_action": volume_action, "level": level, "percent": percent, "mute": mute, "step": step, "system_volume_word": system_volume_word, "question": question, "capture_mode": capture_mode, "ref": ref, "snapshot_id": snapshot_id, "background": background, "include_screenshot": include_screenshot, "include_vision": include_vision, "return_diff": return_diff, "dx": dx, "dy": dy, "degrees": degrees, "axis": axis}
+    return await _run_computer_action(call)
+
+
+async def _computer_impl(
+    *,
+    action: Any,
+    coordinate: Any = None,
+    x: Any = None,
+    y: Any = None,
+    width: Any = None,
+    height: Any = None,
+    end_coordinate: Any = None,
+    end_x: Any = None,
+    end_y: Any = None,
+    text: Any = "",
+    target_window: Any = "",
+    respect_focus: Any = True,
+    key: Any = "",
+    keys: Any = "",
+    button: Any = "left",
+    name: Any = "",
+    coordinate_mode: Any = "logical",
+    direction: Any = "down",
+    amount: Any = 5,
+    scroll_x: Any = 0,
+    scroll_y: Any = 0,
+    duration_ms: Any = 1000,
+    ms: Any = None,
+    monitor_id: Any = None,
+    window_handle: Any = None,
+    hwnd: Any = None,
+    window_title: Any = "",
+    title: Any = "",
+    app_executable: Any = "",
+    app_name: Any = "",
+    bring_to_front: Any = True,
+    include_minimized: Any = True,
+    include_window_titles: Any = True,
+    region: Any = "",
+    volume_action: Any = "get",
+    level: Any = None,
+    percent: Any = None,
+    mute: Any = None,
+    step: Any = 10,
+    system_volume_word: Any = "",
+    question: Any = "",
+    capture_mode: Any = "active_window",
+    ref: Any = "",
+    snapshot_id: Any = "",
+    background: Any = False,
+    include_screenshot: Any = True,
+    include_vision: Any = False,
+    return_diff: Any = True,
+    dx: Any = 0,
+    dy: Any = 0,
+    degrees: Any = 0.0,
+    axis: Any = "horizontal",
+    _progress: dict[str, Any] | None = None,
+) -> str:
+    """Execute one computer-use action (runs on the desktop worker thread)."""
     started = time.monotonic()
     target_app = ""
     user_id = ""
@@ -747,7 +1054,12 @@ async def computer(
             "target_window": target_window,
             "title": title,
         }
+        if _progress is not None:
+            _progress["user_id"] = user_id
+            _progress["session_id"] = session_id
         target_app = safety.resolve_action_target_app(action, **target_args)
+        if _progress is not None:
+            _progress["target_app"] = target_app
         if action not in _ACTIONS_WITHOUT_FOREGROUND_TARGET:
             safety.require_not_uac(action, target_app_executable=target_app)
         if safety.targets_viola_itself(action, **target_args):
@@ -768,7 +1080,24 @@ async def computer(
             session_id=session_id,
         )
         control_token = safety.acquire_control_session(user_id=user_id, session_id=session_id, action=action)
-        focused = _focus_named_app(action, **target_args)
+        key_text_requested = keys or key
+        explicit_handle = window_handle if window_handle is not None else hwnd
+        ambiguity, chosen_handle = _choose_close_target(
+            action,
+            app=safety.normalize_executable_name(app_executable or app_name),
+            named_window=_target_window_title(target_window=target_window, window_title=window_title, title=title),
+            explicit_handle=explicit_handle,
+            key_text=key_text_requested,
+            name=name,
+            user_id=user_id,
+            session_id=session_id,
+        )
+        if ambiguity is not None:
+            return _json(ambiguity)
+        if chosen_handle:
+            explicit_handle = chosen_handle
+        focus_handle = explicit_handle if action in _FOCUS_NAMED_APP_FIRST_ACTIONS else None
+        focused = _focus_named_app(action, **target_args, handle=focus_handle)
         if focused is not None:
             named_window = _target_window_title(target_window=target_window, window_title=window_title, title=title)
             refusal = _focus_precondition(focused, action=action)
@@ -784,8 +1113,61 @@ async def computer(
                 # click elsewhere in the meantime cannot redirect the text.
                 window_title = str(focused.get("window_title") or "")
 
+        # Throwing away unsaved work is decided here, from what the action would
+        # land on, for every way of doing it (button name, ref, point, key press
+        # into a save prompt). An app grant or the whitelist never covers it:
+        # only a one-time approval bound to that window does.
+        try:
+            discard_risk, close_check_hwnd = _assess_discard(
+                action,
+                name=name,
+                ref=ref,
+                snapshot_id=snapshot_id,
+                named_window=_target_window_title(target_window=target_window, window_title=window_title, title=title),
+                explicit_handle=explicit_handle if action != "focus_window" else None,
+                coordinate=coordinate,
+                x=x,
+                y=y,
+                coordinate_mode=coordinate_mode,
+                monitor_id=monitor_id,
+                key_text=key_text_requested,
+            )
+        except discard_guard.ScreenReadTimeout:
+            # The window did not answer in time, so it is not known whether this
+            # press lands on "Don't save". Held, never let through.
+            discard_risk = discard_guard.unreadable_risk(
+                int(explicit_handle or 0) or discard_guard.foreground_window(), trigger="unreadable"
+            )
+            close_check_hwnd = 0
+        except Exception as exc:  # noqa: BLE001, RUF100 - a failed (not slow) read never blocks normal input
+            logger.warning("Unsaved-work check failed for %s: %s", action, type(exc).__name__)
+            discard_risk, close_check_hwnd = None, 0
+        if discard_risk is not None and not safety.consume_discard_approval(
+            discard_risk.window_handle, user_id=user_id, session_id=session_id
+        ):
+            logger.info(
+                "computer_use discard held for approval action_type=%s trigger=%s target_app_executable=%s",
+                action,
+                discard_risk.trigger,
+                discard_risk.app_executable or target_app,
+            )
+            raise _discard_refusal(discard_risk, action=action, target_app=target_app)
+
         if action == "launch_app":
             result = app_launcher.launch_app(app_name or title or window_title, bring_to_front=bring_to_front)
+            if (
+                isinstance(result, dict)
+                and result.get("ok", True)
+                and result.get("hwnd")
+                and not result.get("already_open")
+            ):
+                opened_handle = int(result.get("hwnd") or 0)
+                safety.record_opened_window(
+                    opened_handle,
+                    discard_guard.window_executable(opened_handle) or target_app,
+                    user_id=user_id,
+                    session_id=session_id,
+                )
         elif action == "list_windows":
             result = window_manager.list_windows(
                 include_minimized=include_minimized,
@@ -1104,6 +1486,10 @@ async def computer(
                 target_app_executable=target_app,
             )
 
+        if close_check_hwnd and isinstance(result, dict) and result.get("ok", True):
+            note = await _save_prompt_after_close(close_check_hwnd)
+            if note is not None:
+                result.update(note)
         success = bool(result.get("ok", True))
         duration = int((time.monotonic() - started) * 1000)
         merged = _merge_action_metadata(

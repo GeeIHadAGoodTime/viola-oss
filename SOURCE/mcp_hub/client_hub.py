@@ -28,6 +28,8 @@ from intent.tools.deferred_tool_schemas import (
 
 from .approval_bridge import (
     ApprovalBridge,
+    DISCARD_WINDOW_ARG,
+    computer_use_call_identity,
     computer_use_call_scope,
     computer_use_self_target_refusal,
     recompute_auto_approve,
@@ -58,6 +60,18 @@ def _confirmation_required_result(deferred: Any) -> dict[str, Any]:
         "blocked_tool": tool_name,
         "retryable": True,
     }
+
+
+def _discard_hold_details(result: Any) -> dict[str, Any] | None:
+    """The details of a desktop action held because it would throw away unsaved work."""
+    if not isinstance(result, dict):
+        return None
+    data = result.get("data")
+    if not isinstance(data, dict) or data.get("error_category") != "COMPUTER_USE_DISCARD_APPROVAL_REQUIRED":
+        return None
+    if not int(data.get("window_handle") or 0):
+        return None
+    return data
 
 
 def _launch_gated_tool_names() -> set[str]:
@@ -1879,6 +1893,115 @@ class MCPClientHub:
             user_context_meta["cloud_access_token"] = access_token.strip()
 
     async def call_tool(
+        self,
+        name: str,
+        args: dict[str, Any] | None = None,
+        channel: Any | None = None,
+        allowed_tools: set[str] | None = None,
+        user_context: UserContext | None = None,
+        approval_already_granted: bool = False,
+        *,
+        tool_use_id: str | None = None,
+        on_progress: Any = None,
+        abort_signal: Any = None,
+    ) -> dict[str, Any]:
+        """Execute a tool call with approval checking (see ``_call_tool_once``).
+
+        A desktop action the computer tool holds because it would throw away
+        unsaved work comes back here as ``COMPUTER_USE_DISCARD_APPROVAL_REQUIRED``.
+        The user is asked through the normal approval card, and only a yes
+        for that window runs the action, once.
+        """
+        if args is None:
+            args = {}
+        original_args = dict(args)
+        result = await self._call_tool_once(
+            name,
+            args,
+            channel=channel,
+            allowed_tools=allowed_tools,
+            user_context=user_context,
+            approval_already_granted=approval_already_granted,
+            tool_use_id=tool_use_id,
+            on_progress=on_progress,
+            abort_signal=abort_signal,
+        )
+        if _discard_hold_details(result) is None:
+            return result
+
+        async def _attempt() -> dict[str, Any]:
+            return await self._call_tool_once(
+                name,
+                dict(original_args),
+                channel=channel,
+                allowed_tools=allowed_tools,
+                user_context=user_context,
+                approval_already_granted=approval_already_granted,
+                tool_use_id=tool_use_id,
+                on_progress=on_progress,
+                abort_signal=abort_signal,
+            )
+
+        return await self._resolve_discard_hold(
+            result,
+            original_args,
+            user_context=user_context,
+            channel=channel,
+            call_again=_attempt,
+        )
+
+    async def _resolve_discard_hold(
+        self,
+        result: dict[str, Any],
+        tool_args: dict[str, Any],
+        *,
+        user_context: Any,
+        channel: Any | None,
+        call_again: Any,
+    ) -> dict[str, Any]:
+        """Ask the user about one held discard; run the action again only on their yes."""
+        from intent.approval import ConfirmationDeferred
+        from services.computer_use import safety
+
+        details = _discard_hold_details(result) or {}
+        window_handle = int(details.get("window_handle") or 0)
+        try:
+            with computer_use_call_scope(user_context):
+                approved = await self._bridge.check_discard_approval(details, tool_args, channel=channel)
+        except ConfirmationDeferred as deferred:
+            self.last_approval_path = "confirmation_required"
+            question = _confirmation_required_result(deferred)
+            envelope = question.get("data")
+            if isinstance(envelope, dict) and isinstance(envelope.get("tool_args"), dict):
+                # Internal binding to the window; the model repeats the call it made.
+                envelope["tool_args"].pop(DISCARD_WINDOW_ARG, None)
+            return question
+        if not approved:
+            self.last_approval_path = "approval_denied"
+            title = str(details.get("window_title") or "the window")
+            return {
+                "success": False,
+                "data": None,
+                "display": "",
+                "error": (
+                    "The user said no. Nothing was thrown away: %s is still open with its unsaved changes." % title
+                ),
+                "error_category": "APPROVAL_BLOCKED",
+                "blocked_tool": "computer",
+                "retryable": False,
+            }
+        self.last_approval_path = "user_confirmed"
+        user_id, session_id = computer_use_call_identity(user_context)
+        safety.grant_discard_once(window_handle, user_id=user_id, session_id=session_id)
+        retried = await call_again()
+        if _discard_hold_details(retried) is not None:
+            # The screen changed between the question and the retry (another
+            # window now holds the prompt). Never loop: the user is asked again
+            # on the next call.
+            logger.warning("Discard approval did not match the window on retry; nothing was discarded")
+        return retried
+
+    async def _call_tool_once(
         self,
         name: str,
         args: dict[str, Any] | None = None,
