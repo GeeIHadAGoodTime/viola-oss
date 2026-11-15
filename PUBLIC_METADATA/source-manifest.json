@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "61a2d49be89e53859982aee3ece2a63ed3e69306",
-  "sha256": "c172c945c1457241660c88c6c3db427fe197c2a35c7f52fb622db81b2fdb140c",
+  "revision": "211a9b4a573aa3c5081c4619e57d469c034063f1",
+  "sha256": "883f9dfd7231a051d1d4a7dfa9509295ccbd3d4aaa8f875004c49e2fc4cfc2e1",
   "files": [
     {
       "path": ".env.example",
@@ -5130,8 +5130,8 @@
     },
     {
       "path": "services/outbound_provider_registry.py",
-      "sha256": "2f9bcfae6a09ed9827f5021fed29abf8c31cc4280a444f186412c566b6b39f9a",
-      "bytes": 51340
+      "sha256": "a3df5aed81f9bba1aa7be125a0d5efb6ad2fd861c81c4903b6c435bfab584c1d",
+      "bytes": 51920
     },
     {
       "path": "services/persistence/__init__.py",
