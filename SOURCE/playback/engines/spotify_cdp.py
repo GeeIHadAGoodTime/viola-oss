@@ -17,7 +17,8 @@ from typing import Any
 
 from core.logging_config import get_logger
 from models.player import QueueItem
-from music.track_display_cache import looks_like_track_id, remember as remember_track_display, track_id_from_item
+from models.track_title import TITLE_PENDING_KEY, looks_like_track_id
+from music.track_display_cache import remember as remember_track_display, track_id_from_item
 
 from .base import (
     PlaybackCapabilities,
@@ -445,6 +446,7 @@ class SpotifyCDPEngine(ProviderPlaybackEngine):
             current_track = None
         if isinstance(current_track, str) and current_track and item.title != current_track:
             item.title = current_track
+            item.capabilities.pop(TITLE_PENDING_KEY, None)
         if isinstance(artist, str) and artist and item.artist != artist:
             item.artist = artist
         try:
@@ -483,6 +485,7 @@ class SpotifyCDPEngine(ProviderPlaybackEngine):
             title = ""
         if title:
             item.title = title
+            item.capabilities.pop(TITLE_PENDING_KEY, None)
         if artist:
             item.artist = artist
         remember_track_display(track_id_from_item(item), title=title, artist=artist)
@@ -492,6 +495,51 @@ class SpotifyCDPEngine(ProviderPlaybackEngine):
                 title or "?",
                 artist or "?",
             )
+
+    def _start_oembed_adoption(self, item: QueueItem) -> None:
+        """Fetch the name and cover from Spotify's public oEmbed while the page loads.
+
+        Runs only when the title is still pending or there is no cover. Sends
+        only the track id; any failure is silent and the pending state stays
+        until the page answers.
+        """
+        track_id = track_id_from_item(item)
+        if not track_id:
+            return
+        if not item.capabilities.get(TITLE_PENDING_KEY) and item.artwork_url:
+            return
+        threading.Thread(
+            target=self._adopt_oembed,
+            args=(item, track_id),
+            name="spotify-oembed",
+            daemon=True,
+        ).start()
+
+    def _adopt_oembed(self, item: QueueItem, track_id: str) -> None:
+        try:
+            from music.spotify.oembed import fetch_track_oembed
+
+            found = fetch_track_oembed(track_id, timeout=3.0)
+            if not found:
+                return
+            changed = False
+            title = found.get("title")
+            page_answered = bool(item.title) and not looks_like_track_id(item.title)
+            if title and not page_answered:
+                item.title = title
+                item.capabilities.pop(TITLE_PENDING_KEY, None)
+                changed = True
+            artwork = found.get("artwork_url")
+            if artwork and not item.artwork_url:
+                item.artwork_url = artwork
+                item.capabilities.setdefault("thumbnail_url", artwork)
+                changed = True
+            if changed:
+                remember_track_display(track_id, title=item.title, artwork_url=item.artwork_url)
+                self._logger.info("Spotify oEmbed adopted: title=%s cover=%s", bool(title), bool(artwork))
+                self._broadcast_state()
+        except Exception:
+            self._logger.debug("Spotify oEmbed adoption failed", exc_info=True)
 
     def _request_proctap_track_rescan(self, track: str) -> None:
         """Point ProcTap at the KNOWN Chrome PID after a track change, then rescan.
@@ -758,6 +806,7 @@ class SpotifyCDPEngine(ProviderPlaybackEngine):
         # writing state, and stopping the older handle no longer touches the
         # transport (it used to press pause on the song that had just started).
         self._current_handle = handle
+        self._start_oembed_adoption(item)
 
         # Reset per-play poller state. The engine instance is shared across
         # plays, so a stale _last_track/_position/_duration from the previous

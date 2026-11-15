@@ -1648,7 +1648,11 @@ class CommandExecutor:
             now_playing_key = self._now_playing_track_key(now_playing)
             track_loaded = bool(now_playing_key and now_playing_key != previous_track_key)
             if is_playing or track_loaded:
+                from models.track_title import display_title
+
                 now_playing_title = self._item_value(now_playing, "title")
+                if isinstance(now_playing_title, str):
+                    now_playing_title = display_title(now_playing_title)
                 now_playing_artist = self._item_value(now_playing, "artist")
                 now_playing_video_id = self._item_value(now_playing, "video_id")
                 now_playing_url = self._item_value(now_playing, "url")
@@ -2590,6 +2594,10 @@ class CommandExecutor:
         if state is not None:
             now_playing = getattr(state, "now_playing", None)
             title = getattr(now_playing, "title", None) if now_playing else None
+            if isinstance(title, str):
+                from models.track_title import display_title
+
+                title = display_title(title)
             if isinstance(title, str) and title.strip():
                 is_playing = bool(getattr(state, "is_playing", False))
                 artist = getattr(now_playing, "artist", None)

@@ -13,17 +13,11 @@ import threading
 from collections import OrderedDict
 from typing import Any
 
+from models.track_title import looks_like_track_id
+
 _MAX_ENTRIES = 256
 _lock = threading.Lock()
 _known: OrderedDict[str, dict[str, str]] = OrderedDict()
-
-
-def looks_like_track_id(value: Any) -> bool:
-    """True for a Spotify URI or track URL, which is never a song title."""
-    if not isinstance(value, str):
-        return False
-    cleaned = value.strip().lower()
-    return cleaned.startswith("spotify:") or "open.spotify.com/" in cleaned
 
 
 def track_id_from_item(item: Any) -> str | None:

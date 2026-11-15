@@ -1173,6 +1173,9 @@ async def play_music_handler(
     user_id: str = "",
     *,
     remember_provider: bool = True,
+    title: str = "",
+    artist: str = "",
+    artwork_url: str = "",
 ) -> ToolResult:
     """Search for and play music through Viola's internal music player.
 
@@ -1190,6 +1193,10 @@ async def play_music_handler(
         target_room: Optional Viola room, room group, or paired Spoke speaker.
             When provided, the runtime returns structured room-route and
             pairing-flow facts when the target is not paired.
+        title, artist, artwork_url: What the caller already knows about an
+            exact track (a search just returned it). They travel in the play
+            request so the queue item is created with its real name and cover
+            and no identifier is ever shown as a title.
 
     Returns:
         ToolResult with playback status and queued track info.
@@ -1218,6 +1225,9 @@ async def play_music_handler(
             source = _PROVIDER_SOURCE_MAP.get(provider_id)
 
         request_payload: dict[str, Any] = {"query": query}
+        for field_name, field_value in (("title", title), ("artist", artist), ("artwork_url", artwork_url)):
+            if isinstance(field_value, str) and field_value.strip():
+                request_payload[field_name] = field_value.strip()
         if source:
             request_payload["source"] = source
         if target_room.strip():
@@ -1304,10 +1314,18 @@ async def play_music_handler(
             # Keep the echo (the model still needs something to name) but mark
             # its provenance with the same ``title_unverified`` flag the
             # browser provider and command_executor already use.
-            resolved_title = str(enqueued.get("title") or "").strip()
+            from models.track_title import display_title, looks_like_track_id
+
+            resolved_title = display_title(str(enqueued.get("title") or "")).strip()
+            # What the caller knew (the search that picked this track) is the
+            # next best report of the name; it is not the user's request text.
+            known_title = display_title(title).strip()
+            if not resolved_title and known_title:
+                resolved_title = known_title
             title_from_query = not resolved_title
-            title = resolved_title or query
-            artist = enqueued.get("artist", "")
+            # An identifier is never a title: a bare URI request has no name yet.
+            title = resolved_title or ("" if looks_like_track_id(query) else query)
+            artist = enqueued.get("artist", "") or artist
             queue_size = enqueued.get("queue_size", 0)
             track_uri = enqueued.get("url") or ""
             video_id = enqueued.get("video_id") or ""
@@ -1318,7 +1336,10 @@ async def play_music_handler(
             label = title
             if artist:
                 label = "%s by %s" % (title, artist)
-            if title_from_query:
+            if title_from_query and not title:
+                label = "that track"
+                message = "Playing that track now; its name has not loaded yet."
+            elif title_from_query:
                 message = "I asked the player for %r; it has not reported which track it loaded." % query
             else:
                 msg_parts = ["Now playing: %s" % label]

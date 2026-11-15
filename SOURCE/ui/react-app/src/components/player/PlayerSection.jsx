@@ -6,6 +6,7 @@ import PropTypes from 'prop-types';
 import { THEME } from '../../config';
 import ErrorBoundary from '../ErrorBoundary';
 import { isDesktopApp } from '../../utils/runtimeSurface';
+import { displayTitle, stageTitle } from '../../utils/trackTitle';
 import MediaArea from './MediaArea';
 import MusicCommandInput from './MusicCommandInput';
 import ProgressBar from './ProgressBar';
@@ -76,9 +77,9 @@ const PlayerSection = ({
               <div
                 className={`track-title ${styles.trackTitle}`}
                 style={{ color: THEME.colors.textBright }}
-                title={nowPlaying?.title || undefined}
+                title={displayTitle(nowPlaying?.title) || undefined}
               >
-                {nowPlaying?.title || 'Nothing playing'}
+                {stageTitle(nowPlaying) || 'Nothing playing'}
               </div>
               <div className={`track-artist ${styles.trackArtist}`} style={{ color: THEME.colors.textMuted }}>
                 {nowPlaying ? (nowPlaying.artist || '\u00A0') : 'Ask me to play something'}

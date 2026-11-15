@@ -54,6 +54,9 @@ def _create_state_adapter(app):
 def _known_track_metadata(body: Any) -> dict[str, Any]:
     """Keyword arguments for a play whose caller already knows the track's name."""
     metadata = {key: value for key in ("title", "artist") if (value := getattr(body, key, None))}
+    artwork = getattr(body, "artwork_url", None)
+    if isinstance(artwork, str) and artwork.startswith("https://"):
+        metadata["artwork_url"] = artwork
     return {"metadata": metadata} if metadata else {}
 
 

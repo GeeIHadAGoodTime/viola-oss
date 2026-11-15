@@ -417,6 +417,13 @@ async def _handle_search_mode(query: str, provider: str, limit: int, user_id: st
     return ToolResult(ok=True, data=data)
 
 
+def _known_track_kwargs(track: dict[str, Any], provider: str, track_uri: str) -> dict[str, Any]:
+    """The search result of an exact Spotify track, to carry into its play request."""
+    if _infer_play_provider(provider, track_uri) == "spotify":
+        return {"known_track": track}
+    return {}
+
+
 async def _handle_play_mode(
     track_uri: str,
     provider: str,
@@ -424,6 +431,7 @@ async def _handle_play_mode(
     user_id: str,
     *,
     remember_provider: bool = False,
+    known_track: dict[str, Any] | None = None,
 ) -> ToolResult:
     resolved_provider = _infer_play_provider(provider, track_uri)
     if resolved_provider == "local":
@@ -444,12 +452,22 @@ async def _handle_play_mode(
         play_query = track_uri
         play_provider = resolved_provider
 
+    # What the search already knows about this exact Spotify track travels in
+    # the play request, so the queue item is created with its real name and an
+    # identifier is never the title. Other providers resolve their own names.
+    known_name: dict[str, str] = {}
+    if resolved_provider == "spotify" and isinstance(known_track, dict):
+        for field_name, key in (("title", "title"), ("artist", "artist"), ("artwork_url", "artwork_url")):
+            value = known_track.get(key)
+            if isinstance(value, str) and value.strip():
+                known_name[field_name] = value.strip()
     result = await _play_music_handler(
         play_query,
         provider=play_provider,
         target_room=target_room,
         user_id=user_id,
         remember_provider=remember_provider,
+        **known_name,
     )
     if isinstance(result.data, dict):
         data = dict(result.data)
@@ -821,7 +839,12 @@ async def _handle_search_play_mode(
     ).strip()
     remember_provider = _clean_provider(provider) not in {"auto", "any"}
     play_result = await _handle_play_mode(
-        selected_track_uri, selected_provider, target_room, user_id, remember_provider=remember_provider
+        selected_track_uri,
+        selected_provider,
+        target_room,
+        user_id,
+        remember_provider=remember_provider,
+        **_known_track_kwargs(selected, selected_provider, selected_track_uri),
     )
     unplayable: list[str] = []
     later_indices = [
@@ -847,7 +870,12 @@ async def _handle_search_play_mode(
             selected.get("playback_provider") or selected.get("provider") or data.get("playback_provider") or provider
         ).strip()
         play_result = await _handle_play_mode(
-            selected_track_uri, selected_provider, target_room, user_id, remember_provider=remember_provider
+            selected_track_uri,
+            selected_provider,
+            target_room,
+            user_id,
+            remember_provider=remember_provider,
+            **_known_track_kwargs(selected, selected_provider, selected_track_uri),
         )
     if unplayable:
         data["unplayable_candidates"] = unplayable

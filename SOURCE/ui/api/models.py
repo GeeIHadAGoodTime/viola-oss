@@ -92,6 +92,7 @@ class PlayIn(BaseModel):
     target_room: str | None = Field(default=None, max_length=80, description="Optional in-house room target")
     title: str | None = Field(default=None, max_length=500, description="Known track title when query is a URL")
     artist: str | None = Field(default=None, max_length=500, description="Known artist when query is a URL")
+    artwork_url: str | None = Field(default=None, max_length=2000, description="Known cover (https) for an exact track")
 
     @model_validator(mode="before")
     @classmethod

@@ -31,12 +31,24 @@ Uses Pydantic (v2) for API validation and dataclass compatibility.
 from __future__ import annotations
 
 import copy
+import logging
 from collections.abc import Mapping
 from typing import Annotated, cast
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_serializer
 
 from core.json_types import JsonDict, JsonValue, to_json_value
+from models.track_title import display_title
+
+_logger = logging.getLogger(__name__)
+_warned_ids: set[str] = set()
+
+
+def _warn_title_is_id(value: str, provider: str | None) -> None:
+    if value in _warned_ids or len(_warned_ids) > 200:
+        return
+    _warned_ids.add(value)
+    _logger.warning("SPOTIFY_TITLE_IS_ID source=state_serializer value=%s provider=%s", value[:60], provider)
 
 
 class QueueItem(BaseModel):
@@ -99,6 +111,17 @@ class QueueItem(BaseModel):
     )
 
     model_config = ConfigDict(frozen=False, extra="allow")
+
+    @field_serializer("title")
+    def _serialize_title(self, value: str | None) -> str | None:
+        # An identifier is never a title: every broadcast, queue list and saved
+        # state carries "" instead. The raw value stays on the object.
+        if value is None:
+            return None
+        shown = display_title(value)
+        if shown != value:
+            _warn_title_is_id(value, self.provider)
+        return shown
 
     def is_url_expired(self, max_age_hours: float = 6.0) -> bool:
         """Check if URL is likely expired (YouTube URLs expire after ~6 hours)."""

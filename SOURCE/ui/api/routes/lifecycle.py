@@ -901,27 +901,6 @@ def _setup_automatic_state_broadcast(*, hub: Any, music: Any, state: Any) -> Non
                         if isinstance(now_playing, dict)
                         else getattr(now_playing, "video_id", None)
                     )
-                    from music.track_display_cache import looks_like_track_id
-
-                    if looks_like_track_id(title):
-                        # A title that is an id means the real name has not
-                        # arrived: name the item, so the source shows in the log.
-                        caps = (
-                            now_playing.get("capabilities")
-                            if isinstance(now_playing, dict)
-                            else getattr(now_playing, "capabilities", None)
-                        )
-                        provider = (
-                            now_playing.get("provider")
-                            if isinstance(now_playing, dict)
-                            else getattr(now_playing, "provider", None)
-                        )
-                        log.warning(
-                            "SPOTIFY_TITLE_IS_ID source=state_broadcast title=%s provider=%s resolver_path=%s",
-                            str(title)[:60],
-                            provider,
-                            caps.get("resolver_path") if isinstance(caps, dict) else None,
-                        )
                     log.info(
                         "State change: '%s' by '%s' (video_id: %s)",
                         title,
