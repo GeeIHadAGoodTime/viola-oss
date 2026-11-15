@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "b01fd8be616e42383a5d6c1425a2d5f6d42dc493",
-  "sha256": "979e0b39e018cf456d75cb6b9d2471ca131282573b1c6bf354f1eaae293b3f0e",
+  "revision": "400b4f200a0da522d0ffb485e4a6c22bce62e56b",
+  "sha256": "6bf03e5c59c3b88c9d40376874ff1465abe094695a8ece845ea35641a3894e93",
   "files": [
     {
       "path": ".env.example",
@@ -1880,8 +1880,8 @@
     },
     {
       "path": "intent/irreversible_actions.py",
-      "sha256": "b6ce25e3e9477b853ebf040644e7dd5d7a4001dd22b9f51b2d107bf6536ef535",
-      "bytes": 24229
+      "sha256": "760a1b15371a00fe1545ae656debf2694aa545f1116b51816f4181b586c2d242",
+      "bytes": 23812
     },
     {
       "path": "intent/json_utils.py",
@@ -2270,13 +2270,13 @@
     },
     {
       "path": "mcp_hub/approval_bridge.py",
-      "sha256": "5c336965fe4f0848c2bebbda7e842bb95bb01846eeb0ceabd34a2e5a672c77cc",
-      "bytes": 69523
+      "sha256": "61aa20c93c686fa0b53f51852b7a5b69cc2e54534e603d1135191ea94b78b0b3",
+      "bytes": 72441
     },
     {
       "path": "mcp_hub/client_hub.py",
-      "sha256": "f21c87a37bad3caca51efe344339b2056fd75f2e86c3ee3164f348d1719c1d1c",
-      "bytes": 133228
+      "sha256": "d5030ca49b834b0d52db7519aa2edd8564653ab7cbf6bd37b60cfe161402b0d9",
+      "bytes": 138185
     },
     {
       "path": "mcp_hub/compound_tools.py",
@@ -2380,8 +2380,8 @@
     },
     {
       "path": "mcp_servers/computer_use/server.py",
-      "sha256": "46e43642a8e6ead10fe5f7c8cde6f7239a224d764df8f6b60d92fb885adcbb7b",
-      "bytes": 53250
+      "sha256": "9383aef1cecabbad111940a7fffad145525c7e883d846ebfcb0711c03b4f4891",
+      "bytes": 63579
     },
     {
       "path": "mcp_servers/core_tools/__init__.py",
@@ -4350,13 +4350,18 @@
     },
     {
       "path": "services/computer_use/app_launcher.py",
-      "sha256": "a8ae362222fd9b258c3797f92a75d45f44b36ba40fe261f2589e5dc637fddeae",
-      "bytes": 19477
+      "sha256": "462eb7d45188702dd43510cceeccc0c3d02f5f14c1600eb97d7f824b457bf217",
+      "bytes": 20442
     },
     {
       "path": "services/computer_use/cloud_guard.py",
       "sha256": "d3cf6278c7e57e365bf2f6f0023d5d491033969cf49f44a6489cd8504afebf7f",
       "bytes": 3342
+    },
+    {
+      "path": "services/computer_use/discard_guard.py",
+      "sha256": "ca5b7e18079317061b060907626bd0f6da103457dc1c5631528952f7bea74efe",
+      "bytes": 16544
     },
     {
       "path": "services/computer_use/input.py",
@@ -4365,8 +4370,8 @@
     },
     {
       "path": "services/computer_use/safety.py",
-      "sha256": "c3652143a9db94cfe84385b86b0ea0af6761173b7f61d59c8d01672a130f4f65",
-      "bytes": 29458
+      "sha256": "dd357e6eb39ad4b20641dded5e61128fa4d791f6c5c9c6387c7e1a3269891b76",
+      "bytes": 32362
     },
     {
       "path": "services/computer_use/screen.py",
@@ -4375,8 +4380,8 @@
     },
     {
       "path": "services/computer_use/window_manager.py",
-      "sha256": "ff68e1133495b1246d43b1fd0128d3507cab3883ec8204cba429ddb09198aaeb",
-      "bytes": 45578
+      "sha256": "4a9199253f35cfc906e8952ee1fb549e4e037e9a4e9b5160d308f3bf7b53d7d1",
+      "bytes": 45952
     },
     {
       "path": "services/connectivity.py",
