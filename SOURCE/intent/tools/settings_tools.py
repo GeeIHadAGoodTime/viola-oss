@@ -544,9 +544,30 @@ async def save_delivery_address_handler(
         return ToolResult(ok=False, data=None, error="A delivery address needs a house number and street. Ask for them.")
 
     try:
+        from intent.content_sanitizer import _same_street_name
         from ui.settings_manager import get_settings_manager
 
         sm = get_settings_manager()
+        before = sm.get("delivery_address", {}, user_id=resolved_user_id)
+        before = before if isinstance(before, dict) else {}
+        before_text = delivery_address_text(before)
+        if before_text and _same_street_name(address, before_text):
+            # A correction of the same street ("no, the house number is ..."): a
+            # field left empty keeps the saved value instead of wiping it.
+            for field in ("city", "state", "zip"):
+                if not address[field]:
+                    address[field] = str(before.get(field) or "").strip()
+        elif not address["city"] or not address["zip"]:
+            # A new street (or the first one) needs its own city and ZIP code.
+            return ToolResult(
+                ok=False,
+                data=None,
+                error=(
+                    "Nothing was saved: a new delivery address needs its own city and ZIP code. Ask the user for "
+                    "the city and ZIP code of this street, then save it with them. Do not reuse an old city or "
+                    "ZIP code and do not leave them empty."
+                ),
+            )
         saved = sm.set_user_setting(resolved_user_id, "delivery_address", address, save_immediately=True)
     except Exception as exc:
         # Type only: the message could quote the address.

@@ -6847,9 +6847,31 @@ class AgentExecutor:
         address given over two spoken answers was refused, because the street
         said one answer earlier did not count as the user's words (build 10).
         """
+        parts = [str(user_text or "")]
+        for frame_texts in self._user_authored_frame_texts():
+            parts.extend(frame_texts)
+        if include_saved_address:
+            saved = self._saved_address_text()
+            if saved:
+                parts.append(saved)
+        return "\n".join(parts)
+
+    def _user_messages(self, user_text: str) -> list[str]:
+        """The same words as ``_user_own_words``, one entry per message: oldest first, *user_text* last.
+
+        The save_delivery_address gate needs the order: a new street's city and
+        ZIP code count only from the message that first gave the street onward.
+        No saved address is added here.
+        """
+        messages = ["\n".join(texts) for texts in self._user_authored_frame_texts()]
+        messages.append(str(user_text or ""))
+        return messages
+
+    def _user_authored_frame_texts(self) -> list[list[str]]:
+        """The text blocks of each frame the user wrote or spoke in this conversation, oldest first."""
         from services.conversation.state_manager import get_request_conversation_manager
 
-        parts = [str(user_text or "")]
+        frames_texts: list[list[str]] = []
         manager = get_request_conversation_manager() or getattr(self, "_conversation_state_manager", None)
         get_window = getattr(manager, "get_prompt_window", None)
         if callable(get_window):
@@ -6859,12 +6881,8 @@ class AgentExecutor:
                     and frame.kind is FrameKind.USER_INPUT
                     and (frame.origin or "") in _USER_AUTHORED_FRAME_ORIGINS
                 ):
-                    parts.extend(block.text for block in frame.blocks if isinstance(block, TextBlock))
-        if include_saved_address:
-            saved = self._saved_address_text()
-            if saved:
-                parts.append(saved)
-        return "\n".join(parts)
+                    frames_texts.append([block.text for block in frame.blocks if isinstance(block, TextBlock)])
+        return frames_texts
 
     def _saved_address_text(self) -> str:
         """The address saved in Settings, as one line ("" when there is none)."""
