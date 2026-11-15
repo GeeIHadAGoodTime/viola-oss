@@ -1449,6 +1449,47 @@ async def complete_voicemail_end_call_if_omitted(call_record: Any, *, push_frame
     return True
 
 
+VOICEMAIL_NO_MESSAGE_OUTCOME = "Reached voicemail, but no message was left."
+
+
+async def hang_up_voicemail_without_message(call_record: Any, *, push_frame: Any) -> bool:
+    """End a voicemail call on which no message got out, and say so on the record.
+
+    Before build 12 the line stayed open in silence until the voicemail system cut
+    it off at three minutes (call 79907d19). The status becomes FAILED with the
+    outcome above, so neither the Phone tab nor her report says a message was left.
+    Returns True when a hangup was queued.
+    """
+    from telephony.call_manager import _is_terminal_call_status
+
+    if (
+        not bool(getattr(call_record, "voicemail_detected", False))
+        or bool(getattr(call_record, "voicemail_message_delivered", False))
+        or bool(getattr(call_record, "voicemail_answered_by_person", False))
+        or bool(getattr(call_record, "human_takeover_detected", False))
+        or bool(getattr(call_record, "_end_call_committed", False))
+        or bool(getattr(call_record, "_telnyx_hangup_dispatched", False))
+        or _is_terminal_call_status(getattr(call_record, "status", None))
+        or not callable(push_frame)
+    ):
+        return False
+    call_id = str(getattr(call_record, "call_id", "") or "")
+    with suppress(AttributeError, TypeError):
+        call_record.voicemail_no_message_left = True
+        call_record._end_call_committed = True
+        call_record.outcome = VOICEMAIL_NO_MESSAGE_OUTCOME
+        call_record.error = VOICEMAIL_NO_MESSAGE_OUTCOME
+    try:
+        await push_frame(EndCallHangupFrame(call_id=call_id, reason="voicemail: no message was left"))
+    except (AttributeError, RuntimeError, TypeError, ValueError) as exc:
+        with suppress(AttributeError, TypeError):
+            call_record._end_call_committed = False
+        logger.warning("end_call: could not queue the hangup on %s after no voicemail message: %s", call_id, exc)
+        return False
+    logger.info("end_call: no voicemail message was left on %s; hangup queued", call_id)
+    return True
+
+
 def make_end_call_handler(
     *,
     telnyx_client,

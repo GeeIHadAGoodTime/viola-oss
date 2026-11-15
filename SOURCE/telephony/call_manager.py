@@ -3530,6 +3530,8 @@ def _answered_call_end_status(record: CallRecord) -> CallStatus:
         and not record.voicemail_answered_by_person
     ):
         return CallStatus.VOICEMAIL
+    if record.voicemail_no_message_left and not record.voicemail_message_delivered:
+        return CallStatus.FAILED
     return CallStatus.COMPLETED
 
 
@@ -3750,6 +3752,9 @@ class CallRecord:
     voicemail_message_delivered: bool = False
     # A person answered her voicemail message, so the call went back to a conversation.
     voicemail_answered_by_person: bool = False
+    # Voicemail was detected but no message got out within the limit, so she hung up
+    # without leaving one. The status and the report must not say a message was left.
+    voicemail_no_message_left: bool = False
     human_takeover_detected: bool = False
     human_takeover_at: datetime | None = None
     info_manifest: dict[str, list[str]] = field(default_factory=dict)
@@ -5997,7 +6002,9 @@ class CallManager:
                 await record._pipeline_task.queue_frame(EndFrame(reason="Carrier ended local call"))
             else:
                 record.status = (
-                    CallStatus.VOICEMAIL if record.voicemail_detected else _derive_natural_end_status(record)
+                    (CallStatus.FAILED if record.voicemail_no_message_left else CallStatus.VOICEMAIL)
+                    if record.voicemail_detected
+                    else _derive_natural_end_status(record)
                 )
                 task = self._call_tasks.get(record.call_id)
                 if task is not None:
@@ -7078,6 +7085,7 @@ class CallManager:
             )
             record._voicemail_answer_watch = voicemail_answer_watch
             bot_turn_floor_state.live_answer_check = voicemail_answer_watch.latest_speech_answers_message
+            bot_turn_floor_state.recording_over_message_check = voicemail_handler.recording_talking_over_message
             turn_strategies = UserTurnStrategies(
                 start=[
                     SelfEchoGuardedMinWordsUserTurnStartStrategy(

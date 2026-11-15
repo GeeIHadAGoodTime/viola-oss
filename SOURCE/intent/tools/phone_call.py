@@ -537,10 +537,20 @@ async def _make_phone_call_local(**kwargs) -> ToolResult:
     reached = status.get("status") in {"completed", "voicemail"}
     return ToolResult(
         ok=reached,
-        error=None if reached else "The call ended without reaching the person.",
+        error=None if reached else _not_reached_error("The call ended without reaching the person", status),
         retryable=False,
         data={**status, **transcript},
     )
+
+
+def _not_reached_error(lead: str, status: dict[str, Any]) -> str:
+    """The failure line, plus the call's own reason when it gave one.
+
+    A voicemail with no message left ends FAILED with that reason on the record;
+    without it here, her report could not say why.
+    """
+    detail = str(status.get("error") or status.get("outcome") or "").strip()
+    return "%s: %s" % (lead, detail) if detail else "%s." % lead
 
 
 def _resolve_user_id() -> str:
@@ -1782,7 +1792,11 @@ async def _make_phone_call_cloud(
     reached = final_status in {"completed", "voicemail"}
     return ToolResult(
         ok=reached,
-        error=None if reached else "The call ended without reaching the person (%s)." % final_status,
+        error=(
+            None
+            if reached
+            else _not_reached_error("The call ended without reaching the person (%s)" % final_status, status_data)
+        ),
         error_category=None if reached else "call_not_completed",
         retryable=False,
         data={

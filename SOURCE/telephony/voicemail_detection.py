@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
@@ -14,9 +15,12 @@ logger = get_logger(__name__)
 try:
     from pipecat.extensions.voicemail.voicemail_detector import VoicemailDetector
     from pipecat.frames.frames import (
+        InterruptionFrame,
         LLMContextFrame,
         LLMMessagesAppendFrame,
         TranscriptionFrame,
+        VADUserStartedSpeakingFrame,
+        VADUserStoppedSpeakingFrame,
     )
     from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 
@@ -26,6 +30,9 @@ except ImportError:
     LLMMessagesAppendFrame = None  # type: ignore[assignment]
     LLMContextFrame = None  # type: ignore[assignment]
     TranscriptionFrame = None  # type: ignore[assignment]
+    InterruptionFrame = None  # type: ignore[assignment]
+    VADUserStartedSpeakingFrame = None  # type: ignore[assignment]
+    VADUserStoppedSpeakingFrame = None  # type: ignore[assignment]
     FrameDirection = None  # type: ignore[assignment]
     FrameProcessor = object  # type: ignore[assignment,misc]
     VoicemailDetector = None  # type: ignore[assignment]
@@ -36,6 +43,26 @@ if TYPE_CHECKING:
 
 # A person may be waiting on this answer, so it is bounded. Warm it takes under a second.
 _LATE_GREETING_CLASSIFY_SECS = 4.0
+
+# Leaving the voicemail message (build 12, call 79907d19). With fast transcription the
+# voicemail verdict lands two seconds into the greeting, so these timings decide when
+# she speaks and what happens when nothing gets out. Every one is a structural signal
+# (VAD frames, interruption frames, timers); no wording is looked at.
+#
+# Her message waits until the far end has been quiet this long, so she never starts
+# talking over the greeting that is still playing.
+VOICEMAIL_QUIET_BEFORE_MESSAGE_SECS = 1.2
+# A line that never goes quiet (music, noise) does not hold her message forever.
+VOICEMAIL_QUIET_HOLD_CAP_SECS = 25.0
+# An interruption cancelled her in-flight message. Its end frame can be thrown away by
+# pipecat's interruption queue reset before the transcript collector sees it, so if no
+# end frame with text has arrived by then, the generation is treated as undelivered.
+VOICEMAIL_INTERRUPTED_UNDELIVERED_SECS = 1.0
+# Nothing delivered this long after the far end went quiet: re-fire the message once.
+VOICEMAIL_REFIRE_AFTER_QUIET_SECS = 8.0
+# Voicemail detected and still no message this long after: hang up and say so.
+VOICEMAIL_NO_MESSAGE_HANGUP_SECS = 40.0
+_VOICEMAIL_SUPERVISE_POLL_SECS = 0.1
 
 AMD_MACHINE_RESULTS = {"machine"}
 AMD_GREETING_READY_RESULTS = {"beep_detected", "ended", "no_beep_detected", "not_sure"}
@@ -368,7 +395,43 @@ class PipecatVoicemailDetectionHandler:
         record._end_call_committed = False
         record._voicemail_auto_hangup_queued = False
         record._pending_end_call = None
+        record.voicemail_no_message_left = False
         self._response_gate.reopen_for_conversation()
+
+    def recording_talking_over_message(self) -> bool:
+        """True when far-end speech right now is the recording talking over her message.
+
+        Her voicemail message is in progress (its generation is in flight, or she is
+        speaking in voicemail mode) and the newest speech did not begin after her
+        message did. Such speech must not interrupt her: a recording does not take
+        turns. Speech that began after her message began is a person answering
+        (``VoicemailAnswerWatch``), and that still interrupts and reopens the call.
+
+        The in-flight half matters: the disclosure watchdog holds her first turn
+        until the model finishes it, so her audio can start only after the text is
+        already counted as delivered. An interruption in that gap would cut a
+        message the call then treats as left.
+        """
+        record = self._record
+        if not bool(getattr(record, "voicemail_detected", False)) or bool(
+            getattr(record, "voicemail_answered_by_person", False)
+        ):
+            return False
+        answer_watch = getattr(record, "_voicemail_answer_watch", None)
+        if answer_watch is not None and answer_watch.latest_speech_answers_message():
+            return False
+        bot_speaking = bool(getattr(answer_watch, "_bot_speaking", False))
+        return bool(self._response_gate.message_in_flight or bot_speaking)
+
+    async def give_up_without_message(self) -> None:
+        """No message got out within the limit: hang up and record that none was left."""
+        from telephony.call_tools import hang_up_voicemail_without_message
+
+        llm_service = getattr(self._record, "_llm_service", None)
+        push_frame = getattr(llm_service, "push_frame", None)
+        if not callable(push_frame):
+            push_frame = self._response_gate.push_frame
+        await hang_up_voicemail_without_message(self._record, push_frame=push_frame)
 
     async def on_outbound_opening_queued(self, reason: str) -> None:
         """Release Pipecat's TTS gate for silent-answer openings."""
@@ -383,6 +446,7 @@ class PipecatVoicemailDetectionHandler:
 
     async def cleanup(self) -> None:
         await self._amd_handler.cleanup()
+        await self._response_gate.stop_voicemail_supervision()
 
     async def note_voicemail_message_delivered(self) -> None:
         """Viola's one voicemail message completed and reached TTS.
@@ -430,6 +494,9 @@ class PipecatVoicemailDetectionHandler:
             answer_watch.note_voicemail_mode()
         # Drop Viola's buffered normal opening: she leaves a voicemail message instead.
         await self._response_gate.drop_buffered()
+        # From here the gate owns the message's timing: it waits for the line to go
+        # quiet, re-fires an interrupted message, and gives up after the limit.
+        self._response_gate.start_voicemail_supervision()
         await self._publish_voicemail_context()
 
     def _mark_detected(self, source: str, evidence: str) -> None:
@@ -504,18 +571,45 @@ class _VoicemailResponseGate(FrameProcessor if PIPECAT_AVAILABLE else object):  
         # not dropped, because whether it is a repeat or the re-fire that rescues an
         # interrupted message is not knowable until the in-flight one resolves.
         # Single slot: a recording emits several prompts and only the most recent
-        # context is worth re-firing.
+        # context is worth re-firing. It also holds her message while the far end
+        # is still talking (VOICEMAIL_QUIET_BEFORE_MESSAGE_SECS).
         self._held_voicemail_frame: tuple[Any, Any] | None = None
+        # The newest voicemail context she was given, kept so a message whose
+        # generation vanished (end frame lost) can be fired again.
+        self._last_voicemail_frame: tuple[Any, Any] | None = None
+        # Far-end speech, from the VAD frames the user aggregator sends downstream.
+        self._far_end_speaking = False
+        self._far_end_active_at: float | None = None
+        self._hold_started_at: float | None = None
+        self._in_flight_since: float | None = None
+        # When an interruption passed this gate while her message was in flight.
+        self._interrupted_at: float | None = None
+        self._refired = False
+        self._voicemail_mode_since: float | None = None
+        self._supervisor: asyncio.Task[None] | None = None
+        self._reopened = False
+
+    @property
+    def message_in_flight(self) -> bool:
+        return self._voicemail_generation_in_flight
 
     def reopen_for_conversation(self) -> None:
         """Forget the message accounting: ordinary turns pass from here on."""
+        self._reopened = True
         self._voicemail_generation_in_flight = False
         self._held_voicemail_frame = None
+        self._last_voicemail_frame = None
+        self._interrupted_at = None
         self._buffered_context_frames = []
+        supervisor = self._supervisor
+        self._supervisor = None
+        if supervisor is not None and not supervisor.done() and supervisor is not asyncio.current_task():
+            supervisor.cancel()
 
     async def note_generation_delivered(self) -> None:
         """The in-flight voicemail generation finished with text that reached TTS."""
         self._voicemail_generation_in_flight = False
+        self._interrupted_at = None
         if self._held_voicemail_frame is not None:
             self._held_voicemail_frame = None
             logger.info(
@@ -525,18 +619,189 @@ class _VoicemailResponseGate(FrameProcessor if PIPECAT_AVAILABLE else object):  
 
     async def note_generation_undelivered(self) -> None:
         """The in-flight voicemail generation was cancelled having spoken nothing."""
-        self._voicemail_generation_in_flight = False
-        held = self._held_voicemail_frame
-        self._held_voicemail_frame = None
-        if held is None:
+        if not self._voicemail_generation_in_flight and self._held_voicemail_frame is None:
             return
+        self._mark_undelivered()
         logger.info(
-            "Call %s: releasing the held voicemail context -- the interrupted "
-            "generation delivered nothing, so Viola's one message still has to go out",
+            "Call %s: the interrupted voicemail generation delivered nothing, so Viola's "
+            "one message still has to go out",
             self._record.call_id,
         )
+        await self._release_held_if_quiet()
+
+    # -- voicemail message timing (build 12) ------------------------------------
+
+    def start_voicemail_supervision(self) -> None:
+        """Voicemail was detected: watch the message until it is delivered or given up."""
+        self._reopened = False
+        if self._voicemail_mode_since is None:
+            self._voicemail_mode_since = time.monotonic()
+        if self._supervisor is not None and not self._supervisor.done():
+            return
+        try:
+            self._supervisor = asyncio.get_running_loop().create_task(
+                self._supervise_voicemail_message(),
+                name="voicemail-message-%s" % getattr(self._record, "call_id", ""),
+            )
+        except RuntimeError:
+            self._supervisor = None
+
+    async def stop_voicemail_supervision(self) -> None:
+        supervisor = self._supervisor
+        self._supervisor = None
+        if supervisor is None or supervisor.done() or supervisor is asyncio.current_task():
+            return
+        supervisor.cancel()
+        try:
+            await supervisor
+        except asyncio.CancelledError:
+            pass
+
+    async def cleanup(self) -> None:
+        await self.stop_voicemail_supervision()
+        if PIPECAT_AVAILABLE:
+            await super().cleanup()
+
+    def _far_end_quiet_for(self, seconds: float, now: float | None = None) -> bool:
+        """The far end has not been heard for ``seconds``. No VAD frame yet means quiet."""
+        if self._far_end_speaking:
+            return False
+        active_at = self._far_end_active_at
+        if active_at is None:
+            return True
+        return (time.monotonic() if now is None else now) - active_at >= seconds
+
+    def _mark_undelivered(self) -> None:
+        """Her in-flight message got nothing out: free the latch, keep the message due."""
+        self._voicemail_generation_in_flight = False
+        self._interrupted_at = None
+        self._in_flight_since = None
+        if self._held_voicemail_frame is None and self._last_voicemail_frame is not None:
+            self._held_voicemail_frame = self._fresh_copy(self._last_voicemail_frame)
+        if self._held_voicemail_frame is not None and self._hold_started_at is None:
+            self._hold_started_at = time.monotonic()
+
+    @staticmethod
+    def _fresh_copy(held: tuple[Any, Any]) -> tuple[Any, Any]:
+        frame, direction = held
+        context = getattr(frame, "context", None)
+        if LLMContextFrame is not None and context is not None:
+            return LLMContextFrame(context=context), direction
+        return frame, direction
+
+    async def _admit_voicemail_frame(self, frame: Any, direction: Any) -> None:
         self._voicemail_generation_in_flight = True
-        await self.push_frame(*held)
+        self._in_flight_since = time.monotonic()
+        self._interrupted_at = None
+        self._hold_started_at = None
+        self._last_voicemail_frame = (frame, direction)
+        await self.push_frame(frame, direction)
+
+    async def _release_held_if_quiet(self, *, now: float | None = None) -> bool:
+        held = self._held_voicemail_frame
+        if held is None or self._voicemail_generation_in_flight:
+            return False
+        if bool(getattr(self._record, "voicemail_message_delivered", False)):
+            self._held_voicemail_frame = None
+            return False
+        now = time.monotonic() if now is None else now
+        quiet = self._far_end_quiet_for(VOICEMAIL_QUIET_BEFORE_MESSAGE_SECS, now)
+        capped = self._hold_started_at is not None and now - self._hold_started_at >= VOICEMAIL_QUIET_HOLD_CAP_SECS
+        if not (quiet or capped):
+            return False
+        self._held_voicemail_frame = None
+        logger.info(
+            "Call %s: releasing the held voicemail context: %s",
+            self._record.call_id,
+            "the line has been quiet for %.1fs" % VOICEMAIL_QUIET_BEFORE_MESSAGE_SECS
+            if quiet
+            else "the line never went quiet within %.0fs" % VOICEMAIL_QUIET_HOLD_CAP_SECS,
+        )
+        await self._admit_voicemail_frame(*held)
+        return True
+
+    def _voicemail_message_settled(self) -> bool:
+        from telephony.call_manager import _is_terminal_call_status
+
+        record = self._record
+        return bool(
+            self._reopened
+            or not bool(getattr(record, "voicemail_detected", False))
+            or bool(getattr(record, "voicemail_message_delivered", False))
+            or bool(getattr(record, "voicemail_answered_by_person", False))
+            or bool(getattr(record, "_end_call_committed", False))
+            or bool(getattr(record, "_telnyx_hangup_dispatched", False))
+            or _is_terminal_call_status(getattr(record, "status", None))
+        )
+
+    async def _supervise_voicemail_message(self) -> None:
+        """Make sure her one message gets out, or the call ends saying it did not.
+
+        The latch used to be cleared only by the transcript collector seeing the
+        generation's end frame. On call 79907d19 an interruption threw that frame
+        away and every later prompt waited behind a generation that no longer
+        existed, until the voicemail system hung up at 180 s.
+        """
+        try:
+            while True:
+                await asyncio.sleep(_VOICEMAIL_SUPERVISE_POLL_SECS)
+                if self._voicemail_message_settled():
+                    return
+                now = time.monotonic()
+                if (
+                    self._voicemail_generation_in_flight
+                    and self._interrupted_at is not None
+                    and now - self._interrupted_at >= VOICEMAIL_INTERRUPTED_UNDELIVERED_SECS
+                ):
+                    logger.info(
+                        "Call %s: voicemail message was interrupted and no end frame with text "
+                        "followed within %.1fs; treating it as undelivered",
+                        self._record.call_id,
+                        VOICEMAIL_INTERRUPTED_UNDELIVERED_SECS,
+                    )
+                    self._mark_undelivered()
+                stale_in_flight = (
+                    self._voicemail_generation_in_flight
+                    and self._in_flight_since is not None
+                    and now - self._in_flight_since >= VOICEMAIL_REFIRE_AFTER_QUIET_SECS
+                )
+                nothing_due = not self._voicemail_generation_in_flight and self._held_voicemail_frame is None
+                if (
+                    not self._refired
+                    and self._last_voicemail_frame is not None
+                    and (stale_in_flight or nothing_due)
+                    and self._far_end_quiet_for(VOICEMAIL_REFIRE_AFTER_QUIET_SECS, now)
+                ):
+                    self._refired = True
+                    logger.info(
+                        "Call %s: re-firing Viola's voicemail message once: nothing delivered " "%.0fs after the line went quiet",
+                        self._record.call_id,
+                        VOICEMAIL_REFIRE_AFTER_QUIET_SECS,
+                    )
+                    self._voicemail_generation_in_flight = False
+                    self._held_voicemail_frame = self._fresh_copy(self._last_voicemail_frame)
+                    self._hold_started_at = now
+                await self._release_held_if_quiet(now=now)
+                since = self._voicemail_mode_since
+                recent_generation = (
+                    self._voicemail_generation_in_flight
+                    and self._in_flight_since is not None
+                    and now - self._in_flight_since < VOICEMAIL_REFIRE_AFTER_QUIET_SECS
+                )
+                if since is not None and now - since >= VOICEMAIL_NO_MESSAGE_HANGUP_SECS and not recent_generation:
+                    logger.warning(
+                        "Call %s: no voicemail message delivered %.0fs after voicemail was detected; "
+                        "hanging up, no message was left",
+                        self._record.call_id,
+                        VOICEMAIL_NO_MESSAGE_HANGUP_SECS,
+                    )
+                    self._held_voicemail_frame = None
+                    await self._owner.give_up_without_message()
+                    return
+        except asyncio.CancelledError:
+            return
+        except Exception:
+            logger.exception("Call %s: voicemail message supervisor failed", getattr(self._record, "call_id", ""))
 
     async def release_buffered(self) -> None:
         buffered = self._buffered_context_frames
@@ -557,6 +822,23 @@ class _VoicemailResponseGate(FrameProcessor if PIPECAT_AVAILABLE else object):  
         if not PIPECAT_AVAILABLE:
             return
         await super().process_frame(frame, direction)
+        if VADUserStartedSpeakingFrame is not None and isinstance(frame, VADUserStartedSpeakingFrame):
+            self._far_end_speaking = True
+            self._far_end_active_at = time.monotonic()
+        elif VADUserStoppedSpeakingFrame is not None and isinstance(frame, VADUserStoppedSpeakingFrame):
+            self._far_end_speaking = False
+            self._far_end_active_at = time.monotonic()
+        elif (
+            InterruptionFrame is not None
+            and isinstance(frame, InterruptionFrame)
+            and self._voicemail_generation_in_flight
+            and self._interrupted_at is None
+            and not bool(getattr(self._record, "voicemail_message_delivered", False))
+        ):
+            # The interruption cancels her in-flight message. Whether anything of it
+            # survived is the transcript collector's call, but its end frame can be
+            # dropped on the way; the supervisor resolves it after a short wait.
+            self._interrupted_at = time.monotonic()
         # The turn's context can get here before the turn-started event has run, so
         # settle who is on the line first: a person's turn must never be dropped.
         answer_watch = getattr(self._record, "_voicemail_answer_watch", None)
@@ -602,6 +884,7 @@ class _VoicemailResponseGate(FrameProcessor if PIPECAT_AVAILABLE else object):  
                     self._record.call_id,
                 )
                 return
+            self.start_voicemail_supervision()
             if self._voicemail_generation_in_flight:
                 self._held_voicemail_frame = (frame, direction)
                 logger.info(
@@ -610,11 +893,25 @@ class _VoicemailResponseGate(FrameProcessor if PIPECAT_AVAILABLE else object):  
                     self._record.call_id,
                 )
                 return
-            self._voicemail_generation_in_flight = True
+            if not self._far_end_quiet_for(VOICEMAIL_QUIET_BEFORE_MESSAGE_SECS):
+                # The greeting is still playing. Starting now means talking over it,
+                # and its next words would cut her off (call 79907d19).
+                self._held_voicemail_frame = (frame, direction)
+                if self._hold_started_at is None:
+                    self._hold_started_at = time.monotonic()
+                logger.info(
+                    "Call %s: holding Viola's voicemail message until the line has been quiet for %.1fs",
+                    self._record.call_id,
+                    VOICEMAIL_QUIET_BEFORE_MESSAGE_SECS,
+                )
+                return
+            self._held_voicemail_frame = None
             logger.info(
                 "Call %s: allowing voicemail LLM context (message not yet delivered)",
                 self._record.call_id,
             )
+            await self._admit_voicemail_frame(frame, direction)
+            return
         elif (
             direction == FrameDirection.DOWNSTREAM
             and LLMContextFrame is not None
