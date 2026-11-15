@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "c9e5017bc456f9b7d7751f65a601a35573e72056",
-  "sha256": "06fee3a7944a04a0ee477aaa13af85db0a86824c9b1868a18315408c13407852",
+  "revision": "557f0d6b09abe0ba21735fc49b77c9ade3cb2547",
+  "sha256": "8e03aa1e4f2e18b554db32411c01e27fe490d080b75dd5af3c93a051a99fc18f",
   "files": [
     {
       "path": ".env.example",
@@ -1135,8 +1135,8 @@
     },
     {
       "path": "core/reply_speech_settings.py",
-      "sha256": "b183ac7f2769f26263176bd6d39f3678289131ae41d2c347cb0a9dda5848e533",
-      "bytes": 2474
+      "sha256": "1e19513c2b5fc820a2ebec15126f62e6c7bdb85043640fdc209f3e79df7d1c3b",
+      "bytes": 3108
     },
     {
       "path": "core/request_context.py",
@@ -1605,8 +1605,8 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "57c5365a263a9c9b7b162bcf6d82b3d7f360cf5c3eae7e4e6a155035a010b9ae",
-      "bytes": 646573
+      "sha256": "2509705374c2686116bba7837b11151e1bb80d58becb0067444527403f32658a",
+      "bytes": 646900
     },
     {
       "path": "intent/agent_loop.py",
@@ -9550,8 +9550,8 @@
     },
     {
       "path": "ui/api/routes/command.py",
-      "sha256": "fd1487a8be28a897bb880bd057045a4ae21d9990524d04ef564e4099a2289f3c",
-      "bytes": 39618
+      "sha256": "7cd84d6909fdd73dab1b2c7c5fe2244c6f3912bf80cc4f7c5e074ebc945771fb",
+      "bytes": 39788
     },
     {
       "path": "ui/api/routes/common.py",
@@ -13600,8 +13600,8 @@
     },
     {
       "path": "voice/agent_finish_speech.py",
-      "sha256": "961db34e9b97cfbbc7c179495471d3e674bc0f73a2dff20bdb5787941904ed82",
-      "bytes": 9830
+      "sha256": "058cc07042b4af6f5be3c08099373b1faea643f0dfc59ac005a9e9c4fc9834dc",
+      "bytes": 10200
     },
     {
       "path": "voice/audio_manager.py",
