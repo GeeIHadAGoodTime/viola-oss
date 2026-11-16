@@ -100,7 +100,7 @@ import SubtleDivider from './components/shared/SubtleDivider';
 import LoadingSkeleton from './components/shared/LoadingSkeleton';
 import ModalLoadingSpinner from './components/shared/ModalLoadingSpinner';
 import ProviderBadge from './components/shared/ProviderBadge';
-import AgentDrawer from './components/AgentDrawer';
+import TaskLine from './components/TaskLine';
 import { clampWakeThreshold } from './utils/wakeSensitivity';
 import {
   browserLeaveAction,
@@ -235,10 +235,12 @@ const RESPONSE_LINE_MAX_CHARS = 160;
  * it docks in the corner, the video stays bright, and it leaves in 15 s. The
  * full text stays in Chat History.
  */
-export function longAnswerCard(body, overVideo) {
-  return overVideo
+export function longAnswerCard(body, overVideo, markdown = false) {
+  const card = overVideo
     ? { type: 'detail', body, long_answer: true, compact: true, dismiss_after_ms: LONG_ANSWER_OVER_VIDEO_MS }
     : { type: 'detail', body, long_answer: true };
+  // A background agent writes Markdown; the card draws it like the chat does.
+  return markdown ? { ...card, markdown: true } : card;
 }
 
 // A background agent's result: the response line, and the big card when it is
@@ -246,7 +248,7 @@ export function longAnswerCard(body, overVideo) {
 export function agentResultView(content, overVideo) {
   const text = typeof content === 'string' ? content : String(content ?? '');
   if (text.trim().length > LONG_ANSWER_CARD_CHARS) {
-    return { text, line: truncateForResponseLine(text), card: longAnswerCard(text, overVideo) };
+    return { text, line: truncateForResponseLine(text), card: longAnswerCard(text, overVideo, true) };
   }
   return { text, line: text, card: null };
 }
@@ -265,6 +267,13 @@ const WEATHER_FORECAST_TTL_MS = 30 * 60 * 1000;
 // How long the UI socket may be down before "Connection lost" is shown. The
 // socket retries after 2 s, so a quick drop (e.g. waking from sleep) stays quiet.
 const DISCONNECT_TOAST_GRACE_MS = 6000;
+const PHONE_LIVE_EVENT_TYPES = new Set([
+  'call_started',
+  'call_briefing',
+  'call_consultation',
+  'call_cost_update',
+  'recipient_state',
+]);
 
 function hasForecastPayload(data) {
   const hourly = data?.hourly_forecast || data?.hourly;
@@ -819,6 +828,11 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
     applyCostUpdate: applyCallCostUpdate,
   } = useCallAudio(activeCallId);
   const callFallbackStartRef = useRef(Date.now());
+  // Calls that already sent call_ended. A late call_started / cost / recipient
+  // frame (the cloud repeats call_started while the call waits for its voice
+  // worker) or a stale "is a call live?" answer must not bring the live-call
+  // screen back for a call that is over.
+  const endedCallIdsRef = useRef(new Set());
   const pendingCallTakeoverRef = useRef(false);
   const activeCallPanelMeta = useMemo(() => {
     const merged = {
@@ -837,6 +851,13 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
     }
     return merged;
   }, [activeCallMeta, callBriefing, activeCallId, callAudioLatestCostUsd, callAudioRecipientState]);
+  // The desktop window's surface watchdog reads these before any page reload:
+  // a reload during a live call or a running task would wipe what is on screen.
+  useEffect(() => {
+    const root = document.documentElement;
+    root.setAttribute('data-viola-live-call', activeCallId ? '1' : '0');
+    root.setAttribute('data-viola-task-running', agentTaskActive ? '1' : '0');
+  }, [activeCallId, agentTaskActive]);
   const isPhoneMode = displayMode === 'phone_tab' || displayMode === 'phone_call';
   const refreshPhoneCallQueue = useCallback(async () => {
     try {
@@ -1139,7 +1160,6 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   const [isCommandLoading, setIsCommandLoading] = useState(false);
   const [activeCard, setActiveCard] = useState(null);
   const dismissCard = useCallback(() => setActiveCard(null), []);
-  const [agentDrawerExpanded, setAgentDrawerExpanded] = useState(true);
   const handleAgentResult = useCallback(({ content }) => {
     if (!mountedRef.current) return;
     // A long background-agent result (a 2,000-word essay on the laptop) goes on
@@ -1154,19 +1174,6 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
     ]);
   }, []);
   const agentRegistry = useAgentRegistry({ onAgentResult: handleAgentResult });
-  const activeAgentCount = agentRegistry.active.length;
-  const previousActiveAgentCountRef = useRef(activeAgentCount);
-
-  useEffect(() => {
-    if (activeAgentCount > 0 && previousActiveAgentCountRef.current === 0) {
-      setAgentDrawerExpanded(true);
-    }
-    previousActiveAgentCountRef.current = activeAgentCount;
-  }, [activeAgentCount]);
-
-  const handleToggleAgentDrawer = useCallback(() => {
-    setAgentDrawerExpanded(expanded => !expanded);
-  }, []);
 
   // Any modal/overlay open — drives both onboarding pause and hiding the
   // background content (viola-inner-card) from assistive tech + the display
@@ -2020,7 +2027,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   // Video started while a long answer is up: the answer gets out of the way.
   useEffect(() => {
     if (!videoPlaying) return;
-    setActiveCard((card) => (card?.long_answer && !card.compact ? longAnswerCard(card.body, true) : card));
+    setActiveCard((card) => (card?.long_answer && !card.compact ? longAnswerCard(card.body, true, card.markdown) : card));
   }, [videoPlaying]);
   useEffect(() => {
     if (!setChatResponseCallback) return;
@@ -2211,6 +2218,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       try {
         const active = await fetchActiveCall();
         if (cancelled || !active || !active.call_id) return;
+        if (endedCallIdsRef.current.has(active.call_id)) return;
         callFallbackStartRef.current = Date.now();
         rememberCallMeta(active, active.call_id, true);
         setActiveCallId(active.call_id);
@@ -2230,6 +2238,15 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
     const callId = payload.call_id || payload.id;
 
     if (handlePaidActionGatePayload(data)) {
+      return;
+    }
+
+    if (
+      callId
+      && endedCallIdsRef.current.has(callId)
+      && data.type !== 'call_ended'
+      && PHONE_LIVE_EVENT_TYPES.has(data.type)
+    ) {
       return;
     }
 
@@ -2278,6 +2295,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       setPhoneCallQueue(Array.isArray(payload.queue) ? payload.queue : []);
     } else if (data.type === 'call_ended') {
       if (callId && activeCallId && callId !== activeCallId) return;
+      if (callId) endedCallIdsRef.current.add(callId);
       const endedCall = {
         ...(activeCallMeta || {}),
         ...(payload || {}),
@@ -2633,8 +2651,13 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       // A queued click for a track we left must never rate the next track.
       if (ratingSessionRef.current !== session) return;
       try {
-        await api.setRating(actualRating, expectedTrackId);
+        const saved = await api.setRating(actualRating, expectedTrackId);
         settleRating(true);
+        // Saved in Viola but Spotify did not take it: keep the saved state
+        // on the button and say so plainly (never claim it reached Spotify).
+        if (saved && typeof saved.message === 'string' && saved.message) {
+          addToast({ message: saved.message, level: 'warning' });
+        }
         // Dislike means "not this one": same skip as the Next button.
         if (actualRating === 'disliked') runSkipAction();
       } catch (err) {
@@ -4017,9 +4040,6 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
           onOpenBugReport={handleOpenBugReport}
           onCalendarModalOpenChange={setCalendarModalOpen}
           userSettings={userSettings}
-          activeAgentCount={activeAgentCount}
-          agentDrawerExpanded={agentDrawerExpanded}
-          onToggleAgentDrawer={handleToggleAgentDrawer}
         />
 
         <div
@@ -4235,17 +4255,14 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
             </div>
           </div>
         )}
+        <TaskLine
+          active={agentRegistry.active}
+          recentCompleted={agentRegistry.recent_completed}
+          streamStates={agentRegistry.streamStates}
+          onCancel={agentRegistry.cancelAgent}
+        />
         </div>
       </div>
-
-      <AgentDrawer
-        active={agentRegistry.active}
-        recentCompleted={agentRegistry.recent_completed}
-        streamStates={agentRegistry.streamStates}
-        expanded={agentDrawerExpanded}
-        onToggleExpanded={handleToggleAgentDrawer}
-        onCancel={agentRegistry.cancelAgent}
-      />
 
       <WorkbenchDropZone addToast={addToast} />
 

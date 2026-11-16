@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import contextvars
 import os
 import re
+import threading
 import time
+import weakref
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from core.logging_config import get_logger
@@ -103,6 +106,14 @@ COMPUTER_USE_MUTATING_ACTIONS: frozenset[str] = frozenset(
 # approval cannot grant desktop control for the whole process lifetime.
 _SESSION_APP_GRANTS: dict[tuple[str, str, str], float] = {}
 _LOW_LEVEL_HELD_KEYS: dict[tuple[str, str], set[str]] = {}
+# Throwing away unsaved work is never covered by an app grant or the whitelist.
+# One "yes" covers one discard in one window: (owner, session, window handle)
+# -> monotonic expiry. Consumed by the action it was given for.
+DISCARD_APPROVAL_TTL_SECONDS = 120.0
+_DISCARD_APPROVALS: dict[tuple[str, str, int], float] = {}
+# Windows Viola opened in this conversation: (owner, session) -> {hwnd: executable}.
+# "Close Notepad" with several Notepad windows open means the one she opened.
+_OPENED_WINDOWS: dict[tuple[str, str], dict[int, str]] = {}
 _CONTROL_SESSION_LOCKS: dict[str, ComputerUseControlSession] = {}
 _KEY_ALIASES: dict[str, str] = {
     "control": "ctrl",
@@ -123,15 +134,20 @@ class ComputerUseRefusal(Exception):
     reason: str
     action: str = ""
     target_app_executable: str = ""
+    details: Mapping[str, object] | None = field(default=None, hash=False, compare=False)
 
     def to_envelope(self) -> dict[str, object]:
-        return {
+        envelope: dict[str, object] = {
             "ok": False,
             "error_category": self.error_category,
             "reason": self.reason,
             "action": self.action,
             "target_app_executable": self.target_app_executable,
         }
+        if self.details:
+            for key, value in self.details.items():
+                envelope.setdefault(str(key), value)
+        return envelope
 
 
 @dataclass(frozen=True)
@@ -419,6 +435,72 @@ def clear_session_app_grants(*, user_id: str | None = None, session_id: str | No
         _SESSION_APP_GRANTS.pop(key, None)
 
 
+def _owner_session(user_id: str | None, session_id: str | None) -> tuple[str, str]:
+    owner = _resolve_local_user_id(user_id)
+    session = str(session_id or "local-session").strip() or "local-session"
+    return owner, session
+
+
+def grant_discard_once(
+    window_handle: int,
+    *,
+    user_id: str | None = None,
+    session_id: str | None = None,
+) -> bool:
+    """Record the user's "yes" to throwing away the unsaved work in one window, once."""
+    handle = int(window_handle or 0)
+    if not handle:
+        return False
+    owner, session = _owner_session(user_id, session_id)
+    _DISCARD_APPROVALS[(owner, session, handle)] = time.monotonic() + DISCARD_APPROVAL_TTL_SECONDS
+    return True
+
+
+def consume_discard_approval(
+    window_handle: int,
+    *,
+    user_id: str | None = None,
+    session_id: str | None = None,
+) -> bool:
+    """Use up the one-time discard approval for this window. False when there is none."""
+    handle = int(window_handle or 0)
+    if not handle:
+        return False
+    owner, session = _owner_session(user_id, session_id)
+    expiry = _DISCARD_APPROVALS.pop((owner, session, handle), None)
+    return expiry is not None and time.monotonic() < expiry
+
+
+def clear_discard_approvals() -> None:
+    _DISCARD_APPROVALS.clear()
+
+
+def record_opened_window(
+    window_handle: int | None,
+    executable: str | None,
+    *,
+    user_id: str | None = None,
+    session_id: str | None = None,
+) -> None:
+    """Remember a window launch_app opened in this conversation."""
+    handle = int(window_handle or 0)
+    if not handle:
+        return
+    windows = _OPENED_WINDOWS.setdefault(_owner_session(user_id, session_id), {})
+    windows[handle] = normalize_executable_name(executable)
+    if len(windows) > 64:
+        for stale in list(windows)[: len(windows) - 64]:
+            windows.pop(stale, None)
+
+
+def opened_windows(*, user_id: str | None = None, session_id: str | None = None) -> dict[int, str]:
+    return dict(_OPENED_WINDOWS.get(_owner_session(user_id, session_id), {}))
+
+
+def clear_opened_windows() -> None:
+    _OPENED_WINDOWS.clear()
+
+
 def require_action_consent(
     action: str,
     *,
@@ -493,6 +575,98 @@ def abort_control_session(*, user_id: str | None = None, session_id: str | None 
         return False
     _CONTROL_SESSION_LOCKS.pop(owner, None)
     return True
+
+
+# ---------------------------------------------------------------------------
+# User stop for desktop actions already running
+# ---------------------------------------------------------------------------
+#
+# A desktop action runs on the desktop worker thread. Ending the turn (the
+# executor's cancel, the chat task's cancel) does not reach it: a ``type``
+# already handed to Windows used to keep typing for seconds after Stop.
+# So every computer action gets a stop signal when the server receives it,
+# and a user stop sets the signal of every action of that user still in
+# flight. Typing, waits and holds look at it between small pieces of work.
+# An action that arrives after the stop gets a fresh signal: the stop never
+# carries over to the next control session.
+
+
+class DesktopStopSignal:
+    """Set when the user stops while this desktop action is in flight."""
+
+    __slots__ = ("__weakref__", "_event", "owner", "reason")
+
+    def __init__(self, owner: str) -> None:
+        self.owner = owner
+        self.reason = ""
+        self._event = threading.Event()
+
+    def is_set(self) -> bool:
+        return self._event.is_set()
+
+    def wait(self, timeout: float) -> bool:
+        """Sleep up to ``timeout`` seconds; True as soon as a stop arrives."""
+        return self._event.wait(max(0.0, float(timeout)))
+
+    def set(self, reason: str = "") -> None:
+        if not self._event.is_set():
+            self.reason = reason
+            self._event.set()
+
+
+_STOP_LOCK = threading.Lock()
+_STOP_SIGNALS: dict[str, weakref.WeakSet[DesktopStopSignal]] = {}
+_CURRENT_STOP: contextvars.ContextVar[DesktopStopSignal | None] = contextvars.ContextVar(
+    "viola_desktop_stop_signal", default=None
+)
+
+
+def new_desktop_stop_signal(*, user_id: str | None = None) -> DesktopStopSignal:
+    """A fresh (not stopped) signal for one desktop action of this user."""
+    owner = _resolve_local_user_id(user_id)
+    signal = DesktopStopSignal(owner)
+    with _STOP_LOCK:
+        _STOP_SIGNALS.setdefault(owner, weakref.WeakSet()).add(signal)
+    return signal
+
+
+def request_desktop_stop(*, user_id: str | None = None, reason: str = "user stop") -> int:
+    """The user stopped: every desktop action of this user still running stops.
+
+    Returns how many running actions were told. Typing sends no further piece,
+    and a wait, hold or drag ends early (its button or key is released as usual).
+    """
+    owner = _resolve_local_user_id(user_id)
+    with _STOP_LOCK:
+        signals = [signal for signal in _STOP_SIGNALS.pop(owner, ()) if not signal.is_set()]
+    for signal in signals:
+        signal.set(reason)
+    if signals:
+        logger.info("Desktop stop (%s): %d desktop action(s) in flight told to stop", reason, len(signals))
+    return len(signals)
+
+
+def set_current_desktop_stop(signal: DesktopStopSignal | None) -> contextvars.Token[DesktopStopSignal | None]:
+    return _CURRENT_STOP.set(signal)
+
+
+def reset_current_desktop_stop(token: contextvars.Token[DesktopStopSignal | None]) -> None:
+    _CURRENT_STOP.reset(token)
+
+
+def current_desktop_stop() -> DesktopStopSignal | None:
+    """The stop signal of the desktop action running in this context, if any."""
+    return _CURRENT_STOP.get()
+
+
+def desktop_stop_requested() -> bool:
+    signal = _CURRENT_STOP.get()
+    return bool(signal is not None and signal.is_set())
+
+
+def clear_desktop_stops() -> None:
+    with _STOP_LOCK:
+        _STOP_SIGNALS.clear()
 
 
 def control_session_indicator(

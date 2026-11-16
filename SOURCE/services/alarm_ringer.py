@@ -95,7 +95,9 @@ def _play_on_speaker(samples: np.ndarray, sample_rate: int) -> bool:
                 from audio_core.aec_reference_base import push_local_playback_reference
 
                 # The wake word must still hear "Viola, stop" over the alarm.
-                push_local_playback_reference(samples, sample_rate)
+                # It is not her talking: a wake that stops her reply is judged
+                # against when her voice ended, not the alarm (own_playback).
+                push_local_playback_reference(samples, sample_rate, speech=False)
             except Exception:  # noqa: BLE001, RUF100 - the reference tap must never stop the alarm
                 logger.debug("Alarm AEC reference push failed", exc_info=True)
             with sd.OutputStream(

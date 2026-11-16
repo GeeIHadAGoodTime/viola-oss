@@ -203,6 +203,22 @@ def _session_lane_kind() -> str:
     return "user command"
 
 
+def _hold_saved_private_values(user_id: str | None) -> None:
+    """Keep the account's saved delivery address out of every log (read once per account per process)."""
+    try:
+        from intent.sensitive_values import load_saved_address
+
+        load_saved_address(user_id)
+    except Exception:  # noqa: BLE001 - masking must never break start-up or a command
+        logger.debug("Saved address not loaded for the log mask", exc_info=True)
+    try:
+        from services.conversation.session_memory import tidy_session_memory
+
+        tidy_session_memory(user_id)
+    except Exception:  # noqa: BLE001 - a clean-up must never break start-up or a command
+        logger.debug("Session memory clean-up not run", exc_info=True)
+
+
 class IntentPipeline:
     """
     Unified intent processing pipeline.
@@ -297,6 +313,9 @@ class IntentPipeline:
             state=state,
         )
         self.user_id = resolved_user_id
+        # The address saved in Settings is kept out of every log line from start-up
+        # on, before the user's first words are logged.
+        _hold_saved_private_values(resolved_user_id)
         # Default state manager used when no per-user manager has been
         # published via ``use_request_manager`` (single-user desktop,
         # non-request setup code). Runtime requests resolve the correct
@@ -1477,6 +1496,8 @@ class IntentPipeline:
             PipelineResult with execution details
         """
         request_user_key = self._pending_key(user_key)
+        # Another account signed in: its saved address is masked before its words are logged.
+        _hold_saved_private_values(request_user_key)
 
         # Set ambient user identity for all downstream code. Even desktop
         # default-lane calls must use the explicit construction-time user_id;

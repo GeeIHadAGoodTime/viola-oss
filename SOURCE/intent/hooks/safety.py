@@ -70,6 +70,10 @@ def _check_safety(**kwargs: Any) -> None:
     tool_name: str = kwargs.get("tool_name", "")
     args: dict[str, Any] = kwargs.get("args", {})
 
+    # A fired scheduled command may not add or change future runs. That rule is
+    # applied by the notify and schedule tools where they would write the row
+    # (services.scheduler.service.scheduled_run_refusal), not here on the shape
+    # of the arguments: a notification sent now writes no row.
     try:
         from services.scheduler.service import current_scheduled_action_denied_tools
 

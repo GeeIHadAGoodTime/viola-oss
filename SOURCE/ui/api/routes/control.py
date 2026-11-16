@@ -54,6 +54,9 @@ def _create_state_adapter(app):
 def _known_track_metadata(body: Any) -> dict[str, Any]:
     """Keyword arguments for a play whose caller already knows the track's name."""
     metadata = {key: value for key in ("title", "artist") if (value := getattr(body, key, None))}
+    artwork = getattr(body, "artwork_url", None)
+    if isinstance(artwork, str) and artwork.startswith("https://"):
+        metadata["artwork_url"] = artwork
     return {"metadata": metadata} if metadata else {}
 
 
@@ -922,9 +925,15 @@ def register_control_routes(context: ApiContext, toolbox: RouteToolbox) -> None:
                     # #2736 fixed for volume). Never launder that into ok:true.
                     previous_error = _adapter_failure_error(previous_result, default_code="previous_failed")
                     if previous_error is not None:
-                        log.warning("UI: /v1/previous adapter reported failure: %s", previous_error)
+                        previous_status = _adapter_failure_status(previous_error)
+                        if previous_status == 409:
+                            # Nothing to go back to: the adapter already logged
+                            # it once at INFO. Not a fault, so no WARNING here.
+                            log.debug("UI: /v1/previous refused (user state): %s", previous_error)
+                        else:
+                            log.warning("UI: /v1/previous adapter reported failure: %s", previous_error)
                         return JSONResponse(
-                            status_code=_adapter_failure_status(previous_error),
+                            status_code=previous_status,
                             content={"ok": False, "error": previous_error, "data": None},
                         )
                 else:
@@ -941,7 +950,7 @@ def register_control_routes(context: ApiContext, toolbox: RouteToolbox) -> None:
                     "Going to the previous track is taking longer than expected.",
                 )
             except InvalidOperation as exc:
-                log.warning("Previous command rejected by player: %s", exc)
+                log.info("Previous command rejected by player: %s", exc)
                 return _control_error_response(
                     409,
                     "operation_not_allowed",

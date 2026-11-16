@@ -165,6 +165,10 @@ class ProviderPlaybackEngine:
     provider_id: str
     display_name: str
     capabilities: PlaybackCapabilities
+    # True when one volume change is a slow action (a page click taking a
+    # quarter of a second or more), so a many-step fade cannot be smooth and
+    # only delays the reply; the voice duck then moves in one step each way.
+    volume_change_is_slow: bool = False
 
     def __init__(
         self,

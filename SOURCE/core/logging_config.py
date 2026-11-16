@@ -304,6 +304,7 @@ class StructuredLogger:
 
         handler.setLevel(numeric_level)
         handler.setFormatter(logging.Formatter("%(message)s"))
+        _install_private_value_filter(handler)
         logging.getLogger(_ROOT_LOGGER_NAME).addHandler(handler)
 
         handler_id = _next_handler_id()
@@ -392,6 +393,15 @@ def _split_log_kwargs(
     return passthrough, structured
 
 
+def _install_private_value_filter(handler: logging.Handler) -> None:
+    """Records from plain ``logging`` loggers reach a sink without passing ``_log``: mask them at the handler."""
+    try:
+        from intent.sensitive_values import install_filter
+    except ImportError:
+        return
+    install_filter(handler)
+
+
 def _merge_contexts(*contexts: Mapping[str, LogValue] | MutableMapping[str, LogValue] | None) -> dict[str, LogValue]:
     merged: dict[str, LogValue] = {}
     for ctx in contexts:
@@ -406,7 +416,21 @@ def _merge_contexts(*contexts: Mapping[str, LogValue] | MutableMapping[str, LogV
 
 def _redact_log_value(value: object) -> object:
     value = _redact_diagnostic_log_value(value)
-    return _mask_secret_log_value(value)
+    value = _mask_secret_log_value(value)
+    return _mask_private_log_value(value)
+
+
+def _mask_private_log_value(value: object) -> object:
+    """The user's own private values (a saved address), masked by value, whatever their shape.
+
+    The patterns above know an address only by its shape; a street with no
+    street-type word passed them in the user's own message (1.0.5 builds 9-11).
+    """
+    try:
+        from intent.sensitive_values import mask_value
+    except ImportError:
+        return value
+    return mask_value(value)
 
 
 def _redact_diagnostic_log_value(value: object) -> object:

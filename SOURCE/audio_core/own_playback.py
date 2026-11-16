@@ -55,6 +55,9 @@ class OwnPlayback:
         self._write = 0
         self._lock = threading.Lock()
         self._last_audio_at: float | None = None
+        # Her speech only: a ringing alarm is in the ring (the wake check must
+        # hear "Viola, stop" over it) but is not her talking.
+        self._last_speech_at: float | None = None
         # How far the ring has been written, on the clock (silence included).
         self._ring_at: float | None = None
         self._text: deque[SpokenText] = deque(maxlen=64)
@@ -93,8 +96,11 @@ class OwnPlayback:
             self._append_locked(np.zeros(min(self._size, int(gap * self._rate)), dtype=np.float32))
             self._ring_at = now
 
-    def note_audio(self, samples: np.ndarray, sample_rate: int) -> None:
-        """Record PCM that has just gone to the speaker (mono, float [-1, 1] or int16)."""
+    def note_audio(self, samples: np.ndarray, sample_rate: int, *, speech: bool = True) -> None:
+        """Record PCM that has just gone to the speaker (mono, float [-1, 1] or int16).
+
+        ``speech`` False: a sound of hers that is not her talking (the alarm).
+        """
         data = np.asarray(samples)
         if data.size == 0 or sample_rate <= 0:
             return
@@ -119,6 +125,8 @@ class OwnPlayback:
             self._advance_silence_locked(now)
             self._append_locked(floats)
             self._last_audio_at = now
+            if speech:
+                self._last_speech_at = now
             self._ring_at = now
             self._tail_waived = False
 
@@ -150,6 +158,12 @@ class OwnPlayback:
         """Seconds since she last sent audio to the speaker (inf if never)."""
         with self._lock:
             last = self._last_audio_at
+        return float("inf") if last is None else time.monotonic() - last
+
+    def seconds_since_speech(self) -> float:
+        """Seconds since her voice last went to the speaker, not counting an alarm (inf if never)."""
+        with self._lock:
+            last = self._last_speech_at
         return float("inf") if last is None else time.monotonic() - last
 
     def voice_tail_active(self, seconds: float) -> bool:
@@ -184,6 +198,7 @@ class OwnPlayback:
             self._ring[:] = 0.0
             self._write = 0
             self._last_audio_at = None
+            self._last_speech_at = None
             self._ring_at = None
             self._text.clear()
             self._utterance_started_at = None

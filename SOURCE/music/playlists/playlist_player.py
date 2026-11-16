@@ -25,6 +25,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from core.logging_config import get_logger
+from models.track_title import display_title, looks_like_track_id
 from music.playlists.playlist_store import PlaylistStore, TrackRecord
 from music.providers.youtube_url_validator import extract_video_id
 
@@ -59,7 +60,9 @@ def _track_to_session_dict(track: TrackRecord) -> dict:
     PlaylistSession stores dicts with keys: url, title, artist, provider, etc.
     """
     entry: dict = {
-        "title": track.title or track.track_uri,
+        # An identifier is never a title: a track saved without a name carries
+        # an empty title until the player learns it.
+        "title": display_title(track.title) or ("" if looks_like_track_id(track.track_uri) else track.track_uri),
         "artist": track.artist,
         "provider": track.provider,
     }

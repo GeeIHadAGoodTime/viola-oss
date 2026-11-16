@@ -225,6 +225,10 @@ def _computer_use_whitelist_allows(args: Mapping[str, Any] | None) -> bool:
 # reads as "no consent" (1.0.5 laptop A6.3).
 _COMPUTER_USE_CALL_IDENTITY: ContextVar[tuple[str, str] | None] = ContextVar("computer_use_call_identity", default=None)
 
+# Added to the arguments a discard question is matched on, so a yes is bound to
+# the window it was asked about. Stripped before the model sees the question.
+DISCARD_WINDOW_ARG = "_discard_window"
+
 
 def computer_use_call_identity(user_context: Any) -> tuple[str, str]:
     """(user_id, grant session id) the computer tool will see for this call's context."""
@@ -1221,6 +1225,7 @@ class ApprovalBridge:
         PermissionRequest hook semantics — not just the agent loop.
         """
         _normalize_approval_only_args(tool_name, args)
+        _clear_deferred_confirmation_refusal()
         relay_denial = self._relay_consent_denial(tool_name)
         if relay_denial is not None:
             self.last_permission_decision = relay_denial
@@ -1277,12 +1282,12 @@ class ApprovalBridge:
                 action_description=description,
             )
             if confirmation_state == "accepted":
-                # Under taint, a re-issued call alone is not consent: the
-                # user's own words for this turn must confirm (fails closed).
-                holds_under_taint = getattr(self._approval, "confirmation_holds_under_taint", None)
+                # A re-issued call alone is not consent: the user's own reply
+                # on this turn decides (ApprovalManager.users_reply_confirms_pending).
+                users_reply_confirms = getattr(self._approval, "users_reply_confirms_pending", None)
                 user_confirmed = True
-                if callable(holds_under_taint):
-                    user_confirmed = bool(await holds_under_taint(description, risk))
+                if callable(users_reply_confirms):
+                    user_confirmed = bool(await users_reply_confirms(description, risk, tool_name=tool_name))
                 final_decision = self._permission_policy.resolve_user_response(
                     context,
                     decision,
@@ -1346,6 +1351,66 @@ class ApprovalBridge:
         finally:
             if channel is not None and original_channel is None:
                 self._approval._channel = original_channel
+
+    async def check_discard_approval(
+        self,
+        details: Mapping[str, Any],
+        tool_args: Mapping[str, Any] | None = None,
+        *,
+        channel: Any | None = None,
+    ) -> bool:
+        """Ask before a desktop action throws away unsaved work in one window.
+
+        The computer tool decides from the screen that the action would press
+        "Don't save" (by name, ref, point, or a key press into a save prompt)
+        and holds it. This asks through the same card and yes/no flow as any
+        other approval, but nothing short of the user's answer counts: no app
+        grant, whitelist, allow rule, permission mode or hook skips it. The
+        question is bound to the window, so a yes for one Notepad window never
+        covers another. Raises ``ConfirmationDeferred`` like ``check_approval``.
+        """
+        window_handle = int(details.get("window_handle") or 0)
+        description = str(details.get("planned_action") or "throw away the unsaved changes")
+        approval_args = dict(tool_args or {})
+        approval_args[DISCARD_WINDOW_ARG] = window_handle
+        user_id, _session_id = self._resolve_permission_identity()
+        decision = PermissionDecision(
+            behavior="ask",
+            source="discardUnsavedWork",
+            mode=self._permission_mode,
+            reason="This throws away unsaved work and cannot be undone.",
+            risk_level=RiskLevel.DANGEROUS,
+        )
+        self.last_permission_decision = decision
+        original_channel = getattr(self._approval, "channel", None)
+        if channel is not None and original_channel is None:
+            self._approval._channel = channel
+
+        from intent.approval import ConfirmationDeferred
+
+        try:
+            try:
+                approved = await _request_permission_decision(
+                    self._approval,
+                    decision,
+                    action_description=description,
+                    tool_name="computer",
+                    tool_args=approval_args,
+                    task_id=_active_agent_task_id(),
+                )
+            except ConfirmationDeferred:
+                await _broadcast_approval_state("computer", description, "deferred", user_id)
+                raise
+        finally:
+            if channel is not None and original_channel is None:
+                self._approval._channel = original_channel
+        await _broadcast_approval_state("computer", description, "approved" if approved else "denied", user_id)
+        logger.info(
+            "Discard of unsaved work %s by the user (window_handle=%s)",
+            "approved" if approved else "declined",
+            window_handle,
+        )
+        return bool(approved)
 
     async def _dispatch_permission_request_hook(
         self,
@@ -1547,6 +1612,14 @@ class ApprovalBridge:
                 manager.add_message(decision.frame)
         except Exception as exc:
             logger.debug("Could not append permission meta frame: %s", exc)
+
+
+def _clear_deferred_confirmation_refusal() -> None:
+    """Start each approval check without a refusal text left by an earlier one."""
+
+    from intent.approval import clear_deferred_confirmation_refusal
+
+    clear_deferred_confirmation_refusal()
 
 
 def _normalize_approval_only_args(tool_name: str, args: dict[str, Any]) -> None:

@@ -476,6 +476,21 @@ class QueueHistoryManager:
             self._completion_count[track_id] = self._completion_count.get(track_id, 0) + 1
             return False
 
+    def rearm_completion(self, track_id: str) -> None:
+        """Let ``track_id`` be completed again: the user started a new play of it.
+
+        ``check_double_complete`` remembers only the last completed id, so a
+        track brought back by "previous" (or picked again from the queue) was
+        refused on its next completion as a duplicate, and the following
+        "next" replayed it (build-12 live check: ``Completed track 5485a4d5``
+        then ``Moving to next track 5485a4d5``). A duplicate completion event
+        of one play is still refused: the play that starts here completes
+        once, and that completion records the id again.
+        """
+        with self._lock:
+            if self._last_completed_id == track_id:
+                self._last_completed_id = None
+
     # ------------------------------------------------------------------ #
     # P0-2: Skip Dedup (UI + Backend Safety)                             #
     # ------------------------------------------------------------------ #

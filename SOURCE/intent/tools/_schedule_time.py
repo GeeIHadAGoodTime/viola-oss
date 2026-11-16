@@ -101,17 +101,20 @@ def _parse_clock_time(text: str, current: datetime) -> datetime | None:
     elif re.search(r"\bmidnight\b", lowered):
         local_dt = base.replace(hour=0, minute=0, second=0, microsecond=0)
     else:
-        match = re.search(r"(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b", lowered)
+        # Optional seconds ("4:00:41 am"); the look-behind keeps a match from
+        # starting inside a longer time ("00:41 am" out of "4:00:41 am").
+        match = re.search(r"(?<![\d:])(\d{1,2})(?::(\d{2})(?::(\d{2}))?)?\s*(am|pm)\b", lowered)
         if match:
             hour = int(match.group(1))
             minute = int(match.group(2)) if match.group(2) else 0
-            period = match.group(3)
+            second = int(match.group(3)) if match.group(3) else 0
+            period = match.group(4)
             if period == "pm" and hour != 12:
                 hour += 12
             if period == "am" and hour == 12:
                 hour = 0
         else:
-            match = re.search(r"\b(\d{1,2}):(\d{2})\b", lowered)
+            match = re.search(r"(?<![\d:])\b(\d{1,2}):(\d{2})(?::(\d{2}))?\b", lowered)
             if not match:
                 if day_offset:
                     local_dt = base.replace(hour=8, minute=0, second=0, microsecond=0)
@@ -119,10 +122,11 @@ def _parse_clock_time(text: str, current: datetime) -> datetime | None:
                 return None
             hour = int(match.group(1))
             minute = int(match.group(2))
+            second = int(match.group(3)) if match.group(3) else 0
 
-        if not (0 <= hour <= 23 and 0 <= minute <= 59):
+        if not (0 <= hour <= 23 and 0 <= minute <= 59 and 0 <= second <= 59):
             return None
-        local_dt = base.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        local_dt = base.replace(hour=hour, minute=minute, second=second, microsecond=0)
 
     if local_dt <= current:
         local_dt += timedelta(days=1)

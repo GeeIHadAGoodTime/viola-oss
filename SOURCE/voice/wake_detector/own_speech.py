@@ -20,7 +20,8 @@ hearing "stop" is better than obeying herself.
 
 This module also carries the two signals between the wake loop and the voice turn:
 the barge-in target (a turn that is speaking takes the wake itself) and "a voice
-turn is waiting on a long task" (wake stays open, see VoiceCommandHandler).
+turn is waiting on a long task" (wake stays open, see VoiceCommandHandler),
+and the record of a typed reply or reminder a wake stopped (StoppedSpeech).
 """
 
 from __future__ import annotations
@@ -193,16 +194,56 @@ def set_speech_stopper(stopper: Callable[[], None] | None) -> None:
         _speech_stopper = stopper
 
 
+@dataclass(frozen=True)
+class StoppedSpeech:
+    """A wake stopped a reply no voice turn was speaking (a typed reply, a reminder).
+
+    1.0.5 build-11 laptop (16:03:20): the wake stopped a typed reply and the
+    command take held the tail of her own sentence ("P.M. Central time."),
+    which then ran as a command. The voice turn that follows reads this record
+    to tell her words from the user's (VoiceCommandHandler).
+    """
+
+    at: float  # time.monotonic() of the stop
+    text: str  # what she was given to say lately
+
+
+# The voice turn starts within moments of the wake; an older record is from another wake.
+STOPPED_SPEECH_FRESH_S = 10.0
+# Her text this far back can still be in the room or the capture queue.
+STOPPED_SPEECH_TEXT_S = 30.0
+_stopped_speech: StoppedSpeech | None = None
+
+
 def stop_speaking() -> None:
+    """Silence a reply no voice turn is speaking, for a wake, and note what she was saying."""
+    global _stopped_speech
+    playback = get_own_playback()
+    try:
+        text = playback.recent_text(STOPPED_SPEECH_TEXT_S)
+    except Exception:  # noqa: BLE001, RUF100 - the wake goes on regardless
+        text = ""
     with _lock:
         stopper = _speech_stopper
-    get_own_playback().waive_tail()
+        _stopped_speech = StoppedSpeech(time.monotonic(), text)
+    playback.waive_tail()
     if stopper is None:
         return
     try:
         stopper()
     except Exception as exc:  # noqa: BLE001, RUF100 - the wake goes on regardless
         logger.debug("Could not stop speech for a wake: %s", exc)
+
+
+def take_stopped_speech() -> StoppedSpeech | None:
+    """The record of a reply a wake just stopped (once; None if none or too old)."""
+    global _stopped_speech
+    with _lock:
+        record = _stopped_speech
+        _stopped_speech = None
+    if record is None or time.monotonic() - record.at > STOPPED_SPEECH_FRESH_S:
+        return None
+    return record
 
 
 def set_busy_turn(busy: bool) -> None:
@@ -248,6 +289,7 @@ __all__ = [
     "REFERENCE_WINDOW_S",
     "STRONG_SCORE",
     "OwnSpeechVerdict",
+    "StoppedSpeech",
     "busy_turn_active",
     "check_wake_over_speech",
     "clear_barge_in_target",
@@ -260,4 +302,5 @@ __all__ = [
     "set_busy_turn",
     "set_speech_stopper",
     "stop_speaking",
+    "take_stopped_speech",
 ]

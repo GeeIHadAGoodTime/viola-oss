@@ -71,6 +71,12 @@ CRITICAL_ALWAYS_LOAD_TOOLS = frozenset(
         "timer",
         "alarm",
         "notify",
+        # "Tell me a joke in 2 minutes" runs a command later: schedule. Deferred,
+        # the model saw only notify (always loaded, takes any text with a time)
+        # and filed run-something requests as reminder text, which then fired as
+        # "Reminder: Tell me a joke" (1.0.5 build-11 laptop bug 15; build-12
+        # live count). Still filtered by autonomy tier and confirm-gated.
+        "schedule",
         "calendar",
         "payment",
         # After the user approves a purchase on the payment gate, the

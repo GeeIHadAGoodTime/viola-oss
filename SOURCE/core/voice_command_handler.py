@@ -168,8 +168,17 @@ _ECHO_TAIL_GAP_SEC = 1.5
 _FUZZY_WORD_RATIO = 0.8
 
 
+# Single letters joined by dots ("P.M.", "a.m.", "U.S.") are one word.
+_DOTTED_LETTERS_RE = re.compile(r"(?<![A-Za-z0-9.])[A-Za-z](?:\.[A-Za-z](?![A-Za-z0-9]))+(?:\.(?![A-Za-z0-9]))?")
+
+
+def _join_dotted_letters(text: str) -> str:
+    """ "P.M." -> "PM": 1.0.5 build-11 laptop (16:03:23), her "PM" came back as "P.M.", two words."""
+    return _DOTTED_LETTERS_RE.sub(lambda m: m.group(0).replace(".", ""), text or "")
+
+
 def _echo_words(text: str) -> list[str]:
-    return _ECHO_WORD_RE.findall((text or "").lower().replace("’", "'"))
+    return _ECHO_WORD_RE.findall(_join_dotted_letters(text).lower().replace("’", "'"))
 
 
 def _same_word(heard: str, spoken: str) -> bool:
@@ -362,7 +371,7 @@ def _extends(checked: list[str], longer: list[str]) -> bool:
 
 def classify_barge_in_transcript(transcript: str, reply: str) -> BargeInDecision:
     """Decide whether what was heard while Viola spoke ``reply`` should stop her."""
-    tokens = _BARGE_IN_TOKEN_RE.findall((transcript or "").replace("’", "'"))
+    tokens = _BARGE_IN_TOKEN_RE.findall(_join_dotted_letters(transcript).replace("’", "'"))
     if not tokens:
         return BargeInDecision("ignore", "nothing_heard")
     spoken = _echo_words(reply)
@@ -394,7 +403,7 @@ def classify_after_wake(transcript: str, reply: str) -> BargeInDecision:
     (over her voice it often is not). Her own words are removed; the rest is the
     request (see :func:`_request_after_wake`). Nothing left means she listens.
     """
-    tokens = _BARGE_IN_TOKEN_RE.findall((transcript or "").replace("\u2019", "'"))
+    tokens = _BARGE_IN_TOKEN_RE.findall(_join_dotted_letters(transcript).replace("\u2019", "'"))
     wake_at = max((i for i, t in enumerate(tokens) if _is_barge_in_wake_word(t)), default=None)
     after = tokens if wake_at is None else tokens[wake_at + 1 :]
     return _request_after_wake(after, reply, empty=BargeInDecision("listen", "wake_word_over_speech"))
@@ -515,6 +524,57 @@ def reliable_words_after(words: list[tuple[str, float, float, float]], her_end: 
         her_end,
     )
     return transcript
+
+
+_TIMED_TOKEN_RE = re.compile(_DOTTED_LETTERS_RE.pattern + r"|[A-Za-z0-9']+")
+
+
+def _timed_tokens(words: list[tuple[str, float, float, float]]) -> list[tuple[str, float]]:
+    """(word, start) for each word of a word-timed decode; "P" + ".M." is one word, "pm"."""
+    text = ""
+    starts: list[float] = []
+    for word, start, _end, _prob in words:
+        piece = str(word).replace("’", "'")
+        text += piece
+        starts.extend([float(start)] * len(piece))
+    return [
+        (match.group(0).replace(".", "").lower(), starts[match.start()]) for match in _TIMED_TOKEN_RE.finditer(text)
+    ]
+
+
+def transcript_after_her_voice(transcript: str, words: list[tuple[str, float, float, float]], her_end: float) -> str:
+    """The part of ``transcript`` said after ``her_end`` seconds into the take.
+
+    ``words`` is a word-timed decode of the same take: it says WHEN each word
+    was said. The text comes from the command transcription. On the real
+    tiny.en the word-timed decode invents words in the quiet after a request
+    ("Stop. Jump it.", "Be quiet. let's take a look at the", some at 0.7
+    probability) that the command transcription of the same audio does not
+    have, so its own text is not used as the request. Every transcript word up
+    to the last one the timed decode places before ``her_end`` is hers.
+    """
+    from difflib import SequenceMatcher
+
+    said = _BARGE_IN_TOKEN_RE.findall(_join_dotted_letters(transcript).replace("’", "'"))
+    timed = _timed_tokens(words)
+    last_hers = -1
+    if said and timed:
+        vocabulary = [token for token, _start in timed]
+        lowered = [token.lower() for token in said]
+        matcher = SequenceMatcher(a=_canonical_words(lowered, vocabulary), b=vocabulary, autojunk=False)
+        for block in matcher.get_matching_blocks():
+            for k in range(block.size):
+                if timed[block.b + k][1] < her_end:
+                    last_hers = max(last_hers, block.a + k)
+    kept = said[last_hers + 1 :]
+    logger.info(
+        "Take words: her voice ends %.2fs in; %d of %d transcript words said after it (%d timed words)",
+        her_end,
+        len(kept),
+        len(said),
+        len(timed),
+    )
+    return " ".join(kept)
 
 
 def _needs_confirmation(decision: BargeInDecision) -> bool:
@@ -934,6 +994,10 @@ class VoiceCommandHandler:
             else:
                 _update_state_hub_voice_mode("listening", user_id=ctx.user_id)
 
+            # A wake that stopped a typed reply or a reminder (no voice turn was
+            # speaking it): her last words can open this take.
+            stopped = _own_speech().take_stopped_speech() if turn == 1 else None
+
             # --- Record audio (buffer-based, no disk I/O) ---
             if turn == 1:
                 ctx.audio_file = await self._record_audio_with_timeout(ctx)
@@ -947,6 +1011,16 @@ class VoiceCommandHandler:
                     await self._signal_nothing_heard(ctx, exit_reason)
                 break
 
+            her_reply: str | None = None
+            her_end: float | None = None
+            take_words: list | None = None
+            if stopped is not None:
+                her_end = self._her_voice_end_in_take(ctx, stopped)
+                if her_end is None or her_end > 0:
+                    her_reply = stopped.text
+                    if her_end is not None:
+                        take_words = await self._take_timed_words(ctx)
+
             # --- Transcribe ---
             transcript = await self._transcribe_audio_with_timeout(ctx)
             transcribed_at = time.monotonic()
@@ -955,6 +1029,39 @@ class VoiceCommandHandler:
                 if turn == 1:
                     await self._signal_nothing_heard(ctx, exit_reason)
                 break
+            if her_reply is not None:
+                heard = transcript
+                if take_words is not None and her_end is not None:
+                    heard = transcript_after_her_voice(transcript, take_words, her_end)
+                after_wake = classify_after_wake(heard, her_reply)
+                _log_barge_in_heard("wake over a reply with no voice turn", heard, after_wake)
+                if after_wake.kind == "stop":
+                    # She already stopped for the wake: nothing else to do.
+                    self._unduck_audio()
+                    ctx.ducking_cleaned_up = True
+                    exit_reason = "dismissed"
+                    break
+                if after_wake.kind != "command":
+                    if (
+                        after_wake.reason == "request_mixed_with_her_words"
+                        and conversation_enabled
+                        and turn < max_turns
+                    ):
+                        # Her words and someone else's: she is quiet now, so
+                        # listen for the request on clean audio.
+                        self._cleanup_audio_file(ctx)
+                        _update_state_hub_voice_mode("conversing", user_id=ctx.user_id)
+                        await self._play_follow_up_cue()
+                        self._broadcast_follow_up_listening()
+                        logger.info("Request mixed with her own words after the wake; listening for it again")
+                        continue
+                    # Only her own words after the wake: nothing was asked.
+                    self._unduck_audio()
+                    ctx.ducking_cleaned_up = True
+                    await self._signal_nothing_heard(ctx, "only_her_words")
+                    exit_reason = "only_her_words"
+                    break
+                transcript = after_wake.command
             if turn > 1 and self._transcript_is_own_reply(transcript):
                 exit_reason = "self_echo"
                 break
@@ -2028,7 +2135,7 @@ class VoiceCommandHandler:
             # music actions that all worked gets the done tone, not words.
             from voice.streamed_reply import full_reading, play_done_tone, whole_reply_speech
 
-            spoken = whole_reply_speech(message, self.tts, streamed_reply)
+            spoken = whole_reply_speech(message, self.tts, streamed_reply, result=result)
             if spoken is None:
                 play_done_tone()
                 return
@@ -2475,10 +2582,55 @@ class VoiceCommandHandler:
             return None
         return reliable_words_after(words, her_end)
 
-    def _local_no_speech_prob(self) -> float:
-        """Whisper's no-speech probability for the last on-device transcription (0 if unknown)."""
-        value = getattr(self._local_barge_in_transcriber(), "last_no_speech_prob", 0.0)
-        return float(value) if isinstance(value, (int, float)) else 0.0
+    def _her_voice_end_in_take(self, ctx: CommandContext, stopped: Any) -> float | None:
+        """Seconds into the command take where her voice stopped coming out of the speaker.
+
+        0 or less: the take began after she went quiet, so none of it is her.
+        None: the take's length is unknown (a file take); her words are then
+        removed from the transcript by comparison alone.
+
+        1.0.5 build-11 laptop (16:03:20): a wake stopped a typed reply, the stop
+        was deferred, and the take opened on the tail of her sentence. Her voice
+        is timed on the record of what she played (an alarm ringing is not her
+        voice), at the moment the take ended.
+        """
+        from audio_core.own_playback import get_own_playback
+
+        since = get_own_playback().seconds_since_speech()
+        buffer = ctx.audio_buffer
+        rate = ctx.audio_sample_rate or SAMPLE_RATE_16K
+        if buffer is None:
+            her_end = None
+        else:
+            her_end = len(buffer) / float(rate) - since + _HER_OUTPUT_LATENCY_SEC
+        logger.info(
+            "A wake stopped her reply %.1fs before this take ended; her voice ends %s into it",
+            time.monotonic() - stopped.at,
+            "?" if her_end is None else "%.2fs" % her_end,
+        )
+        return her_end
+
+    async def _take_timed_words(self, ctx: CommandContext) -> list | None:
+        """Word-timed decode (text, start, end, probability) of the command take; None if unsupported."""
+        local = self._local_barge_in_transcriber()
+        words_fn = getattr(local, "transcribe_words", None)
+        buffer = ctx.audio_buffer
+        if local is None or not callable(words_fn) or buffer is None:
+            return None
+        if (ctx.audio_sample_rate or SAMPLE_RATE_16K) != SAMPLE_RATE_16K:
+            return None
+        try:
+            import numpy as np
+
+            clip = np.asarray(buffer, dtype=np.int16).copy()
+            try:
+                words = await asyncio.wait_for(asyncio.to_thread(words_fn, clip), timeout=_BARGE_IN_STT_TIMEOUT_SEC)
+            finally:
+                clip[:] = 0  # privacy: the take is not kept
+        except Exception as exc:  # noqa: BLE001, RUF100 - fall back to comparing the transcript
+            logger.debug("Word-timed take transcription failed: %s", exc)
+            return None
+        return words if isinstance(words, list) else None
 
     def _local_no_speech_prob(self) -> float:
         """Whisper's no-speech probability for the last on-device transcription (0 if unknown)."""

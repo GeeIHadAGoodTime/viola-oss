@@ -256,6 +256,9 @@ class CostTracker:
     ) -> None:
         self._call_id = call_id
         self._gpu_voice = bool(gpu_voice)
+        # Measured GPU worker seconds for this call (warm-up start to teardown),
+        # once known. Before that the documented worst case is used.
+        self._gpu_worker_seconds: float | None = None
         self._llm_model = llm_model
         self._phone_number = phone_number
         self._tts_provider = _normalize_phone_tts_provider(tts_provider)
@@ -263,6 +266,10 @@ class CostTracker:
         self._completion_tokens = 0
         self._tts_characters = 0
         self._stt_audio_seconds = 0.0
+
+    def set_gpu_worker_seconds(self, seconds: float) -> None:
+        """The GPU worker time this call used, measured (build 12, true cost)."""
+        self._gpu_worker_seconds = max(0.0, float(seconds))
 
     def add_llm_usage(self, prompt_tokens: int, completion_tokens: int) -> None:
         """Record LLM token usage from a single API call."""
@@ -289,7 +296,12 @@ class CostTracker:
         """Compute a cost breakdown without settling user spend counters."""
         minutes = duration_seconds / 60.0
         telnyx_cost = estimate_phone_carrier_cost_usd(duration_seconds, self._phone_number)
-        gpu_cost = estimate_phone_gpu_cost_usd(duration_seconds) if self._gpu_voice else 0.0
+        if not self._gpu_voice:
+            gpu_cost = 0.0
+        elif self._gpu_worker_seconds is not None:
+            gpu_cost = max(0.0, self._gpu_worker_seconds) * phone_gpu_usd_per_second()
+        else:
+            gpu_cost = estimate_phone_gpu_cost_usd(duration_seconds)
 
         # LLM cost from actual tokens - pricing from services.llm.pricing (single source of truth)
         llm_cost = calculate_cost_usd(self._llm_model, self._prompt_tokens, self._completion_tokens)

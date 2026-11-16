@@ -7,6 +7,7 @@ import { apiFetch, buildStreamUrl } from '../../../../hooks/useViolaApi';
 import { useCloudConsentGate } from '../../../../hooks/cloudConsentGate';
 import { useWebSocket } from '../../../../hooks/useWebSocket';
 import { isFeatureHidden } from '../../../../utils/featureSurface';
+import { dispatchUiActions } from '../../../../utils/uiActions';
 import ChatInput from './ChatInput.jsx';
 import ChatSidebar from './ChatSidebar.jsx';
 import ChatThread from './ChatThread.jsx';
@@ -165,6 +166,9 @@ function ChatModeInner({
   const [streaming, setStreaming] = useState(false);
   const [streamingMessageId, setStreamingMessageId] = useState(null);
   const [streamNotice, setStreamNotice] = useState(null);
+  // Messages typed with Enter while a reply runs, each sent on its own, in
+  // order, once the reply ends. Each remembers the chat it was typed in.
+  const [queuedMessages, setQueuedMessages] = useState([]);
   const streamSessionRef = useRef(null);
   const streamAttachRef = useRef(null);
   const threadRequestRef = useRef(0);
@@ -844,6 +848,12 @@ function ChatModeInner({
           setMessages((current) => current.map((message) => message.id === assistantMessageId
             ? { ...message, content: `${message.content}${payload.token}` } : message));
         }
+        if (payload.done && payload.ui_actions && typeof payload.ui_actions === 'object') {
+          // What a tool asked the app to show (the memory panel, a settings
+          // tab): the same dispatch the stage uses for chat_response. The
+          // reply bubble stays the only bubble.
+          dispatchUiActions(payload.ui_actions);
+        }
         if (payload.done || payload.error) {
           const finalContent = payload.content || payload.message || (payload.error ? 'Something went wrong while generating the response.' : '');
           setMessages((current) => current.map((message) => message.id === assistantMessageId ? {
@@ -999,6 +1009,27 @@ function ChatModeInner({
   useEffect(() => () => {
     window.dispatchEvent(new CustomEvent('viola:chat:active-thread', { detail: { threadId: null } }));
   }, []);
+
+  const queueMessage = useCallback((text) => {
+    const clean = String(text || '').trim();
+    if (!clean) return;
+    setQueuedMessages((current) => [...current, { text: clean, threadId: activeThreadIdRef.current }]);
+    setDraft('');
+  }, []);
+
+  useEffect(() => {
+    setQueuedMessages([]);
+  }, [principalKey]);
+
+  useEffect(() => {
+    if (streaming || streamingRef.current || !queuedMessages.length) return;
+    const [next, ...rest] = queuedMessages;
+    setQueuedMessages(rest);
+    // Typed in another chat (the user switched away): that chat's message is
+    // not sent into this one.
+    if (next.threadId && next.threadId !== activeThreadIdRef.current) return;
+    void sendText(next.text);
+  }, [streaming, queuedMessages, sendText]);
 
   const stopStreaming = useCallback(async () => {
     pendingStopRef.current = true;
@@ -1544,11 +1575,19 @@ function ChatModeInner({
             </span>
           )}
           {uploadError && <span className="chat-upload-status is-error">{uploadError}</span>}
+          {queuedMessages.length > 0 && (
+            <span className="chat-upload-status chat-queued" role="status">
+              {queuedMessages.length === 1
+                ? `Sends when this reply ends: ${queuedMessages[0].text}`
+                : `${queuedMessages.length} messages send when this reply ends`}
+            </span>
+          )}
           <ChatInput
             value={draft}
             onChange={setDraft}
             onSend={() => sendText(draft)}
             onStop={stopStreaming}
+            onQueue={queueMessage}
             onAttachFiles={uploadFilesToWorkbench}
             streaming={streaming}
             disabled={loading || (threadReadState?.threadId === activeThreadId

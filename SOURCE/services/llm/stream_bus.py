@@ -367,9 +367,16 @@ def finalize_stream(
     streaming_mode: str | None = None,
     token_count: int | None = None,
     fallback: bool | None = None,
+    ui_actions: dict[str, Any] | None = None,
 ) -> bool:
-    """Publish the terminal SSE event for a command stream."""
+    """Publish the terminal SSE event for a command stream.
+
+    ``ui_actions``: what a tool asked the app to show (``open_app_panel`` and the
+    like), for a client that dispatches it when the reply ends (the Chat tab).
+    """
     event: StreamEvent = {"done": True}
+    if ui_actions:
+        event["ui_actions"] = ui_actions
     if content is not None:
         event["content"] = content
     if error:

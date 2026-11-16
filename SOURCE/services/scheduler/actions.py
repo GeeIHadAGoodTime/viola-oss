@@ -46,6 +46,18 @@ def _clean(value: Any, limit: int = 120) -> str:
     return text if len(text) <= limit else text[: limit - 3].rstrip() + "..."
 
 
+def reminder_wording(message: str | None) -> str:
+    """How a reminder is put to the user: its card title and what she says when it fires.
+
+    "Reminder: <message>", unless the message already starts with "Reminder"
+    (calendar reminders do: services/calendar/reminders.py), so it is never doubled.
+    """
+    text = " ".join(str(message or "").split())
+    if not text:
+        return "Reminder"
+    return text if text.lower().startswith("reminder") else "Reminder: %s" % text
+
+
 def describe_tool_action(action: str, label: str | None = None) -> str:
     """A short human title for a scheduled action, for task cards and logs.
 
@@ -62,10 +74,7 @@ def describe_tool_action(action: str, label: str | None = None) -> str:
     tool = decoded["tool"]
     args = decoded["args"]
     if tool == "notify":
-        message = _clean(args.get("message"))
-        if not message:
-            return "Reminder"
-        return message if message.lower().startswith("reminder") else "Reminder: %s" % message
+        return reminder_wording(_clean(args.get("message")))
     if tool == "alarm":
         alarm_label = _clean(args.get("label"))
         return "Alarm: %s" % alarm_label if alarm_label and alarm_label.lower() != "alarm" else "Alarm"
@@ -76,4 +85,4 @@ def describe_tool_action(action: str, label: str | None = None) -> str:
     return fallback
 
 
-__all__ = ["ACTION_PREFIX", "decode_tool_action", "describe_tool_action", "encode_tool_action"]
+__all__ = ["ACTION_PREFIX", "decode_tool_action", "describe_tool_action", "encode_tool_action", "reminder_wording"]

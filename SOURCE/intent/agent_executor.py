@@ -85,6 +85,11 @@ from intent.post_answer_teardown import (
     schedule_post_answer_sync,
 )
 from intent.response_cleanup import strip_json_template as _strip_json_template
+from intent.sensitive_values import (
+    mask_json_line,
+    mask_value as mask_private_values,
+    note_task_finished as note_private_task_finished,
+)
 from intent.spin_detector import SpinDetector
 from intent.subagents.lifecycle import (
     SubagentNotification,
@@ -2102,6 +2107,10 @@ def _first_time_in_step_log(path: Path, schema_hash: str) -> bool:
 
 
 def _write_structured_log_line(path: Path, line: str) -> None:
+    # Every agent-steps line (step, task_complete, agent_stop) is masked here,
+    # at write time, with the private values known by then: the user's words,
+    # the reasoning and the final answer carry an address no pattern knows.
+    line = mask_json_line(line)
     try:
         if path.stat().st_size + len(line) > _STEP_LOG_MAX_BYTES:
             os.replace(path, path.with_name(path.stem + ".1" + path.suffix))
@@ -2643,7 +2652,9 @@ class AgentTaskLog:
 
         def _write() -> None:
             try:
-                _atomic_write_json_restricted(path, _mask_addresses_for_log(redact_card_data(snapshot)))
+                _atomic_write_json_restricted(
+                    path, mask_private_values(_mask_addresses_for_log(redact_card_data(snapshot)))
+                )
                 logger.debug("Agent task log written to %s", path)
             except Exception as exc:
                 logger.warning("Failed to write agent task log: %s", exc)
@@ -3728,6 +3739,19 @@ class AgentExecutor:
         task_id = getattr(self, "task_id", None)
         if task_id:
             keys.append("task:%s" % task_id)
+        # The command stream this run belongs to, so the Chat tab's Stop can
+        # reach exactly its own turn's executor (cancel_stream_executors).
+        stream_id = getattr(self, "_registry_stream_id", None)
+        if stream_id is None:
+            try:
+                from services.llm.stream_bus import get_current_command_stream_id
+
+                stream_id = get_current_command_stream_id() or ""
+            except Exception:  # noqa: BLE001, RUF100 - no stream key only narrows what Stop can find
+                stream_id = ""
+            self._registry_stream_id = stream_id
+        if stream_id:
+            keys.append("stream:%s" % stream_id)
         return keys
 
     def _ensure_task_id(self) -> str:
@@ -4831,6 +4855,9 @@ class AgentExecutor:
             post_turn_memory_extraction=False,
         )
         checkpoint_for_memory = checkpoint if isinstance(checkpoint, TaskCheckpoint) else None
+        if self._cancelled or result.error == "cancelled":
+            self._schedule_turn_address_check(event_text, str(getattr(self, "task_id", "") or "continuation"))
+            return result
         await self._run_post_turn_memory_extraction(
             user_text=event_text,
             final_answer=str(result.answer or ""),
@@ -4923,6 +4950,8 @@ class AgentExecutor:
         tools_called: list[str],
         model_visible_messages: list[dict[str, Any]] | None = None,
     ) -> None:
+        # A helper agent's task text is written by the model, not the user: no
+        # memory extraction and no address check for it.
         if getattr(self, "_current_agent_id", None):
             return
         transcript = self._post_turn_memory_transcript(user_text, final_answer, model_visible_messages)
@@ -4931,15 +4960,35 @@ class AgentExecutor:
         try:
             from services.memory.extract_memories import extract_memories_after_turn
 
+            # user_text: the same hidden pass also reports any address the user
+            # gave, so a street Viola only asked about is masked in the logs too.
             await extract_memories_after_turn(
                 user_id=str(self._get_effective_user_id()),
                 transcript=transcript,
                 task_id=task_id,
                 tools_called=tools_called,
                 model_visible_messages=model_visible_messages,
+                user_text=user_text,
             )
         except (OSError, RuntimeError, TimeoutError, ValueError) as exc:
             logger.debug("Post-turn memory extraction skipped: %s", exc)
+
+    def _schedule_turn_address_check(self, user_text: str, task_id: str) -> None:
+        """A turn that ended by cancellation or an error: the address check on the user's words, detached.
+
+        Synchronous on purpose: it is called on the cancel path, which must stay
+        as fast as it is (no await), and the check runs as its own task so the
+        turn's cancellation cannot kill it. No memory extraction. Helper agents
+        stay out (their task text is the model's).
+        """
+        if getattr(self, "_current_agent_id", None):
+            return
+        try:
+            from services.memory.extract_memories import schedule_address_check
+
+            schedule_address_check(user_id=str(self._get_effective_user_id()), user_text=user_text, task_id=task_id)
+        except Exception:  # noqa: BLE001 - never change how a stop or a failure ends the turn
+            logger.debug("Address check for an ended turn skipped", exc_info=True)
 
     async def run(
         self,
@@ -5046,13 +5095,21 @@ class AgentExecutor:
         self._agent_plan_policy = self._resolve_agent_plan_policy()
         self._apply_agent_chain_cap(self._agent_plan_policy, user_text)
 
-        managed_budget_gate = await self._check_managed_llm_spend_cap_async()
+        try:
+            managed_budget_gate = await self._check_managed_llm_spend_cap_async()
+        except asyncio.CancelledError:
+            # Stopped before the first model call: the user's words are logged already.
+            if post_turn_memory_extraction:
+                self._schedule_turn_address_check(user_text, "")
+            raise
         if not managed_budget_gate.allowed:
             self._record_agent_gate_denial_telemetry(
                 gate_name="managed_llm_spend_cap",
                 current_usage=managed_budget_gate.spent_cents,
                 limit_value=managed_budget_gate.budget_cents,
             )
+            if post_turn_memory_extraction:
+                self._schedule_turn_address_check(user_text, "")
             return AgentResult(
                 ok=False,
                 answer=self._managed_llm_budget_message(managed_budget_gate),
@@ -5447,6 +5504,11 @@ class AgentExecutor:
             # hot-path uses the cached Fernet on TaskTrace + BlobStore.
             try:
                 await self._task_trace.warm_up_keys_async()
+            except asyncio.CancelledError:
+                # Stopped before the first model call: the user's words are logged already.
+                if post_turn_memory_extraction:
+                    self._schedule_turn_address_check(user_text, task_id)
+                raise
             except Exception as _warm_exc:
                 # LOUD, never a warning buried in the log: losing the trace
                 # loses this run's oracle and strips trace context off any bug
@@ -5643,7 +5705,10 @@ class AgentExecutor:
                     )
             finally:
                 _reset_active_taint_tracker(_taint_scope)
-            if post_turn_memory_extraction:
+            if post_turn_memory_extraction and (self._cancelled or agent_result.error == "cancelled"):
+                # Stopped: the address check only, no memory extraction.
+                self._schedule_turn_address_check(user_text, task_id)
+            elif post_turn_memory_extraction:
                 await self._run_post_turn_memory_extraction(
                     user_text=user_text,
                     final_answer=str(agent_result.answer or ""),
@@ -5658,6 +5723,8 @@ class AgentExecutor:
 
         except asyncio.CancelledError:
             outcome = "cancelled"
+            if post_turn_memory_extraction:
+                self._schedule_turn_address_check(user_text, task_id)
             logger.warning(
                 "Agent loop cancelled (asyncio.CancelledError) after %d iterations",
                 iterations,
@@ -5694,6 +5761,8 @@ class AgentExecutor:
             raise
         except Exception as exc:
             outcome = "error"
+            if post_turn_memory_extraction:
+                self._schedule_turn_address_check(user_text, task_id)
             # M7 Bug B: repair orphaned tool_use blocks before saving
             # checkpoint, so a resumed session starts with clean history.
             if self._use_native:
@@ -6169,6 +6238,9 @@ class AgentExecutor:
             _run_task_log_io(lambda: _append_structured_log_line(jsonl_dir, step_log_path, line))
         except Exception:
             logger.debug("JSONL task_complete write failed, continuing")
+        # An address registered during this task: overwrite what any writer put
+        # in the logs before it was known (in the background, in place).
+        note_private_task_finished()
 
         # Telemetry: record agent outcome
         try:
@@ -6674,8 +6746,10 @@ class AgentExecutor:
         task reported everything before it, and on a managed desktop it never saw
         the turns at all (the cloud runs them) and held only background calls.
         That is how "what is 7 times 6" came to log 187,714 input tokens and a
-        28-step helper logged 466,685 tokens at cost 0. The tracker stays the
-        source only for a task that observed no turn of its own.
+        28-step helper logged 466,685 tokens at cost 0. A task that
+        observed no model turn of its own (cancelled before its first turn)
+        reports zero tokens and zero cost: nothing was charged to it, and the
+        session totals are not its numbers.
         """
         own_turns = _normalize_model_totals(getattr(self, "_task_turn_usage", None))
         if own_turns:
@@ -6688,35 +6762,9 @@ class AgentExecutor:
         usage = _empty_task_usage()
         total_cost_usd = 0.0
         model_totals: dict[str, dict[str, int | float]] = {}
-        session_id = str(
-            getattr(self, "_session_cost_session_id", None)
-            or getattr(self, "_session_id", None)
-            or getattr(self, "task_id", "")
-            or ""
-        ).strip()
-        try:
-            if session_id:
-                from services.llm.session_cost_tracker import get_session_cost_tracker
-
-                tracker = get_session_cost_tracker(
-                    user_id=getattr(self, "_session_cost_user_id", None) or getattr(self, "_user_id", None),
-                    session_id=session_id,
-                )
-                snapshot = tracker.snapshot()
-                model_totals = _normalize_model_totals(snapshot.get("model_usage"))
-                usage = _task_usage_from_model_totals(model_totals)
-                total_cost_usd = float(snapshot.get("total_cost_usd") or 0.0)
-        except (
-            AttributeError,
-            ImportError,
-            OSError,
-            RuntimeError,
-            TypeError,
-            ValueError,
-        ):
-            logger.debug("Task usage summary cost snapshot skipped", exc_info=True)
 
         if usage["total_tokens"] <= 0:
+            # This task's own counters only (never the session tracker).
             fallback_usage = dict(getattr(self, "_last_usage", {}) or {})
             if getattr(self, "_llm_total_input_tokens_seen", 0):
                 fallback_usage["input_tokens"] = getattr(self, "_llm_total_input_tokens_seen", 0)
@@ -6831,8 +6879,12 @@ class AgentExecutor:
         row["web_search_requests"] += web_search_requests
         row["cost_usd"] += float(cost_usd)
 
-    def _user_own_words(self, user_text: str) -> str:
+    def _user_own_words(self, user_text: str, *, include_saved_address: bool = True) -> str:
         """What the user has said in this conversation, and the address they already saved.
+
+        ``include_saved_address=False`` leaves the saved address out: the
+        save_delivery_address gate adds it only for a correction of the same
+        street (``_saved_address_text``).
 
         Only frames the user wrote or spoke count. Compaction summaries are
         user-role frames too, but they carry another origin, and they can quote a
@@ -6840,9 +6892,31 @@ class AgentExecutor:
         address given over two spoken answers was refused, because the street
         said one answer earlier did not count as the user's words (build 10).
         """
+        parts = [str(user_text or "")]
+        for frame_texts in self._user_authored_frame_texts():
+            parts.extend(frame_texts)
+        if include_saved_address:
+            saved = self._saved_address_text()
+            if saved:
+                parts.append(saved)
+        return "\n".join(parts)
+
+    def _user_messages(self, user_text: str) -> list[str]:
+        """The same words as ``_user_own_words``, one entry per message: oldest first, *user_text* last.
+
+        The save_delivery_address gate needs the order: a new street's city and
+        ZIP code count only from the message that first gave the street onward.
+        No saved address is added here.
+        """
+        messages = ["\n".join(texts) for texts in self._user_authored_frame_texts()]
+        messages.append(str(user_text or ""))
+        return messages
+
+    def _user_authored_frame_texts(self) -> list[list[str]]:
+        """The text blocks of each frame the user wrote or spoke in this conversation, oldest first."""
         from services.conversation.state_manager import get_request_conversation_manager
 
-        parts = [str(user_text or "")]
+        frames_texts: list[list[str]] = []
         manager = get_request_conversation_manager() or getattr(self, "_conversation_state_manager", None)
         get_window = getattr(manager, "get_prompt_window", None)
         if callable(get_window):
@@ -6852,17 +6926,21 @@ class AgentExecutor:
                     and frame.kind is FrameKind.USER_INPUT
                     and (frame.origin or "") in _USER_AUTHORED_FRAME_ORIGINS
                 ):
-                    parts.extend(block.text for block in frame.blocks if isinstance(block, TextBlock))
+                    frames_texts.append([block.text for block in frame.blocks if isinstance(block, TextBlock)])
+        return frames_texts
+
+    def _saved_address_text(self) -> str:
+        """The address saved in Settings, as one line ("" when there is none)."""
         try:
             from intent.tools.settings_tools import delivery_address_text
             from ui.settings_manager import get_settings_manager
 
             saved = get_settings_manager().get("delivery_address", {}, user_id=self._get_effective_user_id())
             if isinstance(saved, dict):
-                parts.append(delivery_address_text(saved))
+                return delivery_address_text(saved)
         except (ImportError, LookupError, OSError, RuntimeError, TypeError, ValueError):
             logger.debug("Saved address unavailable for the user-words check", exc_info=True)
-        return "\n".join(parts)
+        return ""
 
     def _prompt_cache_key(self) -> str | None:
         """One opaque cache key per account, the same for every command.
@@ -10155,6 +10233,10 @@ class AgentExecutor:
                     helper_done.set()
                     self._live_helpers.pop(agent_id, None)
 
+        # Carried on the registry record so the end of a job the user is no
+        # longer waiting on can be announced the way they asked for it.
+        job_origin = self._agent_job_origin()
+        announce_when_done = self._depth == 0
         try:
             registry_start = getattr(agent_registry, "start", None)
             if run_in_background and not callable(registry_start):
@@ -10173,6 +10255,8 @@ class AgentExecutor:
                     parent_agent_id=getattr(self, "_current_agent_id", None) or getattr(self, "task_id", None),
                     subagent_type=effective_subagent_type,
                     name=str(tool_args.get("name") or "").strip() or None,
+                    origin=job_origin,
+                    announce_when_done=announce_when_done,
                 )
 
             else:
@@ -10187,6 +10271,8 @@ class AgentExecutor:
                     parent_agent_id=getattr(self, "task_id", None),
                     subagent_type=effective_subagent_type,
                     auto_background_seconds=_FOREGROUND_AUTO_BACKGROUND_SECONDS,
+                    origin=job_origin,
+                    announce_when_done=announce_when_done,
                 )
 
                 async def _registered_foreground_runner() -> str:
@@ -10226,6 +10312,11 @@ class AgentExecutor:
                 return_when=asyncio.FIRST_COMPLETED,
             )
             if runner_task not in done:
+                # This turn answers without the helper now; its end is the
+                # user's to hear about, not this turn's.
+                stop_waiting = getattr(agent_registry, "stop_waiting", None)
+                if callable(stop_waiting):
+                    await stop_waiting(user_id, agent_id)
                 return ToolResult(
                     ok=True,
                     data={
@@ -10454,6 +10545,8 @@ class AgentExecutor:
             parent_agent_id=transcript.parent_agent_id,
             subagent_type=transcript.agent_type,
             name=transcript.name,
+            origin=self._agent_job_origin(),
+            announce_when_done=self._depth == 0,
         )
         return ToolResult(
             ok=True,
@@ -12552,6 +12645,27 @@ class AgentExecutor:
             except Exception:
                 logger.debug("TTS fallback also failed for payment stream")
 
+    def _agent_job_origin(self) -> str | None:
+        """How the user asked for this turn's work: "voice", "typed", "remote", or None.
+
+        Read from the turn's own channel (``chat.channel.resolve_rest_channel``
+        turns a wake turn's ``"voice"`` into ``channel_type == "voice"``, the
+        Chat tab's into ``"chat_mode"`` and ``/v1/command`` into ``"web"``).
+        "typed" is a channel whose reply is spoken on this machine (the same set
+        ``_should_speak_reply`` uses); any other known channel (Telegram, phone,
+        email...) is "remote". A turn with no channel at all is None (unknown).
+        """
+        from core.reply_speech_settings import is_locally_spoken_channel
+
+        channel_type = self._get_origin_channel_type()
+        if not channel_type:
+            return None
+        if channel_type == "voice":
+            return "voice"
+        if is_locally_spoken_channel(channel_type):
+            return "typed"
+        return "remote"
+
     def _get_origin_channel_type(self) -> str | None:
         """Return the originating request channel for gate-card replies."""
         channel = self._channel
@@ -14153,6 +14267,15 @@ class AgentExecutor:
         self._cancel_event.set()
         self._takeover_release_event.set()
         logger.info("Agent cancellation requested")
+        # Every user stop (Chat Stop, voice "stop", websocket agent_cancel) ends
+        # here. A desktop action already running on the desktop worker (typing
+        # in particular) does not see the turn end, so it is told directly.
+        try:
+            from services.computer_use import safety as desktop_safety
+
+            desktop_safety.request_desktop_stop(user_id=self._user_id, reason="agent cancel")
+        except Exception:  # noqa: BLE001, RUF100 - the agent stop above already happened
+            logger.debug("Agent cancel: desktop stop could not be signalled", exc_info=True)
 
     def request_user_takeover(self) -> None:
         """Pause agent progress so the user can interact with the browser."""
@@ -14327,6 +14450,23 @@ def get_active_executor(
             continue
         return executor
     return None
+
+
+def cancel_stream_executors(stream_id: str | None, *, user_id: str | None = None) -> int:
+    """User stop for one command stream: ``cancel()`` every executor running under it.
+
+    Helpers a run started share its stream, so all of them stop. Only this
+    user's executors are touched. Returns how many were asked to stop.
+    """
+    if not stream_id:
+        return 0
+    cancelled = 0
+    for executor in list(_executor_stacks.get("stream:%s" % stream_id, ())):
+        if user_id and getattr(executor, "_user_id", None) and executor._user_id != user_id:
+            continue
+        executor.cancel()
+        cancelled += 1
+    return cancelled
 
 
 def _set_active_executor(

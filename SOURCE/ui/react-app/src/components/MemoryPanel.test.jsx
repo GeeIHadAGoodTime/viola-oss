@@ -170,3 +170,43 @@ describe('MemoryPanel -- cloud SPA Memory tab reads/writes /v1/memories (#1182)'
     expect(screen.queryByText(/Available in the desktop app/i)).not.toBeInTheDocument();
   });
 });
+
+// Build 12: the desktop (file) memory rows were named "Delete <text>"; the
+// brief expects "Delete memory: <text>". The file memory has no per-row Edit
+// control (VIOLA.md is edited as a whole with its own Edit button); the cloud
+// rows above have both.
+describe('MemoryPanel -- desktop file memory row buttons', () => {
+  beforeEach(() => {
+    window.viola = {};
+    window.history.replaceState({}, '', '/');
+    authFetchMock.mockImplementation(async (path) => {
+      if (path === '/api/memory/viola') return jsonResponse(200, { content: '' });
+      if (path === '/api/memory/entries') {
+        return jsonResponse(200, {
+          index: {
+            entries: [
+              { id: 'e1', kind: 'item', line_number: 3, markdown: '- Prefers tea', text: 'Prefers tea' },
+              { id: 'e2', kind: 'item', line_number: 4, markdown: '- Has a cat named Pixel', text: 'Has a cat named Pixel' },
+            ],
+          },
+          topics: [],
+        });
+      }
+      if (path === '/api/workbench/files') return jsonResponse(200, { files: [] });
+      throw new Error(`Unexpected request: ${path}`);
+    });
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+    delete window.viola;
+  });
+
+  it('names each row delete button "Delete memory: <text>"', async () => {
+    render(<MemoryPanel isOpen onClose={() => {}} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Memory', exact: true }));
+    expect(await screen.findByRole('button', { name: 'Delete memory: Prefers tea' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete memory: Has a cat named Pixel' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Delete Prefers tea' })).toBeNull();
+  });
+});

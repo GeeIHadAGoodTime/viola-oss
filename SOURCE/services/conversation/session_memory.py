@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import threading
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -13,6 +16,95 @@ from core.logging_config import get_logger
 logger = get_logger(__name__)
 
 _FILTERED_MEMORY_PAYLOAD = "[filtered sensitive memory payload]"
+
+SESSION_MEMORY_MAX_AGE_SECONDS = 7 * 24 * 60 * 60
+_TIDY_LOCK = threading.Lock()
+_AGED_OUT_USERS: set[tuple[str, str]] = set()
+_MASKED_USERS: set[tuple[str, str]] = set()
+
+
+def tidy_session_memory(user_id: str | None, *, root: Path | None = None, now: float | None = None) -> int:
+    """Start-up clean-up of one account's per-task session memory files.
+
+    Files older than 7 days are deleted. The files that stay are passed through
+    the private-value mask once (when values are held) and rewritten only when
+    the text changed, keeping their modified time so the age clock does not
+    restart. Only this account's own ``session_memory`` folder is touched, once
+    per account per process. Logs one INFO line with counts only. Returns the
+    number of files deleted.
+    """
+    account = str(user_id or "").strip()
+    if not account:
+        return 0
+    deleted = 0
+    masked = 0
+    try:
+        from intent import sensitive_values
+
+        key = (account, str(root or ""))
+        with _TIDY_LOCK:
+            do_age = key not in _AGED_OUT_USERS
+            _AGED_OUT_USERS.add(key)
+            do_mask = key not in _MASKED_USERS and sensitive_values.has_values()
+            if do_mask:
+                _MASKED_USERS.add(key)
+        if not do_age and not do_mask:
+            return 0
+        from services.memory.dir import account_root
+
+        folder = account_root(account, root) / "memory" / "session_memory"
+        if not folder.is_dir():
+            return 0
+        cutoff = (time.time() if now is None else now) - SESSION_MEMORY_MAX_AGE_SECONDS
+        from core.user_context import user_scope
+
+        for path in folder.glob("*.md"):
+            try:
+                if not path.is_file():
+                    continue
+                stat = path.stat()
+                if do_age and stat.st_mtime < cutoff:
+                    path.unlink()
+                    deleted += 1
+                    continue
+                if not do_mask:
+                    continue
+                text = path.read_text(encoding="utf-8", errors="replace")
+                with user_scope(account):
+                    clean = sensitive_values.mask(text)
+                if isinstance(clean, str) and clean != text:
+                    path.write_text(clean, encoding="utf-8", newline="\n")
+                    os.utime(path, (stat.st_atime, stat.st_mtime))
+                    masked += 1
+            except OSError:
+                logger.debug("Session memory clean-up skipped one file", exc_info=True)
+    except Exception:  # noqa: BLE001 - a clean-up must never break start-up
+        logger.debug("Session memory clean-up failed", exc_info=True)
+        return deleted
+    if deleted or masked:
+        logger.info(
+            "Session memory clean-up: %d files older than 7 days deleted, %d files masked",
+            deleted,
+            masked,
+        )
+    return deleted
+
+
+def _mask_for_account(user_id: str, text: str) -> str:
+    """*text* with the private values held for *user_id* replaced (unchanged when none are held)."""
+    try:
+        from intent import sensitive_values
+
+        if not sensitive_values.has_values():
+            return text
+        from core.user_context import user_scope
+
+        with user_scope(str(user_id or "").strip()):
+            masked = sensitive_values.mask(text)
+        return masked if isinstance(masked, str) else text
+    except Exception:  # noqa: BLE001 - masking must never stop the memory file being written
+        logger.debug("Session memory mask not applied", exc_info=True)
+        return text
 
 
 @dataclass
@@ -119,7 +211,13 @@ class SessionMemory:
         if self.file_path is None:
             return
         self.file_path.parent.mkdir(parents=True, exist_ok=True)
-        self.file_path.write_text(self._render_markdown(), encoding="utf-8", newline="\n")
+        # Written through the live private-value mask: a value already known
+        # (a street from a refused save, the post-turn address check, the
+        # saved address) never lands in the file. Values learned later are
+        # overwritten in place by the log clean-up (intent/sensitive_values).
+        # This object keeps the plain text for the rest of its own task.
+        text = _mask_for_account(self.user_id, self._render_markdown())
+        self.file_path.write_text(text, encoding="utf-8", newline="\n")
 
     @property
     def allowed_file_path(self) -> str:
@@ -162,10 +260,17 @@ class SessionMemory:
         text = self.file_path.read_text(encoding="utf-8", errors="replace")
         sections: dict[str, list[str]] = {}
         current = ""
+        headers_seen = 0
         for line in text.splitlines():
             match = re.match(r"^##\s+(.+?)\s*$", line)
             if match:
                 current = match.group(1).strip()
+                if current not in self.SECTIONS and headers_seen < len(self.SECTIONS):
+                    # A private-value mask can overwrite a word of a heading
+                    # (a street word "state" in "current_state"); the headings
+                    # are always written in this order.
+                    current = self.SECTIONS[headers_seen]
+                headers_seen += 1
                 sections[current] = []
                 continue
             if current:

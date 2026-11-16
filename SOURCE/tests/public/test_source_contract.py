@@ -96,7 +96,11 @@ class SourceContract(unittest.TestCase):
         nodes = [ast.ImportFrom(module="__future__", names=[ast.alias(name="annotations")], level=0)]
         constants = {"_MIN_BILLED_COST_USD", "_BILLABLE_FAILURE_STATES"}
         for node in tree.body:
-            if isinstance(node, ast.FunctionDef) and node.name in {"_billed_cost_usd", "_conference_leg_cost_usd"}:
+            if isinstance(node, ast.FunctionDef) and node.name in {
+                "_billed_cost_usd",
+                "_conference_leg_cost_usd",
+                "_non_carrier_cost_usd",
+            }:
                 nodes.append(node)
             elif isinstance(node, ast.Assign) and any(
                 isinstance(target, ast.Name) and target.id in constants for target in node.targets
@@ -452,15 +456,19 @@ class CurrentTrackRatingContract(unittest.IsolatedAsyncioTestCase):
                 rating.spotify.set_spotify_track_saved.assert_called_once_with('synthetic',saved,user_id='user-synthetic')
                 getattr(rating,method).assert_called_once()
 
-    async def test_spotify_failure_is_reported_and_not_saved_locally(self):
+    async def test_spotify_failure_still_saves_the_rating_locally(self):
         from types import SimpleNamespace
         track=SimpleNamespace(id='spotify:track:synthetic',video_id=None,title='Synthetic',artist=None)
-        result,rating=await self._rate(SimpleNamespace(current_track=track),'liked',
-                                       spotify_track_id='synthetic',spotify_error='web player not ready')
-        self.assertFalse(result['ok'])
-        self.assertEqual(result['error'],'web player not ready')
-        self.assertEqual(result['spotify'],{'track_id':'synthetic','saved':None,'error':'web player not ready'})
-        rating.thumbs_up.assert_not_called();rating.thumbs_down.assert_not_called();rating.remove_rating.assert_not_called()
+        for value,method in [('liked','thumbs_up'),('disliked','thumbs_down'),(None,'remove_rating')]:
+            with self.subTest(value=value):
+                result,rating=await self._rate(SimpleNamespace(current_track=track),value,
+                                               spotify_track_id='synthetic',spotify_error='web player not ready')
+                self.assertTrue(result['ok'],result)
+                self.assertNotIn('error',result)
+                self.assertEqual(result['spotify'],{'track_id':'synthetic','saved':None,'error':'web player not ready'})
+                getattr(rating,method).assert_called_once()
+                if value=='liked':
+                    self.assertIn('could not add it to your Spotify Liked Songs',result['message'])
 
     async def test_missing_track_and_invalid_rating_do_not_mutate_ratings(self):
         from types import SimpleNamespace
@@ -745,6 +753,16 @@ class ChatStreamRecoveryContract(unittest.IsolatedAsyncioTestCase):
                     and node.name in {"get_thread", "cancel_stream"}]
         for handler in handlers:
             handler.decorator_list = []
+        # The Stop policy the cancel route applies (module level in chat_mode.py).
+        stop_policy = [
+            node
+            for node in tree.body
+            if (isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name in {"_stop_chat_turn", "_stop_watch", "_silence_turn_speech"})
+            or (
+                isinstance(node, ast.Assign)
+                and any(isinstance(t, ast.Name) and t.id in {"_STOP_RETRY_SECONDS", "_STOP_RETRY_LIMIT"} for t in node.targets)
+            )
+        ]
 
         async def record_and_call(function, **_):
             return await function()
@@ -761,8 +779,18 @@ class ChatStreamRecoveryContract(unittest.IsolatedAsyncioTestCase):
             "HTTPException": HTTPException,
             "HTTPStatus": HTTPStatus,
             "toolbox": SimpleNamespace(record_and_call=record_and_call),
+            "asyncio": asyncio,
+            "time": __import__("time"),
+            "logger": __import__("logging").getLogger("chat-mode-contract"),
+            # Agent-run stop and desktop release are inert boundaries here.
+            "_cancel_turn_executors": lambda stream_id, user_id: 0,
+            "_release_desktop_control": lambda user_id: "nothing held",
         }
-        nodes = [ast.ImportFrom(module="__future__", names=[ast.alias(name="annotations")], level=0), *handlers]
+        nodes = [
+            ast.ImportFrom(module="__future__", names=[ast.alias(name="annotations")], level=0),
+            *stop_policy,
+            *handlers,
+        ]
         exec(compile(ast.fix_missing_locations(ast.Module(body=nodes, type_ignores=[])), str(source), "exec"), self.namespace)
         self.tasks = []
 
@@ -776,7 +804,16 @@ class ChatStreamRecoveryContract(unittest.IsolatedAsyncioTestCase):
             await asyncio.Event().wait()
         task = asyncio.create_task(coroutine or waiting())
         self.tasks.append(task)
-        self.active[stream_id] = self.namespace_type(user_id=user, thread_id=thread, task=task)
+        self.active[stream_id] = self.namespace_type(
+            user_id=user,
+            thread_id=thread,
+            task=task,
+            stop_presses=0,
+            finalizing=False,
+            stop_watch=None,
+            last_cancel_at=0.0,
+            turn=None,
+        )
         return task
 
     async def get_thread(self):

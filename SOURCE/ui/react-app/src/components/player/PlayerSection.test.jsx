@@ -101,3 +101,27 @@ describe('PlayerSection long titles keep the controls on the stage (A3.7)', () =
     expect(css).toMatch(/@media \(max-height: 820px\)\s*\{\s*\.trackTitle\s*\{[^}]*-webkit-line-clamp:\s*1/);
   });
 });
+
+describe('PlayerSection title while the name has not arrived', () => {
+  it('shows Loading... for a pending title and never the id', () => {
+    renderPlayerSection({
+      nowPlaying: { id: 'q1', title: '', artist: '', capabilities: { title_pending: true } },
+    });
+    expect(screen.getByText('Loading...')).toBeTruthy();
+    expect(screen.queryByText(/spotify:track/)).toBeNull();
+  });
+
+  it('shows Loading... even if an id leaks into the title', () => {
+    renderPlayerSection({
+      nowPlaying: { id: 'q1', title: 'spotify:track:7AgMX97ljLm9BzszyyXEYZ', artist: '' },
+    });
+    expect(screen.getByText('Loading...')).toBeTruthy();
+    expect(screen.queryByText(/spotify:track/)).toBeNull();
+  });
+
+  it('shows the real title once it arrives', () => {
+    renderPlayerSection({ nowPlaying: { id: 'q1', title: 'Jazz', artist: 'Tribe' } });
+    expect(screen.getByText('Jazz')).toBeTruthy();
+    expect(screen.queryByText('Loading...')).toBeNull();
+  });
+});

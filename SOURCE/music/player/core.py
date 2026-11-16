@@ -776,6 +776,10 @@ class MusicPlayer:
         """Set volume using playback controller."""
         return self._playback_controller.set_playback_volume(level)
 
+    def volume_change_is_slow(self) -> bool:
+        """The backend playing now declares one volume change a slow action."""
+        return self._playback_controller.volume_change_is_slow()
+
     def set_hub_state_authority(self, hub_authority: object) -> None:
         """Set reference to hub state authority for direct state updates."""
         if object.__getattribute__(self, "__dict__").get("_multi_user_router", False):

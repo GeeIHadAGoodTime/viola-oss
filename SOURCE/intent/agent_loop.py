@@ -2353,7 +2353,17 @@ async def run_agent_loop(
     # is_user_named_file_read). Consequential actions keep their confirm gates.
     taint_tracker.set_user_request(user_text)
     if getattr(executor, "_depth", 0) == 0 and hasattr(executor, "_user_own_words"):
-        taint_tracker.set_user_own_words(executor._user_own_words(user_text))
+        # The saved address counts as the user's words only for a correction of
+        # the same street; a new street brings its own city and ZIP code.
+        if hasattr(executor, "_saved_address_text") and hasattr(taint_tracker, "set_saved_address_words"):
+            taint_tracker.set_user_own_words(executor._user_own_words(user_text, include_saved_address=False))
+            taint_tracker.set_saved_address_words(executor._saved_address_text())
+            # In order, oldest first: a new street's city and ZIP code count only
+            # from the message that first gave the street onward.
+            if hasattr(executor, "_user_messages") and hasattr(taint_tracker, "set_user_messages"):
+                taint_tracker.set_user_messages(executor._user_messages(user_text))
+        else:
+            taint_tracker.set_user_own_words(executor._user_own_words(user_text))
     # Let the gate read a tool's _meta (a payment extension's irreversible
     # class) and let the approval layer see this task's taint, so a
     # confirm-or-cancel gate under taint accepts only the user's own words.
@@ -4197,6 +4207,13 @@ async def run_agent_loop(
                 tc_name = tc["tool"]
                 tc_args = tc.get("args", {})
                 tc_id = tc.get("tool_use_id", "")
+                if executor._cancelled:
+                    # The user pressed Stop while the model was choosing this
+                    # step: run nothing more (a desktop click after Stop is the
+                    # worst case). The cancellation check at the top of the
+                    # next iteration ends the run.
+                    tool_results_content.append(executor.synthetic_cancel_tool_result(tc_id))
+                    continue
                 _parallel_batch = _parallel_safe_batches_by_start.get(_tc_index)
                 if _parallel_batch is not None:
                     # F-032: thread the canonical hook dispatcher into

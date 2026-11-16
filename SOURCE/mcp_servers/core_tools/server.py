@@ -407,6 +407,32 @@ def _caller_cloud_bearer_bound() -> Iterator[None]:
             logger.debug("Cloud bearer context token belongs to another context; skipping reset")
 
 
+@contextlib.contextmanager
+def _caller_scheduled_run_bound() -> Iterator[None]:
+    """Give a tool call the CALLER's scheduled-run state (a fired scheduled command or not).
+
+    Same cause as ``_caller_cloud_bearer_bound``: this task froze the ContextVars of
+    the request that built the hub, so the scheduler's marker for the calling turn
+    is not visible here. The hub sends it with the call
+    (``_attach_inprocess_scheduled_run``); it is bound for the call, and its absence
+    is bound too. A direct in-process call (no MCP request) keeps its own context.
+    """
+
+    try:
+        server.get_context().request_context
+        in_request = True
+    except (LookupError, ValueError):
+        in_request = False
+    if not in_request:
+        yield
+        return
+
+    from services.scheduler.service import SCHEDULED_RUN_META_KEY, scheduled_run_from_call_meta
+
+    with scheduled_run_from_call_meta(_get_call_meta().get(SCHEDULED_RUN_META_KEY)):
+        yield
+
+
 def _get_call_user_id() -> str | None:
     """Extract the caller user_id from MCP request metadata."""
     meta = _get_call_meta()
@@ -4114,8 +4140,8 @@ async def memory(
 
 @server.tool(
     description=(
-        "Save or correct the user's own delivery address when they want it kept, from their words only. No confirmation first. "
-        "Say the returned read_back word for word."
+        "Save or correct the user's own delivery address to keep, from their words only. No confirmation first. "
+        "Send any part they gave, even with no city or ZIP; it says what to ask. Say read_back verbatim."
     ),
     annotations=_SAFE,
     meta={"risk": "safe", "anthropic/alwaysLoad": True},
@@ -4385,9 +4411,10 @@ async def user_settings(
 
 @server.tool(
     description=(
-        "Manage scheduled automations: reminders, recurring tasks, and one-shot future actions. "
-        "Covers requests to remind the user or run a Viola action at/after/before a clock time or on a recurrence. "
-        "Actions: create (cron or ISO-8601 datetime), list, delete, update. "
+        "Make Viola do something later or on a recurrence: schedule_action is the command Viola runs then, "
+        "as the user says it (tell me a joke, what's the weather, play jazz), schedule_spec is when "
+        "(ISO-8601 datetime or cron). Reminder text Viola only repeats to the user is notify. "
+        "Actions: create, list, delete, update. "
         "Does not create calendar meetings or appointments with attendees; calendar covers events, while timer covers simple countdowns."
     ),
     annotations=_CONFIRM,
@@ -4443,40 +4470,41 @@ async def schedule(
     - schedule(action="delete", schedule_ref="12")
     - schedule(action="update", schedule_id=12, cron_expr="0 8 * * 1-5", enabled="true")
     """
-    try:
-        if action == "create":
-            # Auto-populate label from schedule_action if empty — the model
-            # often puts the description in schedule_action and forgets label.
-            _effective_label = label or schedule_action[:50] or "Unnamed schedule"
-            return _format_result(
-                await _call_user_scoped(
-                    _schedule_create,
-                    label=_effective_label,
-                    action=schedule_action,
-                    schedule=schedule_spec,
+    with _caller_scheduled_run_bound():
+        try:
+            if action == "create":
+                # Auto-populate label from schedule_action if empty — the model
+                # often puts the description in schedule_action and forgets label.
+                _effective_label = label or schedule_action[:50] or "Unnamed schedule"
+                return _format_result(
+                    await _call_user_scoped(
+                        _schedule_create,
+                        label=_effective_label,
+                        action=schedule_action,
+                        schedule=schedule_spec,
+                    )
                 )
-            )
-        if action == "list":
-            return _format_result(await _call_user_scoped(_schedule_list, enabled_only=enabled_only))
-        if action == "delete":
-            delete_ref = schedule_ref or str(schedule_id)
-            return _format_result(await _call_user_scoped(_schedule_delete, schedule_id=delete_ref))
-        if action == "update":
-            cron_expr = cron_expr or schedule_spec
-            return _format_result(
-                await _call_user_scoped(
-                    _schedule_update,
-                    schedule_id=schedule_id,
-                    label=label,
-                    action=schedule_action,
-                    cron_expr=cron_expr,
-                    enabled=enabled,
+            if action == "list":
+                return _format_result(await _call_user_scoped(_schedule_list, enabled_only=enabled_only))
+            if action == "delete":
+                delete_ref = schedule_ref or str(schedule_id)
+                return _format_result(await _call_user_scoped(_schedule_delete, schedule_id=delete_ref))
+            if action == "update":
+                cron_expr = cron_expr or schedule_spec
+                return _format_result(
+                    await _call_user_scoped(
+                        _schedule_update,
+                        schedule_id=schedule_id,
+                        label=label,
+                        action=schedule_action,
+                        cron_expr=cron_expr,
+                        enabled=enabled,
+                    )
                 )
-            )
-        return json.dumps({"error": "Unknown action: %s" % action})
-    except Exception as exc:
-        logger.exception("schedule failed for action=%s", action)
-        return json.dumps({"error": str(exc)})
+            return json.dumps({"error": "Unknown action: %s" % action})
+        except Exception as exc:
+            logger.exception("schedule failed for action=%s", action)
+            return json.dumps({"error": str(exc)})
 
 
 # ===========================================================================
@@ -5708,10 +5736,10 @@ async def alarm(
 
 @server.tool(
     description=(
-        "Send, schedule, list or delete reminders. action='list' answers what "
-        "reminders or scheduled tasks the user has (returns both); enabled_only=false adds "
-        "finished ones, only if asked. action='delete' takes reminder: an id or its words, "
-        "one at a time. Send: message, optional when, channel."
+        "Reminder text Viola repeats to the user at a time (message, when). "
+        "If Viola should do something then (tell a joke, the weather, music), "
+        "use the schedule tool. action='list' shows reminders and scheduled tasks "
+        "(enabled_only=false adds finished); action='delete' takes reminder: id or words."
     ),
     annotations=_CONFIRM,
     meta={"risk": "confirm"},
@@ -5745,27 +5773,30 @@ async def notify(
     ] = "",
 ) -> str:
     """Send, schedule, list or delete notifications/reminders."""
-    try:
-        action_name = action.strip().lower()
-        if action_name == "list":
-            return _format_result(await _call_user_scoped(_list_notify_reminders_handler, enabled_only=enabled_only))
-        if action_name == "delete":
-            return _format_result(await _call_user_scoped(_delete_notify_reminder_handler, reminder=reminder))
-        if action_name and action_name not in {"send", "schedule", "create"}:
-            return json.dumps(
-                {"error": "Unknown action: %s. Use 'list', 'delete', 'send', 'schedule', or omit action." % action}
+    with _caller_scheduled_run_bound():
+        try:
+            action_name = action.strip().lower()
+            if action_name == "list":
+                return _format_result(
+                    await _call_user_scoped(_list_notify_reminders_handler, enabled_only=enabled_only)
+                )
+            if action_name == "delete":
+                return _format_result(await _call_user_scoped(_delete_notify_reminder_handler, reminder=reminder))
+            if action_name and action_name not in {"send", "schedule", "create"}:
+                return json.dumps(
+                    {"error": "Unknown action: %s. Use 'list', 'delete', 'send', 'schedule', or omit action." % action}
+                )
+            return _format_result(
+                await _call_user_scoped(
+                    _notify_handler,
+                    message=message,
+                    when=when or None,
+                    channel=channel or None,
+                )
             )
-        return _format_result(
-            await _call_user_scoped(
-                _notify_handler,
-                message=message,
-                when=when or None,
-                channel=channel or None,
-            )
-        )
-    except Exception as exc:
-        logger.exception("notify failed")
-        return json.dumps({"error": str(exc)})
+        except Exception as exc:
+            logger.exception("notify failed")
+            return json.dumps({"error": str(exc)})
 
 
 # ---------------------------------------------------------------------------

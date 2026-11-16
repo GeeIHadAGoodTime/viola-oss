@@ -14,6 +14,7 @@ from __future__ import annotations
 import contextlib
 import contextvars
 import json
+import logging
 import os
 import threading
 import time
@@ -224,6 +225,50 @@ def current_confirmation_conversation_scope() -> str | None:
     """The conversation the current turn belongs to (``None`` = main conversation)."""
 
     return _CONFIRMATION_CONVERSATION_SCOPE.get()
+
+
+# What the model is told when the user's reply refused a pending confirmation
+# (``ApprovalManager.users_reply_confirms_pending``). The MCP hub puts it in the
+# tool result in place of the generic "not approved" text, so the model does
+# not re-issue the call or claim it ran.
+_USER_CANCELLED_RESULT = (
+    "The user cancelled this when asked: %s. It did not run and nothing changed. "
+    "Do not run it again and do not ask about it again in this turn."
+)
+# An unclear, empty or unreadable reply is not a cancellation: the model asks once
+# more (a fresh question, which cannot be accepted in the same turn).
+_USER_DID_NOT_CONFIRM_RESULT = (
+    "The user's reply did not clearly say yes or no, so nothing was done (%s). "
+    "Ask them once more, in one short sentence, to confirm or cancel this specific action."
+)
+# Set by _classify_response when the classifier could not answer (exception or
+# timeout), so a refusal can be logged as classifier_unavailable, not unclear.
+_CLASSIFIER_FAILED: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "viola_approval_classifier_failed", default=False
+)
+_CLASSIFIER_UNAVAILABLE_LOGGED_ATTR = "_viola_classifier_unavailable_logged"
+_DEFERRED_REFUSAL: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "viola_deferred_confirmation_refusal", default=None
+)
+
+
+def take_deferred_confirmation_refusal() -> str | None:
+    """The tool-result text for a pending confirmation the user's reply just refused, once.
+
+    Set in the same task as the approval check that refused it; reading it
+    clears it, and every approval check starts without one.
+    """
+
+    text = _DEFERRED_REFUSAL.get()
+    if text is not None:
+        _DEFERRED_REFUSAL.set(None)
+    return text
+
+
+def clear_deferred_confirmation_refusal() -> None:
+    """Forget a refusal text an earlier approval check left unread."""
+
+    _DEFERRED_REFUSAL.set(None)
 
 
 class _PendingStore:
@@ -754,7 +799,9 @@ class ApprovalManager:
         Native tool schemas do not expose Viola's private ``_approval_*`` fields, so
         a confirmed follow-up can only reissue the original tool call. The approval
         remains exact-args and cross-task only; mismatched calls still fall through
-        to the normal confirmation gate.
+        to the normal confirmation gate. "accepted" means only that the call was
+        the one asked about: the callers then let the user's own reply decide
+        (``users_reply_confirms_pending``).
         """
 
         if not isinstance(tool_args, dict):
@@ -809,7 +856,9 @@ class ApprovalManager:
                 return "missing"
             for confirmation_id in matching_ids:
                 store.confirmations.pop(confirmation_id, None)
-        logger.info("Pending confirmation for %s accepted on the re-issued call", tool_name_value)
+        # Matched and consumed; whether it runs is the user's reply's call
+        # (users_reply_confirms_pending), never this re-issue's.
+        logger.info("Pending confirmation for %s matched the re-issued call", tool_name_value)
         self._apply_tool_arg_confirmation_normalization(tool_name_value, tool_args)
         return "accepted"
 
@@ -871,35 +920,68 @@ class ApprovalManager:
                     return dict(pending.tool_args)
         return None
 
-    async def confirmation_holds_under_taint(self, action_description: str, risk: RiskLevel) -> bool:
-        """Check a cross-turn confirmation against the user's own words when tainted.
+    async def users_reply_confirms_pending(
+        self, action_description: str, risk: RiskLevel, *, tool_name: str = ""
+    ) -> bool:
+        """Whether the user's own reply on this turn lets a pending confirmation run.
 
-        A deferred confirmation is accepted when the model re-issues the
-        pending tool call on the user's next turn. While untrusted content
-        (web, email, calendar, memory, files) is in the conversation, the model
-        may be following injected text, so its re-issue alone is not the
-        user's consent. The user's actual message for this turn is classified
-        on its own (the classifier sees only that message and the action, never
-        the tainted conversation) and must affirm the action. Fails closed.
-        Outside taint this returns True and nothing changes.
+        Called only after a pending confirmation was consumed (the model
+        re-issued the call, or sent the structured confirmation fields). Before
+        this, that re-issue alone was the user's "yes": a model that re-issued
+        the discard after the user typed "cancel" threw away their work (build
+        12 live check, 2026-11-15). The user's message for this turn is
+        classified on its own (the classifier sees only that message and the
+        action, never the conversation) and decides:
+
+        - dangerous action, or untrusted content in the conversation: runs only
+          when the user's message affirms it; deny, unclear, no message or a
+          classifier failure refuse it (fails closed). A denial tells the model
+          the user cancelled; anything else tells it to ask once more;
+        - confirm-level action: refused when the user's message denies it;
+          otherwise it runs as before (unclear or a classifier failure does
+          not block).
+
+        The pending confirmation is already consumed, so a refusal is final for
+        it. A refusal leaves the tool-result text for the model in
+        ``take_deferred_confirmation_refusal``. Never logs the user's words.
         """
         try:
             from intent.content_sanitizer import active_taint_tracker
         except ImportError:  # pragma: no cover - same package
-            return True
-        tracker = active_taint_tracker()
-        if not bool(getattr(tracker, "is_tainted", False)):
-            return True
+            active_taint_tracker = None  # type: ignore[assignment]
+        tracker = active_taint_tracker() if active_taint_tracker is not None else None
+        tainted = bool(getattr(tracker, "is_tainted", False))
         user_words = str(getattr(tracker, "user_request", "") or "").strip()
-        decision = await self._classify_response(user_words, action_description, risk) if user_words else "unclear"
-        if decision in ("strong_affirm", "affirm"):
-            logger.info("Confirmation under taint matched the user's own words (%s): %s", decision, action_description)
+        decision: str = "unclear"
+        if user_words:
+            token = _CLASSIFIER_FAILED.set(False)
+            try:
+                decision = await self._classify_response(user_words, action_description, risk)
+                if _CLASSIFIER_FAILED.get():
+                    decision = "classifier_unavailable"
+            except Exception:  # noqa: BLE001 - any classifier failure fails closed
+                decision = "classifier_unavailable"
+            finally:
+                _CLASSIFIER_FAILED.reset(token)
+        affirmed = decision in ("strong_affirm", "affirm")
+        must_affirm = tainted or risk == RiskLevel.DANGEROUS
+        holds = affirmed if must_affirm else decision != "deny"
+        kind = "%s %s%s" % (tool_name or "tool", risk.value, " (untrusted content in context)" if tainted else "")
+        if holds:
+            logger.info("Pending confirmation for %s: the user's reply allows it (%s)", kind, decision)
+            _DEFERRED_REFUSAL.set(None)
             return True
-        logger.warning(
-            "Confirmation under taint refused: the user's message did not confirm (%s): %s",
-            decision,
-            action_description,
-        )
+        level = logging.WARNING
+        if decision == "classifier_unavailable":
+            # Once per turn at WARNING (the turn's tracker remembers it).
+            if getattr(tracker, _CLASSIFIER_UNAVAILABLE_LOGGED_ATTR, False):
+                level = logging.INFO
+            else:
+                with contextlib.suppress(AttributeError, TypeError):
+                    setattr(tracker, _CLASSIFIER_UNAVAILABLE_LOGGED_ATTR, True)
+        logger.log(level, "Pending confirmation for %s refused: the user's reply was %s, nothing ran", kind, decision)
+        template = _USER_CANCELLED_RESULT if decision == "deny" else _USER_DID_NOT_CONFIRM_RESULT
+        _DEFERRED_REFUSAL.set(template % action_description)
         return False
 
     async def user_message_asks_for(
@@ -986,6 +1068,7 @@ class ApprovalManager:
         # idempotent, and a no-op when the remote path is not configured. It
         # never approves anything and never changes the approval outcome.
         self._maybe_prewarm_phone_voice(tool_name, tool_args or {})
+        clear_deferred_confirmation_refusal()
 
         if risk == RiskLevel.SAFE:
             return True
@@ -1029,7 +1112,9 @@ class ApprovalManager:
             action_description=action_description,
         )
         if confirmation_state == "accepted":
-            if not await self.confirmation_holds_under_taint(action_description, risk):
+            # The re-issued call only says the model wants to proceed; the
+            # user's own reply on this turn decides.
+            if not await self.users_reply_confirms_pending(action_description, risk, tool_name=tool_name):
                 return False
             logger.info(
                 "Deferred confirmation accepted for %s action: %s",
@@ -1416,6 +1501,7 @@ class ApprovalManager:
                 "Approval classifier: background-LLM module unavailable (fail-closed): %s",
                 exc,
             )
+            _CLASSIFIER_FAILED.set(True)
             return "unclear"
 
         user_content = (
@@ -1440,6 +1526,7 @@ class ApprovalManager:
                 "Approval classifier call failed (fail-closed -> unclear): %s",
                 exc,
             )
+            _CLASSIFIER_FAILED.set(True)
             return "unclear"
 
         try:

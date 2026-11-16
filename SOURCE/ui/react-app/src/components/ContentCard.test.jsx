@@ -171,3 +171,27 @@ describe('ContentCard does not swallow taps outside the card', () => {
     expect(onDismiss).not.toHaveBeenCalled();
   });
 });
+
+describe('ContentCard Markdown body (background-agent result)', () => {
+  const essay = '# The Cello\n\nThe *violoncello* is a bowed string instrument.\n\n- Four strings\n- Deep voice';
+
+  it('draws headings and emphasis instead of raw Markdown when the card asks for it', () => {
+    const { container } = render(
+      <ContentCard data={{ type: 'detail', body: essay, long_answer: true, markdown: true }} onDismiss={vi.fn()} />,
+    );
+
+    expect(screen.getByRole('heading', { name: 'The Cello' })).toBeInTheDocument();
+    expect(container.querySelector('em')).toHaveTextContent('violoncello');
+    expect(container.textContent).not.toContain('# The Cello');
+    expect(container.textContent).not.toContain('*violoncello*');
+    expect(screen.getByText('Four strings').tagName).toBe('LI');
+  });
+
+  it('leaves an ordinary long answer card as plain text', () => {
+    const { container } = render(
+      <ContentCard data={{ type: 'detail', body: essay, long_answer: true }} onDismiss={vi.fn()} />,
+    );
+
+    expect(container.textContent).toContain('# The Cello');
+  });
+});

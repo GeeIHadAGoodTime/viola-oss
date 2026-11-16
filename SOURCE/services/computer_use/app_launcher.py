@@ -195,7 +195,9 @@ def _window_handles(payload: dict[str, object]) -> set[int]:
     return handles
 
 
-def _candidate_window(app_name: str, before_handles: set[int]) -> dict[str, object] | None:
+def _candidate_window(
+    app_name: str, before_handles: set[int], *, allow_existing: bool = False
+) -> dict[str, object] | None:
     try:
         payload = window_manager.list_windows(include_minimized=True, include_titles=True)
     except Exception:
@@ -213,12 +215,25 @@ def _candidate_window(app_name: str, before_handles: set[int]) -> dict[str, obje
             handle = int(item.get("handle") or 0)
         except (TypeError, ValueError):
             handle = 0
-        if handle and handle not in before_handles and first_new is None:
+        # Only a window that was not there before the launch is the launched one.
+        # Matching any window by name returned (and focused) the user's older,
+        # minimized Notepad as "the window Viola opened" (seen live 2026-11-15,
+        # build 12 desktop check), the same wrong-window shape as the build-11
+        # laptop's "close Notepad without saving".
+        # A single-instance app (Steam, Spotify) only brings its existing window
+        # forward; that window is accepted when no new one appeared, and it is
+        # marked already_open so it is never taken for a window Viola opened.
+        if not handle:
+            continue
+        existing = handle in before_handles
+        if existing and not allow_existing:
+            continue
+        if first_new is None and not existing:
             first_new = item
         title = _normalize_app_name(str(item.get("title") or ""))
         executable = _normalize_app_name(str(item.get("executable") or ""))
         if normalized_app and (normalized_app in title or normalized_app in executable):
-            return item
+            return {**item, "already_open": True} if existing else item
     return first_new
 
 
@@ -229,7 +244,7 @@ def _poll_for_window(app_name: str, before_handles: set[int]) -> dict[str, objec
         if match is not None:
             return match
         time.sleep(WINDOW_POLL_INTERVAL_SECONDS)
-    return None
+    return _candidate_window(app_name, before_handles, allow_existing=True)
 
 
 def _launch_start_app(app: StartApp) -> None:
@@ -468,6 +483,7 @@ def _window_payload(app_name: str, match: dict[str, object] | None, **extra: obj
         "app_name": app_name,
         "window_title": title,
         "hwnd": hwnd,
+        **({"already_open": True} if match and match.get("already_open") else {}),
         **extra,
     }
 

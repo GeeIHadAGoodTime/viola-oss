@@ -94,7 +94,14 @@ async def dispatch_telnyx_end_call_hangup(
     try:
         voicemail_detected = bool(getattr(call_record, "voicemail_detected", False))
         human_takeover_detected = bool(getattr(call_record, "human_takeover_detected", False))
-        if voicemail_detected and not human_takeover_detected:
+        no_message_left = bool(getattr(call_record, "voicemail_no_message_left", False)) and not bool(
+            getattr(call_record, "voicemail_message_delivered", False)
+        )
+        if voicemail_detected and not human_takeover_detected and no_message_left:
+            # Reached a recording but nothing got out: not a delivered voicemail.
+            call_record.status = CallStatus.FAILED
+            call_record.outcome = call_record.outcome or "Reached voicemail, but no message was left."
+        elif voicemail_detected and not human_takeover_detected:
             call_record.status = CallStatus.VOICEMAIL
             call_record.outcome = call_record.outcome or "Voicemail handled by Viola: %s" % reason_text
         else:

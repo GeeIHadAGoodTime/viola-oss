@@ -107,16 +107,6 @@
   50% { opacity: 0.4; }
 }
 
-@keyframes agentDrawerSlideUp {
-  from { opacity: 0; transform: translateX(-50%) translateY(12px); }
-  to { opacity: 1; transform: translateX(-50%) translateY(0); }
-}
-
-@keyframes agentThinkingFadeIn {
-  from { opacity: 0.25; }
-  to { opacity: 1; }
-}
-
 /* Now-playing motion for static album-art tiles (#1530) -- Spotify/browser
    playback has no built-in video motion the way YouTube/provider embeds do,
    so the media tile otherwise sits as a still frame the whole time audio

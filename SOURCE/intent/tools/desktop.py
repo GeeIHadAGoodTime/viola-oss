@@ -224,6 +224,286 @@ def _dispatch_payload(dispatch: object) -> dict:
 _DARWIN_NATIVE_INPUT = sys.platform == "darwin"
 
 
+# ---------------------------------------------------------------------------
+# Typing in pieces, so the user's Stop ends typing within one piece
+# ---------------------------------------------------------------------------
+#
+# One ``type`` used to hand the whole text to one blocking call (send_chars,
+# type_keys, SendInput per character, send_keys). Stop ended the turn, but the
+# call in flight kept typing for seconds. Every typing path now sends small
+# pieces and looks at the action's stop signal
+# (services.computer_use.safety.current_desktop_stop) before each one. After a
+# stop no further piece is sent, and the result says how many characters went
+# out. Piece sizes keep one piece well under 0.25 s on each path (measured on
+# Notepad: send_chars about 3 ms a character, SendInput scancode about 7 ms,
+# send_keys/type_keys with pause=0.01 about 11 ms, pyautogui.write 20 ms).
+_PIECE_CHARS_SEND_CHARS = 40
+_PIECE_CHARS_SCANCODE = 32
+_PIECE_CHARS_SEND_KEYS = 20
+_PIECE_CHARS_PYAUTOGUI = 10
+
+_STOPPED_KEY = "stopped"
+_PYWINAUTO_MODIFIER_CHARS = "+^%"
+
+# Line breaks in typed text (1.0.5 build 12 live check B1: a 1,930-character
+# text arrived in Notepad whole and in order, but with no line break at all).
+# pywinauto's send_chars sends "\n" (its Enter key) as WM_CHAR 13 and nothing
+# else. A classic edit control starts a new line on that; the RichEdit control
+# of Windows 11 Notepad (RichEditD2DPT), like RICHEDIT50W, starts a new line on
+# the Enter key's WM_KEYDOWN and ignores WM_CHAR 13. Measured on this PC: the
+# Enter key's own messages, WM_KEYDOWN VK_RETURN + WM_CHAR 13 + WM_KEYUP, give
+# exactly one line break in Windows 11 Notepad, RICHEDIT50W and a classic EDIT.
+# On every path a "\r\n" is one line break and a lone "\r" is one too (the
+# SendInput paths typed "\r" as character 13, which Notepad also ignores, and
+# a classic edit control then broke the line twice for "\r\n").
+_LINE_BREAK_UNITS = frozenset({"\r\n", "\n", "\r"})
+_WM_KEYDOWN = 0x0100
+_WM_KEYUP = 0x0101
+_WM_CHAR = 0x0102
+_VK_RETURN = 0x0D
+_ENTER_SCAN_CODE = 0x1C
+_ENTER_DOWN_LPARAM = 1 | (_ENTER_SCAN_CODE << 16)
+# Key-up lParam: previous key state and transition state bits set (bits 30
+# and 31), as a signed LPARAM.
+_ENTER_UP_LPARAM = (_ENTER_DOWN_LPARAM | (1 << 30) | (1 << 31)) - (1 << 32)
+
+
+class _PiecesFailed(Exception):
+    """A typing call raised after ``typed`` characters had already gone out."""
+
+    def __init__(self, typed: int, cause: BaseException) -> None:
+        super().__init__(str(cause))
+        self.typed = typed
+        self.cause = cause
+
+
+def _desktop_stop_requested() -> bool:
+    """True once the user has stopped the desktop action running here."""
+    try:
+        from services.computer_use import safety
+    except ImportError:  # pragma: no cover - the safety module ships with this one
+        return False
+    return safety.desktop_stop_requested()
+
+
+def _is_surrogate_pair(text: str, index: int) -> bool:
+    return "\ud800" <= text[index] <= "\udbff" and index + 1 < len(text) and "\udc00" <= text[index + 1] <= "\udfff"
+
+
+def _raw_text_units(text: str) -> list[str]:
+    """One character per unit; a surrogate pair and a "\\r\\n" stay together."""
+    units: list[str] = []
+    index = 0
+    while index < len(text):
+        step = 2 if _is_surrogate_pair(text, index) or text.startswith("\r\n", index) else 1
+        units.append(text[index : index + step])
+        index += step
+    return units
+
+
+def _key_syntax_units(text: str) -> list[str] | None:
+    """Split pywinauto key syntax into parts that must be sent together.
+
+    Mirrors ``pywinauto.keyboard.parse_keys``: modifiers (``+ ^ %``) stay with
+    the key or ``( ... )`` group they apply to, and a ``{...}`` token
+    (``{ENTER}``, ``{TAB}``, ``{{}``) is never cut. A ``{KEY down}`` /
+    ``{KEY up}`` token holds a key across what follows, so nothing after it is
+    split. None when the text is not valid key syntax (it is then sent whole,
+    exactly as before).
+    """
+    units: list[str] = []
+    index = 0
+    length = len(text)
+    while index < length:
+        end = index
+        while end < length and text[end] in _PYWINAUTO_MODIFIER_CHARS:
+            end += 1
+        if end >= length:
+            units.append(text[index:])
+            break
+        char = text[end]
+        if char == "(":
+            close = text.find(")", end + 1)
+            if close == -1:
+                return None
+            stop = close + 1
+        elif char == "{":
+            close = text.find("}", end + 2)
+            if close == -1:
+                return None
+            code = text[end + 1 : close].lower()
+            if " up" in code or " down" in code:
+                units.append(text[index:])
+                break
+            stop = close + 1
+        elif char in ")}":
+            return None
+        else:
+            # A "\r\n" is one line break, so it is never cut between pieces.
+            whole_crlf = end == index and text.startswith("\r\n", end)
+            stop = end + (2 if _is_surrogate_pair(text, end) or whole_crlf else 1)
+        units.append(text[index:stop])
+        index = stop
+    return units
+
+
+def _group_pieces(units: list[str], max_chars: int, *, line_breaks_alone: bool = False) -> list[str]:
+    pieces: list[str] = []
+    current = ""
+    for unit in units:
+        if line_breaks_alone and unit in _LINE_BREAK_UNITS:
+            if current:
+                pieces.append(current)
+                current = ""
+            pieces.append(unit)
+            continue
+        if current and len(current) + len(unit) > max_chars:
+            pieces.append(current)
+            current = ""
+        current += unit
+    if current:
+        pieces.append(current)
+    return pieces
+
+
+def _raw_pieces(text: str, max_chars: int) -> list[str]:
+    if len(text) <= max_chars:
+        return [text] if text else []
+    return _group_pieces(_raw_text_units(text), max_chars)
+
+
+def _pywinauto_parse_keys():
+    try:
+        return getattr(_pywinauto_keyboard_module(), "parse_keys", None)
+    except ImportError:
+        return None
+
+
+def _key_syntax_pieces(text: str, max_chars: int, *, line_breaks_alone: bool = False) -> list[str]:
+    """Pieces of pywinauto key syntax; text pywinauto would reject stays whole.
+
+    ``line_breaks_alone`` puts every line break in a piece of its own, so the
+    caller can send it as the Enter key.
+    """
+    if not line_breaks_alone or ("\r" not in text and "\n" not in text):
+        line_breaks_alone = False
+        if len(text) <= max_chars:
+            return [text] if text else []
+    parse_keys = _pywinauto_parse_keys()
+    if parse_keys is not None:
+        try:
+            parse_keys(text, True, True, True)
+        except Exception:  # noqa: BLE001, RUF100 - rejected text is sent whole so it fails as it always did
+            return [text]
+    units = _key_syntax_units(text)
+    if units is None:
+        return [text]
+    return _group_pieces(units, max_chars, line_breaks_alone=line_breaks_alone)
+
+
+def _one_key_per_line_break(text: str) -> str:
+    """Each line break as one Enter ("\\n"): "\\r\\n" and a lone "\\r" become "\\n"."""
+    return text.replace("\r\n", "\n").replace("\r", "\n")
+
+
+def _send_in_pieces(pieces: list[str], send) -> tuple[int, bool]:
+    """Send each piece unless the user has stopped. Returns (characters sent, stopped).
+
+    A first piece that raises raises as before. A later one becomes
+    ``_PiecesFailed`` carrying how much went out before it, so a fallback
+    continues from there instead of typing it twice.
+    """
+    typed = 0
+    for piece in pieces:
+        if _desktop_stop_requested():
+            return typed, True
+        try:
+            send(piece)
+        except Exception as exc:
+            if typed == 0:
+                raise
+            raise _PiecesFailed(typed, exc) from exc
+        typed += len(piece)
+    return typed, False
+
+
+def _typed_before_failure(exc: BaseException) -> tuple[int, BaseException]:
+    """(characters already typed, the original error) for an error from ``_send_in_pieces``."""
+    if isinstance(exc, _PiecesFailed):
+        return exc.typed, exc.cause
+    return 0, exc
+
+
+def _merge_dispatch(total: object, dispatch: object) -> object:
+    if total is None:
+        return dispatch
+    merge = getattr(total, "merge", None)
+    if callable(merge) and getattr(dispatch, "requested", None) is not None:
+        return merge(dispatch)
+    return dispatch
+
+
+def _stopped_payload(payload: dict, *, typed: int, requested: int, reason: str) -> dict:
+    """A type the user stopped: what really went out, and not a clean success."""
+    payload["typed"] = typed
+    payload["chars_requested"] = requested
+    payload[_STOPPED_KEY] = True
+    payload["error"] = _stopped_message(typed, requested)
+    logger.info(
+        "desktop_type_text stopped by the user path=%s typed=%d of %d",
+        payload.get("method", ""),
+        typed,
+        requested,
+    )
+    return _mark_unverified(payload, reason)
+
+
+def _stopped_message(typed: int, requested: int) -> str:
+    return "Stopped by the user: %d of %d characters were typed before Stop." % (typed, requested)
+
+
+def _after_typed_prefix(result: dict, prefix: int, total: int) -> dict:
+    """A fallback typed the rest after ``prefix`` characters had gone out another way."""
+    if "typed" in result:
+        result["typed"] = int(result["typed"]) + prefix
+    else:
+        result["typed"] = prefix
+    if result.get(_STOPPED_KEY):
+        result["chars_requested"] = total
+        result["error"] = _stopped_message(int(result["typed"]), total)
+    elif "error" not in result:
+        result["typed"] = total
+    return result
+
+
+def _send_enter_messages(wrapper) -> None:
+    """One line break into the window, as the Enter key's own messages (see _LINE_BREAK_UNITS)."""
+    wrapper.send_message(_WM_KEYDOWN, _VK_RETURN, _ENTER_DOWN_LPARAM)
+    wrapper.send_message(_WM_CHAR, 13, _ENTER_DOWN_LPARAM)
+    wrapper.send_message(_WM_KEYUP, _VK_RETURN, _ENTER_UP_LPARAM)
+
+
+def send_chars_in_pieces(wrapper, text: str, **kwargs) -> tuple[int, bool]:
+    """``wrapper.send_chars`` in pieces that honour the user's Stop: (characters sent, stopped).
+
+    A line break goes as the Enter key's messages, not through send_chars,
+    whose WM_CHAR 13 alone Windows 11 Notepad ignores. The count is of the
+    characters asked for ("\\r\\n" counts 2 and is one line break).
+    """
+    newlines = bool(kwargs.get("with_newlines", True))
+
+    def send(piece: str) -> None:
+        if newlines and piece in _LINE_BREAK_UNITS:
+            _send_enter_messages(wrapper)
+        else:
+            wrapper.send_chars(piece, **kwargs)
+
+    return _send_in_pieces(
+        _key_syntax_pieces(str(text), _PIECE_CHARS_SEND_CHARS, line_breaks_alone=newlines),
+        send,
+    )
+
+
 def _check_pywinauto() -> str | None:
     """Return an error string if pywinauto is unavailable, else None."""
     if not _PYWINAUTO_AVAILABLE:
@@ -401,11 +681,28 @@ def _type_text_with_pywinauto_foreground(text: str) -> dict:
     # WM_KEYDOWN — fails silently against raw-input handlers (the bug behind
     # trace 0226750ea085 where every chat keystroke registered at the OS but
     # never reached Minecraft).
+    text = str(text)
+    typed = 0
     try:
         from intent.tools import desktop_input_low
 
-        dispatch = desktop_input_low.type_text(str(text))
-        logger.info("desktop_type_text path=sendinput_scancode chars=%d", len(text))
+        # The whole text is checked before the first piece: this path still
+        # types all of it once or none of it.
+        desktop_input_low.require_typeable(_one_key_per_line_break(text))
+        dispatch: object = None
+        stopped = False
+        for piece in _raw_pieces(text, _PIECE_CHARS_SCANCODE):
+            if _desktop_stop_requested():
+                stopped = True
+                break
+            dispatch = _merge_dispatch(dispatch, desktop_input_low.type_text(_one_key_per_line_break(piece)))
+            typed += len(piece)
+        logger.info("desktop_type_text path=sendinput_scancode chars=%d", typed)
+        if stopped:
+            payload = _dispatch_payload(dispatch) if dispatch is not None else {}
+            payload.pop("error", None)
+            payload["method"] = "sendinput_scancode"
+            return _stopped_payload(payload, typed=typed, requested=len(text), reason=_REASON_ACCEPTED_NOT_ARRIVAL)
         payload = _dispatch_payload(dispatch)
         if "error" in payload:
             # Windows refused the keystrokes -- the ordinary outcome when the
@@ -430,14 +727,29 @@ def _type_text_with_pywinauto_foreground(text: str) -> dict:
             exc,
         )
 
-    _pywinauto_keyboard_module().send_keys(
-        str(text),
-        with_spaces=True,
-        with_tabs=True,
-        with_newlines=True,
-        pause=0.01,
-    )
-    logger.info("desktop_type_text path=pywinauto_send_keys chars=%d", len(text))
+    keyboard = _pywinauto_keyboard_module()
+    try:
+        more, stopped = _send_in_pieces(
+            _key_syntax_pieces(text[typed:], _PIECE_CHARS_SEND_KEYS),
+            lambda piece: keyboard.send_keys(
+                _one_key_per_line_break(piece),
+                with_spaces=True,
+                with_tabs=True,
+                with_newlines=True,
+                pause=0.01,
+            ),
+        )
+    except Exception as exc:
+        more, cause = _typed_before_failure(exc)
+        if typed + more == 0:
+            raise
+        raise _PiecesFailed(typed + more, cause) from cause
+    typed += more
+    logger.info("desktop_type_text path=pywinauto_send_keys chars=%d", typed)
+    if stopped:
+        return _stopped_payload(
+            {"method": "pywinauto_send_keys"}, typed=typed, requested=len(text), reason=_REASON_SEND_KEYS
+        )
     # send_keys raises RuntimeError when its own SendInput call is short, so
     # reaching here means nothing was refused at the boundary. It still
     # proves nothing about arrival, and its virtual-key actions run through
@@ -450,24 +762,37 @@ def _type_text_with_pywinauto_foreground(text: str) -> dict:
 
 def _type_text_without_stealing_focus(text: str, window_title: str = "") -> dict:
     wrapper, hwnd, target_source = _resolve_no_focus_type_target(window_title)
+    text = str(text)
     try:
-        wrapper.send_chars(str(text), with_spaces=True, with_tabs=True, with_newlines=True)
+        typed, stopped = send_chars_in_pieces(wrapper, text, with_spaces=True, with_tabs=True, with_newlines=True)
         method = "pywinauto_send_chars"
     except Exception as exc:
+        typed, cause = _typed_before_failure(exc)
         logger.info(
             "desktop_type_text send_chars failed; path=pywinauto_type_keys_no_foreground hwnd=%s source=%s error=%s",
             hwnd,
             target_source,
-            exc,
+            cause,
         )
-        wrapper.type_keys(
-            str(text),
-            with_spaces=True,
-            with_tabs=True,
-            with_newlines=True,
-            set_foreground=False,
-            pause=0.01,
-        )
+        # Continue from the piece that failed; the pieces before it are typed.
+        try:
+            more, stopped = _send_in_pieces(
+                _key_syntax_pieces(text[typed:], _PIECE_CHARS_SEND_KEYS),
+                lambda piece: wrapper.type_keys(
+                    _one_key_per_line_break(piece),
+                    with_spaces=True,
+                    with_tabs=True,
+                    with_newlines=True,
+                    set_foreground=False,
+                    pause=0.01,
+                ),
+            )
+        except Exception as again:
+            more, again_cause = _typed_before_failure(again)
+            if typed + more == 0:
+                raise
+            raise _PiecesFailed(typed + more, again_cause) from again_cause
+        typed += more
         method = "pywinauto_type_keys_no_foreground"
 
     logger.info(
@@ -475,22 +800,22 @@ def _type_text_without_stealing_focus(text: str, window_title: str = "") -> dict
         method,
         hwnd,
         target_source,
-        len(text),
+        typed,
     )
+    payload = {
+        "typed": typed,
+        "method": method,
+        "respect_focus": True,
+        "target_hwnd": hwnd,
+        "target_source": target_source,
+    }
+    if stopped:
+        return _stopped_payload(payload, typed=typed, requested=len(text), reason=_REASON_SEND_CHARS)
     # Neither pywinauto path reports an outcome: send_chars throws away the
     # SendMessage reply, and type_keys(set_foreground=False) returns nothing.
     # "typed" is therefore the length of what we ASKED for, and saying so is
     # the difference between a count and a claim.
-    return _mark_unverified(
-        {
-            "typed": len(text),
-            "method": method,
-            "respect_focus": True,
-            "target_hwnd": hwnd,
-            "target_source": target_source,
-        },
-        _REASON_SEND_CHARS,
-    )
+    return _mark_unverified(payload, _REASON_SEND_CHARS)
 
 
 def desktop_click_element_unavailable_reason() -> str | None:
@@ -1062,17 +1387,28 @@ def _type_text_sync(text: str, respect_focus: bool = True, window_title: str = "
         # return and no channel back from the target app, so posted is all we
         # know.
         result = computer_input.type_text(text)
+        quartz_reason = (
+            "the events were posted via CGEventPost, which has no error return and no channel back "
+            "from the target application"
+        )
+        if result.get(_STOPPED_KEY):
+            return _stopped_payload(
+                {"method": "quartz_unicode"},
+                typed=int(result.get("chars_typed", 0)),
+                requested=len(text),
+                reason=quartz_reason,
+            )
         return _mark_unverified(
             {"typed": int(result.get("chars_typed", len(text))), "method": "quartz_unicode"},
-            "the events were posted via CGEventPost, which has no error return and no channel back "
-            "from the target application",
+            quartz_reason,
         )
 
     if _PYWINAUTO_AVAILABLE:
         if respect_focus:
             try:
                 return _type_text_without_stealing_focus(text, window_title)
-            except Exception as exc:
+            except Exception as failure:
+                typed_before, exc = _typed_before_failure(failure)
                 if window_title:
                     # A specific target window was requested (commonly because
                     # the caller wants text NOT to land in whatever else is
@@ -1085,33 +1421,54 @@ def _type_text_sync(text: str, respect_focus: bool = True, window_title: str = "
                         window_title,
                         exc,
                     )
-                    return {
+                    failed = {
                         "error": "Could not type into window '%s': %s" % (window_title, exc),
                     }
+                    if typed_before:
+                        failed["typed"] = typed_before
+                    return failed
                 logger.info(
                     "desktop_type_text no-focus path unavailable; falling back to foreground input: %s",
                     exc,
                 )
+                if typed_before:
+                    # Only the part that did not go out is typed again.
+                    return _after_typed_prefix(
+                        _type_text_with_pywinauto_foreground(text[typed_before:]), typed_before, len(text)
+                    )
         return _type_text_with_pywinauto_foreground(text)
 
     import pyautogui
 
     # Attempt ASCII-only fast path
+    write_reason = (
+        "pyautogui.write returns nothing, so the keystrokes were submitted with no report of "
+        "whether the OS accepted them or the application received them"
+    )
+    typed = 0
     try:
-        pyautogui.write(text, interval=0.02)
-        return _mark_unverified(
-            {"typed": len(text), "method": "write"},
-            "pyautogui.write returns nothing, so the keystrokes were submitted with no report of "
-            "whether the OS accepted them or the application received them",
+        typed, stopped = _send_in_pieces(
+            _raw_pieces(text, _PIECE_CHARS_PYAUTOGUI),
+            lambda piece: pyautogui.write(_one_key_per_line_break(piece), interval=0.02),
         )
-    except (ValueError, UnicodeEncodeError) as exc:
+        if stopped:
+            return _stopped_payload({"method": "write"}, typed=typed, requested=len(text), reason=write_reason)
+        return _mark_unverified({"typed": len(text), "method": "write"}, write_reason)
+    except (ValueError, UnicodeEncodeError, _PiecesFailed) as failure:
+        typed, exc = _typed_before_failure(failure)
+        if not isinstance(exc, (ValueError, UnicodeEncodeError)):
+            raise exc from None
         logger.debug("ASCII write failed, falling back to clipboard paste: %s", exc)
 
     # Unicode fallback: clipboard paste
     try:
         import pyperclip
 
-        pyperclip.copy(text)
+        if _desktop_stop_requested():
+            return _stopped_payload(
+                {"method": "clipboard_paste"}, typed=typed, requested=len(text), reason=_REASON_CLIPBOARD
+            )
+        pyperclip.copy(text[typed:])
         pyautogui.hotkey("ctrl", "v")
         return _mark_unverified(
             {"typed": len(text), "method": "clipboard_paste"},
@@ -1354,12 +1711,25 @@ async def desktop_type_text(text: str, *, respect_focus: bool = True, window_tit
         logger.warning("Blocked attempt to type SSN pattern")
         return ToolResult(ok=False, error="Refused: text contains a Social Security Number pattern")
 
+    # The computer server gives each action a stop signal; a direct caller gets
+    # one here, so a user Stop reaches this typing either way.
+    stop_token = None
+    try:
+        from services.computer_use import safety
+
+        if safety.current_desktop_stop() is None:
+            stop_token = safety.set_current_desktop_stop(safety.new_desktop_stop_signal())
+    except Exception:  # noqa: BLE001, RUF100 - typing still works without a stop signal
+        logger.debug("desktop_type_text: no stop signal available", exc_info=True)
     try:
         result = await asyncio.to_thread(_type_text_sync, text, respect_focus, window_title)
         return _result_from_payload(result)
     except Exception as exc:
         logger.exception("Failed to type text")
         return ToolResult(ok=False, error="Failed to type text: %s" % exc)
+    finally:
+        if stop_token is not None:
+            safety.reset_current_desktop_stop(stop_token)
 
 
 async def desktop_hotkey(keys: str) -> ToolResult:

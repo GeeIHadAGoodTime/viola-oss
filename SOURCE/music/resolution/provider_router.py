@@ -7,11 +7,12 @@ import logging
 import uuid
 from collections.abc import Callable, Mapping
 from contextlib import suppress
-from typing import Literal, Protocol, cast
+from typing import Any, Literal, Protocol, cast
 
 from pydantic import ValidationError
 
 from models.player import QueueItem
+from models.track_title import TITLE_PENDING_KEY, looks_like_track_id
 from music.exceptions import ResolutionError
 from music.providers.checker import is_youtube_url
 from music.providers.errors import (
@@ -139,11 +140,15 @@ class ProviderRouter:
             if spotify_target:
                 item = self._resolve_via_spotify_cdp(spotify_target)
                 meta_title = metadata.get("title")
-                if isinstance(meta_title, str) and meta_title.strip():
+                if isinstance(meta_title, str) and meta_title.strip() and not looks_like_track_id(meta_title):
                     item.title = meta_title.strip()
+                    item.capabilities.pop(TITLE_PENDING_KEY, None)
                 meta_artist = metadata.get("artist")
-                if isinstance(meta_artist, str) and meta_artist.strip():
+                if isinstance(meta_artist, str) and meta_artist.strip() and not looks_like_track_id(meta_artist):
                     item.artist = meta_artist.strip()
+                meta_art = metadata.get("artwork_url")
+                if isinstance(meta_art, str) and meta_art.startswith("https://"):
+                    item.artwork_url = meta_art
                 return item
             try:
                 metadata_resolution = self._metadata_to_resolution(query, source, metadata)
@@ -658,20 +663,31 @@ class ProviderRouter:
         if track_id_for_uri:
             spotify_uri = "spotify:track:%s" % track_id_for_uri
             placeholder_url = "https://open.spotify.com/track/%s" % track_id_for_uri
+            # A track played before keeps its real title, artist and cover, so
+            # the stage never shows the raw URI while the page loads.
+            from music.track_display_cache import lookup as _known_track_display
+
+            known = _known_track_display(track_id_for_uri)
+            # With no name known the title stays EMPTY and the item is marked
+            # pending: an identifier is never a title.
+            capabilities: dict[str, Any] = {
+                "requires_embedded_player": False,
+                "uri": spotify_uri,
+                "resolver_path": "provider.spotify_cdp.direct_uri",
+                "resolver_extras": {"playback_mode": "spotify_cdp"},
+            }
+            if not known.get("title"):
+                capabilities[TITLE_PENDING_KEY] = True
             item = QueueItem(
                 id=str(uuid.uuid4()),
-                title=query,  # caller may have richer metadata; runtime can update on poll
+                title=known.get("title") or "",  # the page or oEmbed fills it in
                 url=placeholder_url,
                 source="spotify_cdp",
-                artist="",
+                artist=known.get("artist", ""),
+                artwork_url=known.get("artwork_url"),
                 provider="spotify",
                 playback_mode="spotify_cdp",
-                capabilities={
-                    "requires_embedded_player": False,
-                    "uri": spotify_uri,
-                    "resolver_path": "provider.spotify_cdp.direct_uri",
-                    "resolver_extras": {"playback_mode": "spotify_cdp"},
-                },
+                capabilities=capabilities,
             )
             self._logger.info(
                 "Spotify CDP direct-URI resolution: track_id=%s",

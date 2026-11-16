@@ -40,7 +40,13 @@ def _normalize_user_email(value: Any) -> str:
     if not raw:
         raise ValueError("Email address is required")
     try:
-        display_name, local_part, domain, quoted_local_part = split_email(raw)
+        parts = split_email(raw)
+        if len(parts) == 4:
+            # email-validator <= 2.3.0: (display_name, local_part, domain, quoted)
+            display_name, local_part, domain, quoted_local_part = parts
+        else:
+            # email-validator >= 2.4.0: (display_name, original_local, unescaped_local, quoted, domain)
+            display_name, local_part, quoted_local_part, domain = parts[0], parts[2], parts[3], parts[4]
         if display_name is not None:
             raise EmailSyntaxError("Display names are not allowed in user email addresses.")
         local_result = validate_email_local_part(

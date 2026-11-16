@@ -28,6 +28,8 @@ from intent.tools.deferred_tool_schemas import (
 
 from .approval_bridge import (
     ApprovalBridge,
+    DISCARD_WINDOW_ARG,
+    computer_use_call_identity,
     computer_use_call_scope,
     computer_use_self_target_refusal,
     recompute_auto_approve,
@@ -58,6 +60,18 @@ def _confirmation_required_result(deferred: Any) -> dict[str, Any]:
         "blocked_tool": tool_name,
         "retryable": True,
     }
+
+
+def _discard_hold_details(result: Any) -> dict[str, Any] | None:
+    """The details of a desktop action held because it would throw away unsaved work."""
+    if not isinstance(result, dict):
+        return None
+    data = result.get("data")
+    if not isinstance(data, dict) or data.get("error_category") != "COMPUTER_USE_DISCARD_APPROVAL_REQUIRED":
+        return None
+    if not int(data.get("window_handle") or 0):
+        return None
+    return data
 
 
 def _launch_gated_tool_names() -> set[str]:
@@ -510,6 +524,13 @@ def _legacy_computer_alias(tool_name: str, args: dict[str, Any]) -> tuple[str, d
         return "computer", {"action": action}
 
     return None
+
+
+def _deferred_refusal_text() -> str | None:
+    """What to tell the model when the user's reply refused a pending confirmation, else None."""
+    from intent.approval import take_deferred_confirmation_refusal
+
+    return take_deferred_confirmation_refusal()
 
 
 class MCPClientHub:
@@ -1878,7 +1899,138 @@ class MCPClientHub:
         if isinstance(access_token, str) and access_token.strip():
             user_context_meta["cloud_access_token"] = access_token.strip()
 
+    def _attach_inprocess_scheduled_run(self, call_meta: dict[str, Any], server_name: str | None) -> None:
+        """Tell an in-process server that the calling turn is a fired scheduled command.
+
+        The memory transport pins the tool handler to the hub-build context (see
+        ``_attach_inprocess_cloud_bearer``), so the scheduler's ContextVar set for
+        the run is invisible there. The marker carries only the schedule id.
+        """
+
+        if not server_name:
+            return
+        config = self._configs.get(server_name) or self._deferred_server_configs.get(server_name)
+        if getattr(config, "transport", "") != "inprocess":
+            return
+        try:
+            from services.scheduler.service import SCHEDULED_RUN_META_KEY, scheduled_run_call_meta
+
+            marker = scheduled_run_call_meta()
+        except ImportError:
+            return
+        if marker is not None:
+            call_meta[SCHEDULED_RUN_META_KEY] = marker
+
     async def call_tool(
+        self,
+        name: str,
+        args: dict[str, Any] | None = None,
+        channel: Any | None = None,
+        allowed_tools: set[str] | None = None,
+        user_context: UserContext | None = None,
+        approval_already_granted: bool = False,
+        *,
+        tool_use_id: str | None = None,
+        on_progress: Any = None,
+        abort_signal: Any = None,
+    ) -> dict[str, Any]:
+        """Execute a tool call with approval checking (see ``_call_tool_once``).
+
+        A desktop action the computer tool holds because it would throw away
+        unsaved work comes back here as ``COMPUTER_USE_DISCARD_APPROVAL_REQUIRED``.
+        The user is asked through the normal approval card, and only a yes
+        for that window runs the action, once.
+        """
+        if args is None:
+            args = {}
+        original_args = dict(args)
+        result = await self._call_tool_once(
+            name,
+            args,
+            channel=channel,
+            allowed_tools=allowed_tools,
+            user_context=user_context,
+            approval_already_granted=approval_already_granted,
+            tool_use_id=tool_use_id,
+            on_progress=on_progress,
+            abort_signal=abort_signal,
+        )
+        if _discard_hold_details(result) is None:
+            return result
+
+        async def _attempt() -> dict[str, Any]:
+            return await self._call_tool_once(
+                name,
+                dict(original_args),
+                channel=channel,
+                allowed_tools=allowed_tools,
+                user_context=user_context,
+                approval_already_granted=approval_already_granted,
+                tool_use_id=tool_use_id,
+                on_progress=on_progress,
+                abort_signal=abort_signal,
+            )
+
+        return await self._resolve_discard_hold(
+            result,
+            original_args,
+            user_context=user_context,
+            channel=channel,
+            call_again=_attempt,
+        )
+
+    async def _resolve_discard_hold(
+        self,
+        result: dict[str, Any],
+        tool_args: dict[str, Any],
+        *,
+        user_context: Any,
+        channel: Any | None,
+        call_again: Any,
+    ) -> dict[str, Any]:
+        """Ask the user about one held discard; run the action again only on their yes."""
+        from intent.approval import ConfirmationDeferred
+        from services.computer_use import safety
+
+        details = _discard_hold_details(result) or {}
+        window_handle = int(details.get("window_handle") or 0)
+        try:
+            with computer_use_call_scope(user_context):
+                approved = await self._bridge.check_discard_approval(details, tool_args, channel=channel)
+        except ConfirmationDeferred as deferred:
+            self.last_approval_path = "confirmation_required"
+            question = _confirmation_required_result(deferred)
+            envelope = question.get("data")
+            if isinstance(envelope, dict) and isinstance(envelope.get("tool_args"), dict):
+                # Internal binding to the window; the model repeats the call it made.
+                envelope["tool_args"].pop(DISCARD_WINDOW_ARG, None)
+            return question
+        if not approved:
+            self.last_approval_path = "approval_denied"
+            title = str(details.get("window_title") or "the window")
+            refusal = _deferred_refusal_text()
+            return {
+                "success": False,
+                "data": None,
+                "display": "",
+                "error": "%s Nothing was thrown away: %s is still open with its unsaved changes."
+                % (refusal or "The user said no.", title),
+                "error_category": "APPROVAL_BLOCKED",
+                "blocked_tool": "computer",
+                "retryable": False,
+            }
+        self.last_approval_path = "user_confirmed"
+        user_id, session_id = computer_use_call_identity(user_context)
+        safety.grant_discard_once(window_handle, user_id=user_id, session_id=session_id)
+        retried = await call_again()
+        if _discard_hold_details(retried) is not None:
+            # The screen changed between the question and the retry (another
+            # window now holds the prompt). Never loop: the user is asked again
+            # on the next call.
+            logger.warning("Discard approval did not match the window on retry; nothing was discarded")
+        return retried
+
+    async def _call_tool_once(
         self,
         name: str,
         args: dict[str, Any] | None = None,
@@ -1983,7 +2135,7 @@ class MCPClientHub:
                     "success": False,
                     "data": None,
                     "display": "",
-                    "error": "Tool '%s' was not approved by the user." % name,
+                    "error": _deferred_refusal_text() or "Tool '%s' was not approved by the user." % name,
                     "error_category": "APPROVAL_BLOCKED",
                     "blocked_tool": name,
                     "retryable": False,
@@ -2105,7 +2257,7 @@ class MCPClientHub:
                 "success": False,
                 "data": None,
                 "display": "",
-                "error": "Tool '%s' was not approved by the user." % name,
+                "error": _deferred_refusal_text() or "Tool '%s' was not approved by the user." % name,
                 "error_category": "APPROVAL_BLOCKED",
                 "blocked_tool": name,
                 "retryable": False,
@@ -2146,6 +2298,9 @@ class MCPClientHub:
         # could not already reach. It is never attached for stdio/SSE servers,
         # so a third-party MCP server can never observe a user's GoTrue bearer.
         self._attach_inprocess_cloud_bearer(call_meta, server_name)
+        # Same reason for the scheduled-run marker: a tool must know whether the
+        # turn calling it is a fired scheduled command (services.scheduler.service).
+        self._attach_inprocess_scheduled_run(call_meta, server_name)
         # Claude parity (S6-007): forward ``claudecode/toolUseId`` on _meta so
         # MCP servers can correlate progress/audit log entries to the host
         # turn (``services/mcp/client.ts:1840-1843``).

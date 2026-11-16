@@ -33,7 +33,8 @@ log = get_logger(__name__)
 # ``ui/qt_native/window_core.py`` both POST here with no channel, which the
 # route defaults to "http") and the web chat. Saved ChatMode threads have
 # their own completion route, which invokes this same policy with "chat_mode".
-_LOCALLY_SPOKEN_CHANNELS = frozenset({"http", "web", "chat_mode"})
+# The set itself is ``core.reply_speech_settings.LOCALLY_SPOKEN_CHANNELS``, shared
+# with the line that says a background task has finished.
 
 # Upper bound on one spoken reply, so a wedged synthesizer leaks one task and
 # not one per command. Well above any real reply; this is a backstop, not a
@@ -154,39 +155,22 @@ def _should_speak_reply(channel_value: Any, user_id: str) -> bool:
     speaks every response aloud, not just responses to voice commands"
     (``docs/user/SETTINGS.md``).
 
-    Every default below is passed from ``config.defaults`` rather than written
-    as a literal, and that is load-bearing rather than tidiness. All three keys
-    are user-scoped (``ui/settings_schema.py``), and for a user-scoped read with
-    a real signed-in principal ``SettingsManager.get`` resolves through
-    ``get_user_setting`` -> ``_read_setting_from_blob``, which returns THE
-    CALLER'S default when the user's blob has no row for the key -- it never
-    consults ``DEFAULT_SETTINGS``. So a literal here silently outranks the
-    shipped default for exactly the users whose blob is real: a hard-coded
-    ``False`` left every signed-in install mute while a signed-out one spoke,
-    and only the signed-out case (a device pseudo-identity, which does fall back
-    to the global blob) would show up in a cold-install test.
+    The three settings are read by ``core.reply_speech_settings`` (shared with
+    the line that says a background task has finished); its docstring explains
+    why every default there comes from ``config.defaults`` and never a literal.
 
     ``voice_muted`` is checked here because this is the first code that decides
     whether to speak from user settings, and a path that speaks straight
     through the user's own mute would be a new bug rather than a fixed one.
     """
-    if channel_key(channel_value) not in _LOCALLY_SPOKEN_CHANNELS:
+    from core.reply_speech_settings import is_locally_spoken_channel, read_reply_speech_settings
+
+    if not is_locally_spoken_channel(channel_key(channel_value)):
         return False
     if not is_desktop_surface():
         return False
-    from config.defaults import (
-        SPEAK_ALL_REPLIES_DEFAULT,
-        TTS_ENABLED_DEFAULT,
-        VOICE_MUTED_DEFAULT,
-    )
-    from ui.settings_manager import get_settings_manager
 
-    settings_mgr = get_settings_manager()
-    if not bool(settings_mgr.get("speak_all_replies", SPEAK_ALL_REPLIES_DEFAULT, user_id=user_id)):
-        return False
-    if bool(settings_mgr.get("voice_muted", VOICE_MUTED_DEFAULT, user_id=user_id)):
-        return False
-    return bool(settings_mgr.get("tts_enabled", TTS_ENABLED_DEFAULT, user_id=user_id))
+    return read_reply_speech_settings(user_id).typed_allowed
 
 
 def _new_streamed_reply(
@@ -195,11 +179,12 @@ def _new_streamed_reply(
     channel_value: Any,
     user_id: str,
     stream_id: str | None,
+    show_on_stage: bool = True,
 ) -> Any | None:
     """A reply that may start speaking while the model still writes it, or None.
 
     Only when this reply would be spoken at all (``_should_speak_reply``) and
-    the engine can speak a stream. Push-to-talk and touch turns post here.
+    the engine can speak a stream. Push-to-talk, touch and Chat tab turns use it.
     """
     try:
         if not _should_speak_reply(channel_value, user_id):
@@ -228,7 +213,13 @@ def _new_streamed_reply(
 
             return _reply_speech_tasks.create_task(_run())
 
-        return new_streamed_reply(engine, user_id=user_id, stream_id=stream_id, start_speaking=_start)
+        return new_streamed_reply(
+            engine,
+            user_id=user_id,
+            stream_id=stream_id,
+            start_speaking=_start,
+            show_on_stage=show_on_stage,
+        )
     # Deciding whether to speak must never change what the caller gets back.
     except Exception as exc:  # noqa: BLE001, RUF100
         log.debug("Streamed spoken reply skipped: %s", exc)
@@ -237,7 +228,9 @@ def _new_streamed_reply(
 
 def _silent_stage_reply(channel_value: Any, stream_id: str | None, user_id: str) -> Any:
     """Live stage text for a reply on a local text surface that is not being spoken."""
-    if channel_key(channel_value) not in _LOCALLY_SPOKEN_CHANNELS or not is_desktop_surface():
+    from core.reply_speech_settings import is_locally_spoken_channel
+
+    if not is_locally_spoken_channel(channel_key(channel_value)) or not is_desktop_surface():
         return contextlib.nullcontext()
     from voice.stage_reply import stage_reply
 
@@ -291,7 +284,7 @@ def _speak_reply_now(
     else:
         # Long answers say their lead and point at the card; a turn of quick
         # music actions that all worked gets the done tone, not words.
-        spoken_text = whole_reply_speech(message, engine, streamed_reply)
+        spoken_text = whole_reply_speech(message, engine, streamed_reply, result=data)
         if spoken_text is None:
             play_done_tone()
             return
@@ -310,6 +303,21 @@ def _speak_reply_now(
 
             def speak(_text: str) -> Any:
                 return full.speak()
+
+            timeout = max(_SPEAK_REPLY_TIMEOUT_SECONDS, len(message) / 8.0)
+        elif streamed_reply is not None and streamed_reply.gate.read_in_full:
+            # An engine that cannot stream caps one speak() at 800 characters or
+            # 10 sentences (voice/synthesis/text_normalizer.py): "read it out
+            # loud" on this PC's pyttsx3 fallback said 832 of 3,012 characters
+            # (build-12 live check). Say it in parts that each fit.
+            parts = _whole_reading_parts(message)
+            whole_speak = speak
+
+            async def speak(_text: str) -> None:
+                for part in parts:
+                    spoken = whole_speak(part)
+                    if asyncio.iscoroutine(spoken):
+                        await spoken
 
             timeout = max(_SPEAK_REPLY_TIMEOUT_SECONDS, len(message) / 8.0)
 
@@ -338,6 +346,28 @@ def _speak_reply_now(
     _reply_speech_tasks.create_task(_run())
 
 
+_READING_PART_CHARS = 600
+_READING_PART_SENTENCES = 8
+
+
+def _whole_reading_parts(text: str) -> list[str]:
+    """Split a full reading into parts that each stay under a whole-reply speak() cap."""
+    from services.llm.answer_stream import all_sentences
+
+    parts: list[str] = []
+    current: list[str] = []
+    size = 0
+    for sentence in all_sentences(text) or [text]:
+        if current and (size + len(sentence) + 1 > _READING_PART_CHARS or len(current) >= _READING_PART_SENTENCES):
+            parts.append(" ".join(current))
+            current, size = [], 0
+        current.append(sentence)
+        size += len(sentence) + 1
+    if current:
+        parts.append(" ".join(current))
+    return parts
+
+
 def _speak_reply(
     context: ApiContext,
     envelope: Any,
@@ -364,6 +394,213 @@ def _speak_reply(
     # Deciding whether to speak must never change what the caller gets back.
     except Exception as exc:  # noqa: BLE001, RUF100
         log.debug("Spoken reply skipped: %s", exc)
+
+
+# The fields of a command result that ask the app to do something on screen
+# (open a panel, a settings tab, a room). Copied into the stage's
+# ``chat_response`` broadcast and into the Chat tab's final stream event.
+_UI_ACTION_KEYS = (
+    "ui_action",
+    "rooms_modal_tab",
+    "path_identifier",
+    "panel_id",
+    "tab",
+    "sub_tab",
+    "section",
+    "initial_section",
+    "prefill",
+    "room_name",
+    "target_room",
+)
+
+
+def ui_action_fields(data: Any) -> dict[str, Any]:
+    """The on-screen actions a command result asked for (ai_data included), or {}."""
+    if not isinstance(data, dict):
+        return {}
+    fields: dict[str, Any] = {}
+    ai_data = data.get("ai_data")
+    if isinstance(ai_data, dict):
+        fields["ai_data"] = ai_data
+    for key in _UI_ACTION_KEYS:
+        if key in data:
+            fields[key] = data[key]
+    return fields
+
+
+def _ask_user_questions(stream_id: str | None) -> list[str]:
+    """Questions ask_user put to the user this turn that are still waiting for an answer.
+
+    A typed turn cannot wait for a reply mid-request, so ask_user returns the
+    question for the model to put in its answer. When the answer does not
+    include it, the user never sees what was asked (1.0.5 build 11, bug 20).
+    """
+    if not stream_id:
+        return []
+    try:
+        from services.llm.stream_bus import get_stream_tool_events
+    except Exception:  # noqa: BLE001, RUF100 - no stream registry means no questions to show
+        return []
+    questions: list[str] = []
+    for event in get_stream_tool_events(stream_id):
+        if str(event.get("tool_name") or event.get("name") or "") != "ask_user":
+            continue
+        if str(event.get("status") or "") != "ok":
+            continue
+        output = event.get("tool_output")
+        if isinstance(output, str) and output and "needs_user_reply" not in output:
+            continue  # answered in the same request (a channel that can wait)
+        tool_input = event.get("tool_input")
+        question = tool_input.get("question") if isinstance(tool_input, dict) else None
+        if isinstance(question, str) and question.strip() and question.strip() not in questions:
+            questions.append(question.strip())
+    return questions
+
+
+def _folded(text: str) -> str:
+    return " ".join(str(text or "").lower().split())
+
+
+def show_pending_questions(envelope: Any, stream_id: str | None) -> None:
+    """Put a waiting ask_user question into the reply when the reply leaves it out (in place)."""
+    data = envelope.get("data") if isinstance(envelope, dict) else None
+    if not isinstance(data, dict):
+        return
+    message = data.get("message")
+    if not isinstance(message, str):
+        message = ""
+    missing = [q for q in _ask_user_questions(stream_id) if _folded(q) not in _folded(message)]
+    if not missing:
+        return
+    data["message"] = "\n\n".join(part for part in (message.strip(), *missing) if part)
+
+
+class TypedTurn:
+    """What every typed command shares around ``CommandService.execute``.
+
+    Used by ``POST /v1/command`` (stage, push-to-talk) and by the Chat tab
+    (``chat_mode.py``), so both behave the same: the reply may speak while it
+    is written, the speech gate sees the turn's tool events (a turn of quick
+    music actions gets the done tone instead of words, ``read_aloud`` reads the
+    whole answer, a long answer says its lead), and the on-screen actions a
+    tool asked for travel with the result.
+    """
+
+    def __init__(
+        self,
+        context: ApiContext,
+        *,
+        channel_value: Any,
+        user_id: str,
+        stream_id: str | None,
+        show_on_stage: bool = True,
+    ) -> None:
+        self._context = context
+        self.channel_value = channel_value
+        self.user_id = user_id
+        self.stream_id = stream_id
+        self._show_on_stage = show_on_stage
+        # Speak the reply while the model writes it (when it is spoken at all).
+        self.streamed_reply = _new_streamed_reply(
+            context,
+            channel_value=channel_value,
+            user_id=user_id,
+            stream_id=stream_id,
+            show_on_stage=show_on_stage,
+        )
+
+    @contextlib.contextmanager
+    def running(self) -> Any:
+        """Wrap ``execute``: the speech gate and live stage text listen to the turn's stream."""
+        if self.streamed_reply is not None:
+            reply_context = self.streamed_reply.attached()
+        elif self._show_on_stage:
+            # A reply that is not spoken still shows on the stage as it is written.
+            reply_context = _silent_stage_reply(self.channel_value, self.stream_id, self.user_id)
+        else:
+            reply_context = contextlib.nullcontext()
+        try:
+            with reply_context:
+                yield self
+        except BaseException:
+            self.cancel()
+            raise
+
+    def cancel(self) -> None:
+        """No speech for this turn (failed, rate limited or stopped); safe to call twice."""
+        reply, self.streamed_reply = self.streamed_reply, None
+        if reply is not None:
+            reply.cancel()
+
+    def stop_speaking(self) -> str:
+        """The user pressed Stop: this turn says nothing more and its speech is cut now.
+
+        Only this turn's own speech: when its reply has not started speaking,
+        nothing is called on the engine (another reply or a reminder playing
+        goes on). Safe to call twice. Returns what was done, for the Stop log line.
+        """
+        reply, self.streamed_reply = self.streamed_reply, None
+        if reply is None:
+            return "no speech"
+        silence = getattr(reply, "silence", None)
+        if not callable(silence):
+            reply.cancel()
+            return "queue closed"
+        return "cut" if silence() else "not speaking yet; queue dropped"
+
+    def finish_envelope(self, envelope: Any) -> dict[str, Any]:
+        """Complete the reply text in place; return the on-screen actions it asked for."""
+        show_pending_questions(envelope, self.stream_id)
+        data = envelope.get("data") if isinstance(envelope, dict) else None
+        return ui_action_fields(data)
+
+    def speak(self, envelope: Any) -> None:
+        """Speak the finished reply (or play the done tone) under the user's settings."""
+        _speak_reply(
+            self._context,
+            envelope,
+            channel_value=self.channel_value,
+            user_id=self.user_id,
+            streamed_reply=self.streamed_reply or _tools_only_reply(self.stream_id),
+        )
+
+
+class _ToolsOnlyReply:
+    """The speech gate's view of a turn whose reply is not streamed live.
+
+    With no live reply (an engine that cannot stream, or a hook that may replace
+    the answer) the gate never saw the turn's tools, so the done tone and
+    read_aloud were lost: "set the volume to 30" spoke words on this PC's
+    pyttsx3 fallback (build-12 live check). The stream bus records every tool
+    event of the turn, so the gate is fed from that record at the end.
+    """
+
+    started = False
+
+    def __init__(self, gate: Any) -> None:
+        self.gate = gate
+
+    def finish(self, final_message: str | None, *, already_spoken: bool = False) -> str:
+        return ""
+
+
+def _tools_only_reply(stream_id: str | None) -> _ToolsOnlyReply | None:
+    if not stream_id:
+        return None
+    try:
+        from services.llm.answer_stream import FinalAnswerSpeechGate
+        from services.llm.stream_bus import get_stream_tool_events
+
+        events = get_stream_tool_events(stream_id)
+        if not events:
+            return None
+        gate = FinalAnswerSpeechGate(live=False, reason="not_streamed")
+        for event in events:
+            gate.feed({"tool": event})
+        return _ToolsOnlyReply(gate)
+    except Exception:  # noqa: BLE001, RUF100 - without the record the reply is spoken as before
+        log.debug("Tool record for the speech gate unavailable", exc_info=True)
+        return None
 
 
 def _get_command_service(context: ApiContext) -> Any:
@@ -625,26 +862,14 @@ def register_command_routes(context: ApiContext) -> None:
                 stream_context = command_stream_context(stream_id)
             else:
                 stream_context = contextlib.nullcontext()
-            # Speak the reply while the model writes it (when it is spoken at all).
-            streamed_reply = _new_streamed_reply(
+            turn = TypedTurn(
                 context,
                 channel_value=channel_value,
                 user_id=user_id,
                 stream_id=stream_id,
             )
-            # A reply that is not spoken still shows on the stage as it is written.
-            reply_context = (
-                streamed_reply.attached()
-                if streamed_reply is not None
-                else _silent_stage_reply(channel_value, stream_id, user_id)
-            )
-            try:
-                with stream_context, reply_context:
-                    result = await command_service.execute(command_request)
-            except BaseException:
-                if streamed_reply is not None:
-                    streamed_reply.cancel()
-                raise
+            with stream_context, turn.running():
+                result = await command_service.execute(command_request)
 
             if "rate_limited" in result.policy_flags:
                 if idempotency_claim is not None and idempotency_claim.is_owner:
@@ -659,11 +884,11 @@ def register_command_routes(context: ApiContext) -> None:
                         error=True,
                         message=str(result.data.get("message") or "Rate limit exceeded."),
                     )
-                if streamed_reply is not None:
-                    streamed_reply.cancel()
+                turn.cancel()
                 return build_429_response(result)
 
             envelope = result.to_envelope()
+            ui_fields = turn.finish_envelope(envelope)
 
             try:
                 hub = getattr(app.state, "event_hub", None)
@@ -697,24 +922,7 @@ def register_command_routes(context: ApiContext) -> None:
                         pairing_flow = data.get("pairing_flow") if isinstance(data, dict) else None
                         if pairing_flow:
                             payload["pairing_flow"] = pairing_flow
-                        ai_data = data.get("ai_data") if isinstance(data, dict) else None
-                        if isinstance(ai_data, dict):
-                            payload["ai_data"] = ai_data
-                        for key in (
-                            "ui_action",
-                            "rooms_modal_tab",
-                            "path_identifier",
-                            "panel_id",
-                            "tab",
-                            "sub_tab",
-                            "section",
-                            "initial_section",
-                            "prefill",
-                            "room_name",
-                            "target_room",
-                        ):
-                            if isinstance(data, dict) and key in data:
-                                payload[key] = data[key]
+                        payload.update(ui_fields)
                         await hub.broadcast(
                             "chat_response",
                             payload,
@@ -732,13 +940,7 @@ def register_command_routes(context: ApiContext) -> None:
                 from services.llm.stream_bus import finalize_stream
 
                 finalize_stream(stream_id, content=_command_stream_message(envelope))
-            _speak_reply(
-                context,
-                envelope,
-                channel_value=channel_value,
-                user_id=user_id,
-                streamed_reply=streamed_reply,
-            )
+            turn.speak(envelope)
             return envelope
         except Exception as exc:
             log.exception("Command execution failed")

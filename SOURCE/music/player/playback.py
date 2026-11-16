@@ -838,6 +838,19 @@ class MusicPlayerPlaybackController:
 
         self.player._emit()
 
+    def _engine_manager_drives_backend(self, manager: Any) -> bool:
+        """The engine manager's active backend is the player's own backend."""
+        active_backend = getattr(manager, "active_backend", None)
+        if not callable(active_backend):
+            return False
+        backend = getattr(self.player, "_backend", None)
+        return backend is not None and active_backend() is backend
+
+    def volume_change_is_slow(self) -> bool:
+        """The current backend says one volume change is a slow action (a page click)."""
+        backend = getattr(self.player, "_backend", None)
+        return getattr(backend, "volume_change_is_slow", False) is True
+
     def set_playback_volume(self, level: int) -> int:
         """Set playback volume with comprehensive backend management."""
         import threading
@@ -850,12 +863,18 @@ class MusicPlayerPlaybackController:
         level = max(0, min(100, level))
 
         with self.player._lock:
-            # Set volume on engine manager if active
+            # Set volume on engine manager if active, unless what it would set is
+            # the player's own backend: a provider engine (Spotify, YouTube, the
+            # browser provider) plays through one EngineBackedBackend that is both
+            # ``player._backend`` and the manager's active backend, so calling
+            # both set it twice. On Spotify each set is a page action, and every
+            # duck step cost two of them (1.0.5 build-11 laptop log).
             if hasattr(self.player, "_engine_manager") and self.player._engine_manager is not None:
                 try:
-                    active_provider = self.player._engine_manager.active_provider()
-                    if active_provider:
-                        self.player._engine_manager.set_volume(level)
+                    manager = self.player._engine_manager
+                    active_provider = manager.active_provider()
+                    if active_provider and not self._engine_manager_drives_backend(manager):
+                        manager.set_volume(level)
                 except Exception as exc:
                     logger.warning("Engine manager set_volume failed: %r", exc)
 

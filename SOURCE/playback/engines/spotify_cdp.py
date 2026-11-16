@@ -17,6 +17,8 @@ from typing import Any
 
 from core.logging_config import get_logger
 from models.player import QueueItem
+from models.track_title import TITLE_PENDING_KEY, looks_like_track_id
+from music.track_display_cache import remember as remember_track_display, track_id_from_item
 
 from .base import (
     PlaybackCapabilities,
@@ -83,6 +85,10 @@ class SpotifyCDPEngine(ProviderPlaybackEngine):
     Controls playback through keyboard shortcuts and reads state
     from the Spotify DOM via JS evaluation.
     """
+
+    # Each volume change sets the page's slider (``SpotifyCDPController.set_volume``):
+    # 0.25 s per change on the build-11 laptop, 1.6 s for the first.
+    volume_change_is_slow = True
 
     def __init__(
         self,
@@ -434,10 +440,29 @@ class SpotifyCDPEngine(ProviderPlaybackEngine):
         item = handle.item
         if item is None:
             return
+        if isinstance(current_track, str) and looks_like_track_id(current_track):
+            # Never show an id as the title: keep the last known good one.
+            self._logger.warning(
+                "SPOTIFY_TITLE_IS_ID source=poller_page_read value=%s item_title=%s",
+                current_track[:60],
+                (item.title or "")[:60],
+            )
+            current_track = None
         if isinstance(current_track, str) and current_track and item.title != current_track:
             item.title = current_track
+            item.capabilities.pop(TITLE_PENDING_KEY, None)
         if isinstance(artist, str) and artist and item.artist != artist:
             item.artist = artist
+        try:
+            artwork = handle.artwork_url()
+        except Exception:
+            artwork = None
+        remember_track_display(
+            track_id_from_item(item),
+            title=item.title,
+            artist=item.artist,
+            artwork_url=artwork or item.artwork_url,
+        )
 
     def _adopt_direct_uri_metadata(self, item: QueueItem, played_meta: Any) -> None:
         """Populate human title/artist on a direct-URI play, at play start.
@@ -455,16 +480,70 @@ class SpotifyCDPEngine(ProviderPlaybackEngine):
             return
         title = str(played_meta.get("title") or "").strip()
         artist = str(played_meta.get("artist") or "").strip()
+        if title and looks_like_track_id(title):
+            self._logger.warning(
+                "SPOTIFY_TITLE_IS_ID source=direct_uri_metadata value=%s item_title=%s",
+                title[:60],
+                (item.title or "")[:60],
+            )
+            title = ""
         if title:
             item.title = title
+            item.capabilities.pop(TITLE_PENDING_KEY, None)
         if artist:
             item.artist = artist
+        remember_track_display(track_id_from_item(item), title=title, artist=artist)
         if title or artist:
             self._logger.info(
                 "Spotify CDP direct-URI metadata adopted: title=%s artist=%s",
                 title or "?",
                 artist or "?",
             )
+
+    def _start_oembed_adoption(self, item: QueueItem) -> None:
+        """Fetch the name and cover from Spotify's public oEmbed while the page loads.
+
+        Runs only when the title is still pending or there is no cover. Sends
+        only the track id; any failure is silent and the pending state stays
+        until the page answers.
+        """
+        track_id = track_id_from_item(item)
+        if not track_id:
+            return
+        if not item.capabilities.get(TITLE_PENDING_KEY) and item.artwork_url:
+            return
+        threading.Thread(
+            target=self._adopt_oembed,
+            args=(item, track_id),
+            name="spotify-oembed",
+            daemon=True,
+        ).start()
+
+    def _adopt_oembed(self, item: QueueItem, track_id: str) -> None:
+        try:
+            from music.spotify.oembed import fetch_track_oembed
+
+            found = fetch_track_oembed(track_id, timeout=3.0)
+            if not found:
+                return
+            changed = False
+            title = found.get("title")
+            page_answered = bool(item.title) and not looks_like_track_id(item.title)
+            if title and not page_answered:
+                item.title = title
+                item.capabilities.pop(TITLE_PENDING_KEY, None)
+                changed = True
+            artwork = found.get("artwork_url")
+            if artwork and not item.artwork_url:
+                item.artwork_url = artwork
+                item.capabilities.setdefault("thumbnail_url", artwork)
+                changed = True
+            if changed:
+                remember_track_display(track_id, title=item.title, artwork_url=item.artwork_url)
+                self._logger.info("Spotify oEmbed adopted: title=%s cover=%s", bool(title), bool(artwork))
+                self._broadcast_state()
+        except Exception:
+            self._logger.debug("Spotify oEmbed adoption failed", exc_info=True)
 
     def _request_proctap_track_rescan(self, track: str) -> None:
         """Point ProcTap at the KNOWN Chrome PID after a track change, then rescan.
@@ -731,6 +810,7 @@ class SpotifyCDPEngine(ProviderPlaybackEngine):
         # writing state, and stopping the older handle no longer touches the
         # transport (it used to press pause on the song that had just started).
         self._current_handle = handle
+        self._start_oembed_adoption(item)
 
         # Reset per-play poller state. The engine instance is shared across
         # plays, so a stale _last_track/_position/_duration from the previous
