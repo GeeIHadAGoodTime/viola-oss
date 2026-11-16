@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "e4311912718939fb7ffd0db1834fd8f27f3ae3f3",
-  "sha256": "bdd47e571f5114310437656a2acac6cbcd2c87b30d4b632545351ae4eab5b00b",
+  "revision": "4b7796038fd0f306adf57213edf5833bd4cde67f",
+  "sha256": "88421ba302fd0ac6b18a85e07a43616a57af74124f9543bb771ef1a91ad778e5",
   "files": [
     {
       "path": ".env.example",
@@ -5235,13 +5235,13 @@
     },
     {
       "path": "services/scheduler/service.py",
-      "sha256": "d1c35ce98c0ff6c9e00edb5856f40d3a8afd12f61edeb9ec17ee2f6d79b782b8",
-      "bytes": 64079
+      "sha256": "1610ed51c2f52f337b74a7f39369929a7c7a00ba8b0b415f96342ef7f7e041ea",
+      "bytes": 72796
     },
     {
       "path": "services/scheduler/store.py",
-      "sha256": "c481f455ba0f732a0dccc9a0f3614c58aba59024f6aa9df935e3c4e3be893321",
-      "bytes": 55288
+      "sha256": "14fe45b90abff6c00c22829b796b5fd6d37e7619e1a15e575caf506405cf5a86",
+      "bytes": 55656
     },
     {
       "path": "services/sentry_init.py",
@@ -9500,8 +9500,8 @@
     },
     {
       "path": "ui/api/routes/agents.py",
-      "sha256": "149f46fbf9a13bf951cd4bbfb8d1d76401b694c208726347b64a68076521ca93",
-      "bytes": 12004
+      "sha256": "a9481e263a03bf4f1b1551bf30bdb1d756dd5b68f2652e9cab6c49134ba6e3b3",
+      "bytes": 12156
     },
     {
       "path": "ui/api/routes/audio_stream.py",
@@ -11075,8 +11075,8 @@
     },
     {
       "path": "ui/react-app/src/components/TaskLine.jsx",
-      "sha256": "0cf751f01ae8031e7a57fb5fb8978adc18ffb98cb1d92b1cbbd7a34d85d26dc6",
-      "bytes": 9572
+      "sha256": "92869bb9ae814f27abf3cdadff003a7316a1a81161edfe36aa25fd02749aa3a6",
+      "bytes": 9681
     },
     {
       "path": "ui/react-app/src/components/TaskLine.module.css",
@@ -11085,8 +11085,8 @@
     },
     {
       "path": "ui/react-app/src/components/TaskLine.test.jsx",
-      "sha256": "b2e2d96d4c8eb27f3828e2da5a1b34caa2ed33a5aff3df57394c710b077dc6c5",
-      "bytes": 10791
+      "sha256": "ab85da3d8854fda79d697e082704b491004de247b01f1eba8f45da9feae6643e",
+      "bytes": 13185
     },
     {
       "path": "ui/react-app/src/components/TimerCountdown.jsx",
@@ -12625,13 +12625,13 @@
     },
     {
       "path": "ui/react-app/src/utils/agentTasks.js",
-      "sha256": "2df7989fd564e80eeac53acfe590b9532e9c687e004cf1397ba141aedda644cf",
-      "bytes": 1599
+      "sha256": "05fc38bbfb88265cef64c86d45d1cf2242e267e60d6ae3e9468b1ffc4922ac23",
+      "bytes": 1932
     },
     {
       "path": "ui/react-app/src/utils/agentTasks.test.js",
-      "sha256": "fb3bb4360dffe35658bd369e4eb23218eae83dab5b6ca90ef367e6700ca6c1d5",
-      "bytes": 1393
+      "sha256": "c497091b79e280128b2df0850aff3fca935c09157c0bd34e7f5b2c7d17865e4b",
+      "bytes": 2021
     },
     {
       "path": "ui/react-app/src/utils/artProxy.js",
