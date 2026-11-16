@@ -231,6 +231,8 @@ def _serialize_task(task: Any, *, now: datetime) -> dict[str, Any]:
         "id": agent_id,
         "agent_id": agent_id,
         "task": to_json_value(_field(task, "task")),
+        # The short name a task was given (a schedule's label, a background agent's name), if any.
+        "name": to_json_value(_field(task, "name")),
         "reason": to_json_value(_field(task, "reason")),
         "subagent_type": to_json_value(_field(task, "subagent_type")),
         "status": to_json_value(_field(task, "status")),

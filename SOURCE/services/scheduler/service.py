@@ -17,10 +17,12 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import contextvars
+import dataclasses
 import inspect
 import re
 import threading
 import time
+import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -215,6 +217,52 @@ def _scheduled_action_tool_guard(schedule_id: int | None = None):
     finally:
         _SCHEDULED_RUN_ID.reset(run_token)
         _SCHEDULED_ACTION_DENIED_TOOLS.reset(token)
+
+
+# How long a stopped run may take to unwind before the scheduler records the stop anyway.
+_STOP_GRACE_S = 10.0
+
+
+class _UserStop(Exception):
+    """Raised inside a scheduled run the user stopped, before anything is said or shown."""
+
+
+@dataclasses.dataclass
+class _RunHandle:
+    """One fired schedule's registry record, as ``_with_registered_agent`` yields it.
+
+    ``stop_event`` is the record's cancel event: ``AgentRegistry.cancel`` (the
+    task line's Stop, ``POST /v1/agents/{id}/cancel``) sets it. ``stopped`` is set
+    when the run ended because of it.
+    """
+
+    agent_id: str | None = None
+    stop_event: asyncio.Event | None = None
+    stopped: bool = False
+
+
+@dataclasses.dataclass
+class _RunState:
+    """What a stop needs to reach inside one running scheduled action.
+
+    ``stream_id`` is the command stream the model run is tagged with, so the
+    stop reaches exactly this run's executors (``cancel_stream_executors``, the
+    Chat tab's Stop); ``speech`` holds this run's own speak calls.
+    """
+
+    stream_id: str
+    stop_event: asyncio.Event
+    speech: list[asyncio.Future[Any]] = dataclasses.field(default_factory=list)
+
+
+_CURRENT_RUN: contextvars.ContextVar[_RunState | None] = contextvars.ContextVar("scheduler_current_run", default=None)
+
+
+def _raise_if_stopped() -> None:
+    """Called right before a scheduled run says or shows anything: a stopped run does neither."""
+    run = _CURRENT_RUN.get()
+    if run is not None and run.stop_event.is_set():
+        raise _UserStop
 
 
 def compute_next_run(cron_expr: str, after: datetime | None = None, timezone_name: str = "UTC") -> str:
@@ -947,8 +995,8 @@ class SchedulerService:
         """
         try:
             async with self._semaphore:
-                async with self._with_registered_agent(schedule):
-                    await self._execute_schedule(schedule)
+                async with self._with_registered_agent(schedule) as handle:
+                    handle.stopped = await self._execute_schedule(schedule, stop_event=handle.stop_event)
         finally:
             # F-015: clear in-flight marker so the next tick can fire
             # the schedule's next due time (cron) or skip it (one-shot).
@@ -958,11 +1006,14 @@ class SchedulerService:
     async def _with_registered_agent(self, schedule: Schedule):
         """F-049: register the scheduled run as a background agent record.
 
-        Yields the registered ``agent_id`` (or ``None`` if registration
-        failed). The record is marked completed/errored on exit so the
-        registry's TaskOutput / cancel surfaces see the lifecycle.
+        Yields a ``_RunHandle``: the registered ``agent_id`` (``None`` if
+        registration failed) and the record's cancel event, which the run obeys
+        (the task line's Stop). The record is marked completed/errored on exit
+        so the registry's TaskOutput / cancel surfaces see the lifecycle; a run
+        the user stopped ends as killed, never completed or failed.
         """
         agent_id: str | None = None
+        stop_event: asyncio.Event | None = None
         registry = None
         try:
             from services.agent_runtime.registry import agent_registry as _registry
@@ -976,13 +1027,16 @@ class SchedulerService:
                 from services.agent_runtime.registry import AgentRegistryError
                 from services.scheduler.actions import describe_tool_action
 
-                agent_id, _cancel_event, _background_signal = await registry.register_foreground(
+                agent_id, stop_event, _background_signal = await registry.register_foreground(
                     user_id=schedule.user_id,
                     # The card shows this: a readable title, never the encoded action.
                     task=describe_tool_action(schedule.action, schedule.label),
                     reason="scheduler:%d" % schedule.id,
                     subagent_type="scheduler",
-                    name=schedule.label or None,
+                    # The task line shows this short name when there is one. A
+                    # reminder, alarm or timer is already named by its title
+                    # ("Reminder: Stretch"); its label is a generic word.
+                    name=(schedule.label or None) if decode_tool_action(schedule.action) is None else None,
                 )
             except (AgentRegistryError, ValueError, RuntimeError):
                 logger.debug(
@@ -992,11 +1046,13 @@ class SchedulerService:
                     exc_info=True,
                 )
                 agent_id = None
+                stop_event = None
 
+        handle = _RunHandle(agent_id=agent_id, stop_event=stop_event if agent_id is not None else None)
         success = False
         error_msg: str | None = None
         try:
-            yield agent_id
+            yield handle
         except Exception as exc:
             error_msg = str(exc) or exc.__class__.__name__
             raise
@@ -1007,7 +1063,12 @@ class SchedulerService:
                 from services.agent_runtime.registry import AgentRegistryError
 
                 try:
-                    if success:
+                    if handle.stopped:
+                        # The user's Stop already marked it killed; it stays killed.
+                        await registry.mark_failed_explicit(
+                            schedule.user_id, agent_id, "stopped by the user", killed=True
+                        )
+                    elif success:
                         await registry.mark_complete_explicit(schedule.user_id, agent_id, "schedule completed")
                     else:
                         await registry.mark_failed_explicit(
@@ -1104,10 +1165,13 @@ class SchedulerService:
 
     # ------------------------------------------------------------------ execution
 
-    async def _execute_schedule(self, schedule: Schedule) -> None:
+    async def _execute_schedule(self, schedule: Schedule, *, stop_event: asyncio.Event | None = None) -> bool:
         """Execute a single schedule by spawning a sub-agent.
 
         Updates the schedule with execution results regardless of outcome.
+        ``stop_event`` is the run's registry cancel event (the task line's Stop).
+        Returns True when the user stopped the run: nothing more was said or
+        shown, and it is recorded as fired, not failed.
         """
         start = time.monotonic()
         logger.info(
@@ -1138,13 +1202,25 @@ class SchedulerService:
                     next_run_at=None,
                     error="Schedule could not run: the recurrence pattern is invalid.",
                 )
-                return
+                return False
 
         try:
-            await asyncio.wait_for(
-                self._run_subagent(schedule),
+            stopped = await asyncio.wait_for(
+                self._run_until_stopped(schedule, stop_event),
                 timeout=_SUBAGENT_TIMEOUT,
             )
+            if stopped:
+                # A stop by the user is not a failure: no error, no backoff, no
+                # failure count, no retry. A one-shot has fired; a recurring
+                # schedule keeps its next occurrence.
+                logger.info("Schedule %d stopped by the user", schedule.id)
+                await self._store.record_execution_async(
+                    schedule.user_id,
+                    schedule.id,
+                    status="stopped",
+                    next_run_at=next_run_at,
+                )
+                return True
             elapsed = time.monotonic() - start
             logger.info(
                 "Schedule %d completed successfully in %.1fs",
@@ -1187,6 +1263,103 @@ class SchedulerService:
                 # Store generic user-facing message; technical details are in logs
                 error=str(exc) if str(exc).startswith("Scheduled action") else "Scheduled action failed unexpectedly",
             )
+        return False
+
+    async def _run_until_stopped(self, schedule: Schedule, stop_event: asyncio.Event | None) -> bool:
+        """Run the schedule's action; end it promptly when the user stops it. True when stopped.
+
+        The action runs as its own task, raced against the registry cancel event.
+        Without an event (registration failed) it runs exactly as before. The
+        scheduler's own limit cancels this coroutine, and with it the action, as
+        it always did.
+        """
+        if stop_event is None:
+            await self._run_subagent(schedule)
+            return False
+        if stop_event.is_set():
+            return True
+        run = _RunState(stream_id="schedule-%d-%s" % (schedule.id, uuid.uuid4().hex[:12]), stop_event=stop_event)
+
+        async def _action() -> None:
+            token = _CURRENT_RUN.set(run)
+            try:
+                await self._run_subagent(schedule)
+            finally:
+                _CURRENT_RUN.reset(token)
+
+        action = asyncio.create_task(_action(), name="scheduler-run-%d" % schedule.id)
+        stop_wait = asyncio.create_task(stop_event.wait(), name="scheduler-stop-%d" % schedule.id)
+        try:
+            try:
+                done, _pending = await asyncio.wait({action, stop_wait}, return_when=asyncio.FIRST_COMPLETED)
+            except asyncio.CancelledError:
+                # The scheduler's limit (or shutdown): the action is cancelled as before.
+                action.cancel()
+                await asyncio.gather(action, return_exceptions=True)
+                raise
+            finally:
+                stop_wait.cancel()
+            if action in done:
+                try:
+                    action.result()
+                except _UserStop:
+                    # Stopped in the moment before it would have spoken or shown its result.
+                    await self._stop_run(schedule, action, run)
+                    return True
+                return False
+            await self._stop_run(schedule, action, run)
+            return True
+        finally:
+            self._forget_run_stream(run)
+
+    async def _stop_run(self, schedule: Schedule, action: asyncio.Task[None], run: _RunState) -> None:
+        """The user stopped this scheduled run: end its model run, its speech and its ringing alarm.
+
+        Same as the Chat tab's Stop: ``AgentExecutor.cancel()`` for every executor
+        of this run (found by its command stream, so no other turn is touched),
+        then the task is cancelled. Only this run's own speak calls are cut: one
+        still waiting for the voice is dropped without touching what is playing.
+        """
+        executors = 0
+        try:
+            from intent.agent_executor import cancel_stream_executors
+
+            executors = cancel_stream_executors(run.stream_id, user_id=schedule.user_id)
+        except Exception:  # noqa: BLE001, RUF100 - the task cancel below still ends the run
+            logger.debug("Schedule %s stop: executor lookup failed", schedule.id, exc_info=True)
+        action.cancel()
+        speech = [task for task in run.speech if not task.done()]
+        for task in speech:
+            task.cancel()
+        _done, unfinished = await asyncio.wait({action, *speech}, timeout=_STOP_GRACE_S)
+        alarms = 0
+        decoded = decode_tool_action(schedule.action)
+        is_alarm = (decoded or {}).get("tool") == "alarm" or str(schedule.action or "").strip().lower() == (
+            "play alarm sound"
+        )
+        if is_alarm:
+            # A ringing alarm is stopped through its own stop.
+            from services.alarm_ringer import stop_ringing_alarm
+
+            alarms = stop_ringing_alarm(schedule.user_id, str(schedule.id), reason="stopped")
+        logger.debug(
+            "Schedule %s stop: %d executor(s) cancelled, %d speech call(s) cut, %d alarm(s) stopped, %d still unwinding",
+            schedule.id,
+            executors,
+            len(speech),
+            alarms,
+            len(unfinished),
+        )
+
+    @staticmethod
+    def _forget_run_stream(run: _RunState) -> None:
+        """The run's command stream was never registered; drop anything recorded under its id."""
+        try:
+            from services.llm.stream_bus import remove_stream
+
+            remove_stream(run.stream_id)
+        except Exception:  # noqa: BLE001, RUF100 - nothing was registered; this is tidying only
+            logger.debug("Scheduled run stream cleanup failed", exc_info=True)
 
     async def _run_subagent(self, schedule: Schedule) -> None:
         """Dispatch the schedule's action through the intent pipeline.
@@ -1248,7 +1421,7 @@ class SchedulerService:
                 schedule.id,
                 result.get("message", "ok"),
             )
-        except ServiceError:
+        except (ServiceError, _UserStop):
             raise
         except Exception as exc:
             logger.exception(
@@ -1283,12 +1456,14 @@ class SchedulerService:
         spoken = False
         speak = getattr(getattr(self._intent_pipeline, "tts", None), "speak", None)
         if callable(speak):
+            _raise_if_stopped()
             try:
                 spoken = await _say_when_voice_free(speak, reply, schedule_id=schedule.id, deadline=deadline)
             except (RuntimeError, OSError, TypeError, ValueError) as exc:
                 logger.warning("Scheduled reply TTS failed for schedule=%s: %s", schedule.id, exc)
         from intent.tools.notification_tools import deliver_notification_handler
 
+        _raise_if_stopped()
         delivered = await deliver_notification_handler(
             message=reply,
             user_id=schedule.user_id,
@@ -1318,8 +1493,16 @@ class SchedulerService:
 
             process = getattr(self._intent_pipeline, "process", None)
             if callable(process):
-                with _scheduled_action_tool_guard(schedule.id):
+                from services.llm.stream_bus import command_stream_context
+
+                run = _CURRENT_RUN.get()
+                # The run's own command stream, so a Stop reaches exactly this
+                # run's executors (cancel_stream_executors, as the Chat tab's Stop).
+                tagged = command_stream_context(run.stream_id) if run is not None else contextlib.nullcontext()
+                with _scheduled_action_tool_guard(schedule.id), tagged:
                     result = _schedule_result_fields(await process(schedule.action, user_key=schedule.user_id))
+                # A run the user stopped while it was finishing says and shows nothing.
+                _raise_if_stopped()
                 if result.get("ok"):
                     await self._deliver_schedule_reply(schedule, result, deadline=deadline)
                 return result
@@ -1343,6 +1526,7 @@ class SchedulerService:
             from intent.tools.alarm_tools import play_alarm_sound_handler
 
             tts = getattr(self._intent_pipeline, "tts", None)
+            _raise_if_stopped()
             result = await play_alarm_sound_handler(
                 label=str(args.get("label") or schedule.label or "Alarm"),
                 tts=tts,
@@ -1361,6 +1545,7 @@ class SchedulerService:
             tts = getattr(self._intent_pipeline, "tts", None)
             speak = getattr(tts, "speak", None)
             if callable(speak):
+                _raise_if_stopped()
                 try:
                     # Said with the card's wording ("Reminder: Stretch"), not the bare word.
                     words = reminder_wording(message)
@@ -1368,6 +1553,8 @@ class SchedulerService:
                     spoken = await _say_when_voice_free(speak, words, schedule_id=schedule.id, deadline=deadline)
                 except (RuntimeError, OSError, TypeError, ValueError) as exc:
                     logger.warning("Scheduled reminder TTS failed for schedule=%s: %s", schedule.id, exc)
+
+            _raise_if_stopped()
 
             # user_requested: this row exists because the user asked to be
             # reminded at this moment (#4790), so it is delivered now rather
@@ -1468,6 +1655,10 @@ async def _say_when_voice_free(speak: Any, words: str, *, schedule_id: Any, dead
     called_at = time.time()
     budget = max(0.0, deadline - time.monotonic() - _DELIVERY_RESERVE_S)
     task = asyncio.ensure_future(speak(words))
+    run = _CURRENT_RUN.get()
+    if run is not None:
+        # This run's own speech: a Stop cuts it (and only it).
+        run.speech.append(task)
     done, _pending = await asyncio.wait({task}, timeout=min(_SPEECH_WAIT_S, budget))
     if not done and _own_speech_started(called_at):
         # The voice became free and these words are playing: let them finish.

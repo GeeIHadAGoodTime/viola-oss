@@ -64,6 +64,19 @@ _REQUIRED_PG_COLUMNS = {
 }
 
 
+def _failure_count_expr(status: str) -> str:
+    """How a run's status changes ``consecutive_failures`` (the circuit breaker's count).
+
+    An error or timeout adds one, a run that did its work resets it, and a run
+    the user stopped ("stopped") leaves it as it was: it is neither.
+    """
+    if status in ("error", "timeout"):
+        return "consecutive_failures + 1"
+    if status == "stopped":
+        return "consecutive_failures"
+    return "0"
+
+
 def _utcnow_iso() -> str:
     return datetime.now(UTC).isoformat()
 
@@ -562,7 +575,7 @@ class SqliteScheduleBackend:
         is_failure = status in ("error", "timeout")
         with self._lock, self._conn:
             if next_run_at is not None:
-                failure_expr = "consecutive_failures + 1" if is_failure else "0"
+                failure_expr = _failure_count_expr(status)
                 self._conn.execute(
                     """
                     UPDATE schedules
@@ -574,7 +587,7 @@ class SqliteScheduleBackend:
                     (now, status, error, next_run_at, now, user_id, schedule_id),
                 )
             else:
-                failure_expr = "consecutive_failures + 1" if is_failure else "0"
+                failure_expr = _failure_count_expr(status)
                 self._conn.execute(
                     """
                     UPDATE schedules
@@ -1047,7 +1060,7 @@ class PostgresScheduleBackend:
         is_failure = status in ("error", "timeout")
         async with self._user_conn(user_id, require_consent=True) as conn:
             if next_run_at is not None:
-                failure_expr = "consecutive_failures + 1" if is_failure else "0"
+                failure_expr = _failure_count_expr(status)
                 row = await conn.fetchrow(
                     """
                     UPDATE sync_schedules
@@ -1073,7 +1086,7 @@ class PostgresScheduleBackend:
                 if row is not None:
                     await _write_schedule_journal(conn, row, "upsert")
             else:
-                failure_expr = "consecutive_failures + 1" if is_failure else "0"
+                failure_expr = _failure_count_expr(status)
                 row = await conn.fetchrow(
                     """
                     UPDATE sync_schedules

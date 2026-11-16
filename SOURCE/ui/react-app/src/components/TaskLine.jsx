@@ -2,7 +2,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { THEME } from '../config';
-import { agentTaskTitle, isScheduledAgent } from '../utils/agentTasks';
+import { agentTaskName, agentTaskTitle, isScheduledAgent } from '../utils/agentTasks';
 import styles from './TaskLine.module.css';
 
 // Running tasks are one quiet line of text at the bottom left of the stage:
@@ -22,8 +22,9 @@ export const STAGE_SIDE_PADDING = 'clamp(36px, 5.5vw, 72px)';
 const TERMINAL = ['completed', 'cancelled', 'killed', 'error', 'failed'];
 const FAILED = ['error', 'failed'];
 
+// The short name when the task has one, else its title; the tooltip keeps the full task text.
 export function shortTaskName(agent) {
-  const text = String(agentTaskTitle(agent)).replace(/\s+/g, ' ').trim();
+  const text = String(agentTaskName(agent)).replace(/\s+/g, ' ').trim();
   return text.length > MAX_NAME_CHARS ? `${text.slice(0, MAX_NAME_CHARS - 1).trimEnd()}…` : text;
 }
 
