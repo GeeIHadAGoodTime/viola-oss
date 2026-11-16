@@ -48,6 +48,11 @@ _SERVICE_LOCK = threading.Lock()
 _SERVICE_SINGLETON: SchedulerService | None = None
 
 _CHECK_INTERVAL = 30  # seconds between due-schedule checks
+# A sleep that ends at a due time is made this much longer. asyncio may run a
+# timer up to one clock tick early (on Windows the tick is 15.6 ms), and a wake
+# that lands just before the due instant finds nothing due (build 12: a
+# schedule fired 30.0 s late on an idle PC).
+_DUE_WAKE_MARGIN_S = 0.05
 _MAX_CONCURRENT_SUBAGENTS = 3
 _SUBAGENT_TIMEOUT = 60.0  # seconds per sub-agent execution
 _SHUTDOWN_GRACE_PERIOD = 5.0  # seconds to wait for in-flight sub-agents
@@ -427,6 +432,11 @@ class SchedulerService:
         # cause the next poll tick to re-fire the same due row before
         # ``record_execution`` advances ``next_run_at``.
         self._inflight_ids: set[int] = set()
+        # The instant the last check's due query used, and the last query
+        # instant that already earned an immediate re-check (see
+        # ``_seconds_until_next_due``).
+        self._last_due_query_at: datetime | None = None
+        self._rechecked_after_query_at: datetime | None = None
         self._lock = asyncio.Lock()
 
         # Intent pipeline reference (set externally after bootstrap)
@@ -833,6 +843,17 @@ class SchedulerService:
         slept the full 30 s between checks. Rows that are already due but were
         held back (in flight, error backoff, model down) keep the normal
         cadence, so they never turn this into a busy loop.
+
+        1.0.5 build 12: a schedule fired exactly 30.0 s late on an idle PC. The
+        loop woke for the due time a few milliseconds early, the check's due
+        query used a ``now`` just before the due instant, and this method's
+        ``now`` was just after it, so the row looked "already due, held back"
+        and the loop slept the full interval. A row whose due time is later
+        than the last check's query instant was never seen by any check, so it
+        is checked again at once (0 s). Held-back rows were due at that query,
+        so they still keep the normal cadence. Each check's query instant can
+        earn at most one immediate re-check, and that re-check queries at a
+        later instant, so a row can cause at most one.
         """
         now = datetime.now(UTC)
         horizon = (now + timedelta(seconds=_CHECK_INTERVAL)).isoformat()
@@ -841,6 +862,8 @@ class SchedulerService:
         except Exception as exc:
             logger.debug("Scheduler next-due lookup failed: %s", exc)
             return float(_CHECK_INTERVAL)
+        last_query_at = getattr(self, "_last_due_query_at", None)
+        unseen_due = False
         soonest = float(_CHECK_INTERVAL)
         for schedule in upcoming or []:
             due = _parse_due_time(schedule.next_run_at)
@@ -849,6 +872,12 @@ class SchedulerService:
             seconds = (due - now).total_seconds()
             if seconds > 0:
                 soonest = min(soonest, seconds)
+            elif last_query_at is not None and due > last_query_at:
+                unseen_due = True
+        if unseen_due and getattr(self, "_rechecked_after_query_at", None) != last_query_at:
+            self._rechecked_after_query_at = last_query_at
+            logger.debug("Scheduler re-checking at once: a schedule became due after the last check")
+            return 0.0
         return soonest
 
     async def _wait_for_next_tick(self, timeout: float = _CHECK_INTERVAL) -> None:
@@ -860,6 +889,9 @@ class SchedulerService:
         __init__.
         """
         timeout = max(0.0, min(float(_CHECK_INTERVAL), float(timeout)))
+        if timeout < _CHECK_INTERVAL:
+            # A wake for a due time must not land before it.
+            timeout = min(float(_CHECK_INTERVAL), timeout + _DUE_WAKE_MARGIN_S)
         stop_event = self._stop_event
         if stop_event is None:
             await asyncio.sleep(timeout)
@@ -887,6 +919,7 @@ class SchedulerService:
         """
         now = datetime.now(UTC)
         now_iso = now.isoformat()
+        self._last_due_query_at = now
 
         due = await self._store.get_due_schedules_for_all_users_async(now_iso)
         if not due:
