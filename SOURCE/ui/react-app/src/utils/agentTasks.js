@@ -8,6 +8,15 @@ export function isScheduledAgent(agent) {
 }
 
 /**
+ * What the task line calls a task: its short name when it has one (a
+ * scheduled command's label, a background agent's name), otherwise its title.
+ */
+export function agentTaskName(agent) {
+  const name = typeof agent?.name === 'string' ? agent.name.replace(/\s+/g, ' ').trim() : '';
+  return name || agentTaskTitle(agent);
+}
+
+/**
  * The readable title of a task. Scheduled work is stored as an encoded tool
  * action; the backend now sends a readable title, and this keeps an older or
  * unexpected encoded value from ever reaching the screen raw (1.0.5 build 5

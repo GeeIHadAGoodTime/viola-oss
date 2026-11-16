@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { agentTaskTitle, isScheduledAgent } from './agentTasks';
+import { agentTaskName, agentTaskTitle, isScheduledAgent } from './agentTasks';
+
+describe('agentTaskName', () => {
+  it('prefers the short name and falls back to the title', () => {
+    expect(agentTaskName({ name: 'Tide times', task: 'Search the web for the tide times at Brennock Weir' })).toBe('Tide times');
+    expect(agentTaskName({ name: '  Tide   times ', task: 'x' })).toBe('Tide times');
+    expect(agentTaskName({ name: '', task: 'Book a table' })).toBe('Book a table');
+    expect(agentTaskName({ name: null, task: 'viola-tool-action:v1:{"args":{"message":"Stretch"},"tool":"notify"}' })).toBe('Reminder: Stretch');
+    expect(agentTaskName({})).toBe('Background task');
+  });
+});
 
 describe('agentTaskTitle', () => {
   const encoded = 'viola-tool-action:v1:{"args":{"channel":null,"message":"Stretch"},"tool":"notify"}';

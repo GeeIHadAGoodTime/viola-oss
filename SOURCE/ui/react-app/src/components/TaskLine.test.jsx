@@ -184,6 +184,44 @@ describe('TaskLine', () => {
     expect(name.textContent.endsWith('\u2026')).toBe(true);
   });
 
+  // Live (livecheck4): the line read "Search the web for the height of the tallest li\u2026"
+  // for a scheduled command and the agent's own long prompt for a background agent.
+  it('shows the short name of a scheduled task and keeps the full task text in the tooltip', () => {
+    const long = 'Search the web for the height of the tallest lighthouse in Velmora and say it';
+    setup([task('a', long, { name: 'Lighthouse height' })]);
+    advance(1300);
+    const name = screen.getByText('Lighthouse height');
+    expect(name).toHaveAttribute('title', long);
+    expect(screen.getByRole('button', { name: 'Stop Lighthouse height' })).toBeInTheDocument();
+    expect(screen.getByTestId(LINE).textContent).not.toContain('Search the web');
+  });
+
+  it('shows the short name of a background agent; the tooltip has the full text and the step', () => {
+    const long = 'Write an essay of exactly 300 words comparing the quorrel harp and the lute';
+    setup([bg('b', long, { name: 'Harp essay' })], { streamStates: { b: { activityText: 'writing' } } });
+    advance(1300);
+    expect(screen.getByText('Harp essay')).toHaveAttribute('title', `${long}\nwriting`);
+  });
+
+  it('falls back to the title when the name is missing or blank, and cuts a long name at 48', () => {
+    const longName = 'Look up the opening hours of every Tamberlin bakery in the old town';
+    setup([task('a', 'Brindle soup notification', { name: '   ' }), bg('b', 'Research electricians', { name: null }), task('c', 'Short task', { name: longName })]);
+    advance(1300);
+    expect(screen.getByText('Brindle soup notification')).toBeInTheDocument();
+    expect(screen.getByText('Research electricians')).toBeInTheDocument();
+    const cut = screen.getByTitle('Short task');
+    expect(cut.textContent.length).toBe(48);
+    expect(cut.textContent.endsWith('\u2026')).toBe(true);
+    expect(longName.startsWith(cut.textContent.slice(0, -1))).toBe(true);
+  });
+
+  it('names a failed task by its short name', () => {
+    const { update } = setup([task('a', 'Search the web for the depth of Lake Orrin', { name: 'Lake depth' })]);
+    advance(1300);
+    update([], { recentCompleted: [task('a', 'Search the web for the depth of Lake Orrin', { name: 'Lake depth', status: 'failed' })] });
+    expect(screen.getByText("Lake depth didn't finish")).toHaveAttribute('title', 'Search the web for the depth of Lake Orrin');
+  });
+
   it('shows a readable title for an encoded tool action', () => {
     const raw = `viola-tool-action:v1:${JSON.stringify({ tool: 'notify', args: { message: 'stretch' } })}`;
     setup([task('a', raw)]);
