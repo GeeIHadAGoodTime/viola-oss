@@ -41,6 +41,15 @@ CONSULT_USER_FALLBACK_ANSWER = (
     "without mentioning any delay, hold, or attempt to reach someone."
 )
 _VOICE_CONSULT_TIMEOUT = 20.0
+# Closing words of the pre-call briefing, shown to the user and bound for the
+# approval classifier from this one constant.
+_CALL_PLAN_CLOSING = "Shall I go ahead and dial?"
+
+
+def call_plan_question(label: str) -> str:
+    """The fixed part of the call-briefing question (the label is already in the action description)."""
+    return "I'm going to call %s. %s" % (label, _CALL_PLAN_CLOSING)
+
 _MESSAGING_CONSULT_TIMEOUT = 300.0
 
 # The live phone pipeline (pipecat's LLMService) enforces a per-function-call
@@ -874,7 +883,9 @@ async def present_call_plan_handler(params) -> None:
             from intent.approval import ApprovalManager, approval_question_asked
             from intent.tool_types import RiskLevel
 
-            with approval_question_asked(plan_text):
+            # Only the fixed part of the briefing: goal, talking points and
+            # fallback are model-written and never reach the classifier.
+            with approval_question_asked(call_plan_question(label)):
                 decision = await ApprovalManager()._classify_response(
                     user_feedback,
                     "place the planned phone call to %s" % label,

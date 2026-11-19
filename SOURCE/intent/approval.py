@@ -88,9 +88,22 @@ def confirm_or_cancel_question(action_description: str) -> str:
     return "Please confirm or cancel before I %s." % action
 
 
+# Closing words of the plan-approval question, shown to the user and bound for
+# the classifier from this one constant.
+_PLAN_APPROVAL_CLOSING = "Should I go ahead?"
+
+
+def plan_approval_question(step_count: int) -> str:
+    """The fixed part of the plan-approval question: counts and constants only."""
+    return "I'd like to do %d things. %s" % (int(step_count), _PLAN_APPROVAL_CLOSING)
+
+
 # The question Viola asked, when it is not the confirm-or-cancel question above
 # (the interactive channel's yes/no prompt, a plan or a call briefing). Bound by
 # the caller around ``_classify_response`` with ``approval_question_asked``.
+# Bind only fixed words plus what the action description already says: never
+# model-written text (plan bodies, tool arguments, talking points), which can
+# carry instructions from a page or file into the classifier's input.
 _QUESTION_ASKED: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "viola_approval_question_asked", default=None
 )
@@ -1400,7 +1413,7 @@ class ApprovalManager:
             dangerous_list = ", ".join(sorted(dangerous_tools)).replace("_", " ")
             summary += " The %s step will need separate confirmation." % dangerous_list
 
-        summary += " Should I go ahead?"
+        summary += " " + _PLAN_APPROVAL_CLOSING
 
         logger.info(
             "Requesting plan approval for %d steps (%d approvable, %d dangerous)",
@@ -1423,7 +1436,9 @@ class ApprovalManager:
         # ``request_approval``). Plan-level approval is always CONFIRM
         # risk (DANGEROUS tools were already excluded above), so both
         # ``strong_affirm`` and ``affirm`` count as approval.
-        with approval_question_asked(summary):
+        # Only the fixed part of what was asked: the plan body holds tool
+        # arguments (possibly from a page or file), never classifier input.
+        with approval_question_asked(plan_approval_question(len(plan))):
             decision = await self._classify_response(
                 response_text, "approve plan with %d steps" % len(plan), RiskLevel.CONFIRM
             )
