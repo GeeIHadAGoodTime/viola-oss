@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "09c6ded909daefd2a43915f6629dbe94ec3a1097",
-  "sha256": "061ea79804d736107633cf4bf988fd594506a6387a3c56188476312a02508fcc",
+  "revision": "fa6ec73f9452618a1ce464280b69f925f1de2580",
+  "sha256": "496005de1362320f10cb5d62b15e5dae35ad53c1f4356bea2c97a091c161eb78",
   "files": [
     {
       "path": ".env.example",
@@ -5870,8 +5870,8 @@
     },
     {
       "path": "telephony/end_call_hangup.py",
-      "sha256": "ccf38a1f2e512d875bd1af899efb0aafdce70d6446ee2dac38b2827918247afa",
-      "bytes": 9200
+      "sha256": "a3554b5190e61b2387c3c5c9448b6468009044022ab2bb4ff14f4df2e20b7caf",
+      "bytes": 12619
     },
     {
       "path": "telephony/espeak_tts_service.py",
@@ -6065,8 +6065,8 @@
     },
     {
       "path": "telephony/telnyx_transport.py",
-      "sha256": "4a44919e56bca98c7c519ac80a05fbee43c9645cb4e3c5d458a8ec6567b393c3",
-      "bytes": 39187
+      "sha256": "e4453f8c8484ccdd6aeae18641fa552128e83cb5e6653a2b8588cf6083206662",
+      "bytes": 41032
     },
     {
       "path": "telephony/test_scenarios.py",
@@ -6115,8 +6115,8 @@
     },
     {
       "path": "telephony/voicemail_answer_watch.py",
-      "sha256": "2f990276dd0d3bb8aa5b9e016cecb9034f392bc2f97853ff41ee04a956319a4a",
-      "bytes": 6299
+      "sha256": "be0b53d0b0ebf640c16539ba39f5ca9eb7c8d4332a7f0c35de82ad2b5fd8c198",
+      "bytes": 6440
     },
     {
       "path": "telephony/voicemail_detection.py",
