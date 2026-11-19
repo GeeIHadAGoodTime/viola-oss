@@ -81,7 +81,9 @@ def _load_namespace():
     }, namespace)
     _execute_nodes("telephony/end_call_hangup.py", {
         "END_CALL_MEDIA_MARK_TIMEOUT_SECONDS", "END_CALL_PLAYOUT_MARGIN_SECONDS",
-        "END_CALL_MEDIA_MARK_MAX_WAIT_SECONDS", "EndCallHangupFrame",
+        "END_CALL_MEDIA_MARK_MAX_WAIT_SECONDS", "END_CALL_SPEECH_PRODUCTION_MAX_WAIT_SECONDS",
+        "_PLAYOUT_SETTLED_SECONDS", "_SPEECH_POLL_SECONDS", "END_CALL_HANGUP_TEARDOWN_WAIT_SECONDS",
+        "EndCallHangupFrame",
         "dispatch_telnyx_end_call_hangup", "EndCallHangupAfterOutputProcessor",
     }, namespace)
     _execute_nodes("telephony/call_tools.py", {
