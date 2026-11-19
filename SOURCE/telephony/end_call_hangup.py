@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
+import time
+from collections.abc import Awaitable, Callable
 from contextlib import suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -26,6 +27,11 @@ except ImportError:  # pragma: no cover - Pipecat is optional in local test envi
 
 
 END_CALL_MEDIA_MARK_TIMEOUT_SECONDS = 2.0
+# The carrier plays in real time audio it was handed all at once (a 10 s voicemail
+# message was sent within 1.7 s on call c33057ff), and echoes the mark only when its
+# playback reaches it. So the wait covers the estimated rest of playback plus this.
+END_CALL_PLAYOUT_MARGIN_SECONDS = 1.5
+END_CALL_MEDIA_MARK_MAX_WAIT_SECONDS = 60.0
 
 
 @dataclass
@@ -122,6 +128,8 @@ class EndCallHangupAfterOutputProcessor(FrameProcessor if PIPECAT_AVAILABLE else
         call_record: Any,
         transport: Any,
         mark_timeout_seconds: float = END_CALL_MEDIA_MARK_TIMEOUT_SECONDS,
+        playout_margin_seconds: float = END_CALL_PLAYOUT_MARGIN_SECONDS,
+        max_mark_wait_seconds: float = END_CALL_MEDIA_MARK_MAX_WAIT_SECONDS,
     ) -> None:
         if PIPECAT_AVAILABLE:
             super().__init__(name="end_call_hangup_after_output")
@@ -130,6 +138,8 @@ class EndCallHangupAfterOutputProcessor(FrameProcessor if PIPECAT_AVAILABLE else
         self._call_record = call_record
         self._transport = transport
         self._mark_timeout_seconds = mark_timeout_seconds
+        self._playout_margin_seconds = playout_margin_seconds
+        self._max_mark_wait_seconds = max_mark_wait_seconds
         self._dispatched = False
         self._listen_task: asyncio.Task[None] | None = None
 
@@ -154,18 +164,85 @@ class EndCallHangupAfterOutputProcessor(FrameProcessor if PIPECAT_AVAILABLE else
             return
         self._dispatched = True
 
+        answer_watch = getattr(self._call_record, "_voicemail_answer_watch", None)
+        if frame.listen_first and answer_watch is not None:
+            # Not inline: frames keep flowing here while her message plays and the
+            # line is listened to, and an interruption cannot cancel the wait.
+            self._listen_task = asyncio.create_task(
+                self._hang_up_unless_answered(frame, answer_watch),
+                name="voicemail-answer-window-%s" % frame.call_id,
+            )
+            return
+
+        await self._wait_for_output_playout(frame)
+        await self._dispatch_hangup(frame)
+
+    def _output_playout_remaining(self) -> float:
+        playout_remaining = getattr(self._transport, "output_playout_remaining", None)
+        if not callable(playout_remaining):
+            return 0.0
+        try:
+            return max(0.0, float(playout_remaining()))
+        except (AttributeError, RuntimeError, TypeError, ValueError):
+            return 0.0
+
+    @staticmethod
+    async def _unless_answered(work: Awaitable[Any], answer_watch: Any) -> tuple[bool, Any]:
+        """Await ``work`` unless a person answers first. Returns (answered, result)."""
+        wait_answered = getattr(answer_watch, "wait_answered", None)
+        if not callable(wait_answered):
+            return False, await work
+        work_task = asyncio.ensure_future(work)
+        answered_task = asyncio.ensure_future(wait_answered())
+        try:
+            done, _pending = await asyncio.wait({work_task, answered_task}, return_when=asyncio.FIRST_COMPLETED)
+        finally:
+            for task in (work_task, answered_task):
+                if not task.done():
+                    task.cancel()
+        if work_task in done:
+            return False, work_task.result()
+        return True, None
+
+    async def _wait_for_output_playout(self, frame: EndCallHangupFrame, answer_watch: Any = None) -> None:
+        """Return once the carrier has played the audio sent before ``frame``.
+
+        The mark echo is the proof. Without it, never return before the estimated
+        end of playback. Returns early only if a person answers her message.
+        """
+        playout = self._output_playout_remaining()
+        timeout = min(
+            max(self._mark_timeout_seconds, playout + self._playout_margin_seconds),
+            max(self._mark_timeout_seconds, self._max_mark_wait_seconds),
+        )
+        if playout > self._mark_timeout_seconds:
+            logger.info(
+                "end_call: waiting up to %.1fs for the last %.1fs of audio to play on %s",
+                timeout,
+                playout,
+                frame.call_id,
+            )
+        started = time.monotonic()
         mark_name = "end_call_%s_%s" % (frame.call_id, getattr(frame, "id", "mark"))
         wait_for_output_mark = getattr(self._transport, "wait_for_output_mark", None)
+        drained = False
         if callable(wait_for_output_mark):
             try:
-                drained = await wait_for_output_mark(mark_name, timeout=self._mark_timeout_seconds)
+                answered, drained = await self._unless_answered(
+                    wait_for_output_mark(mark_name, timeout=timeout), answer_watch
+                )
+                if answered:
+                    return
                 if drained:
                     logger.info("end_call: Telnyx media mark drained for %s", frame.call_id)
-                else:
-                    logger.warning(
-                        "end_call: Telnyx media mark did not confirm drain for %s; hanging up fail-closed",
-                        frame.call_id,
-                    )
+                    return
+                logger.warning(
+                    "end_call: Telnyx media mark did not confirm drain for %s after %.1fs "
+                    "(estimated playback %.1fs); hanging up fail-closed",
+                    frame.call_id,
+                    time.monotonic() - started,
+                    playout,
+                )
             except (ConnectionError, OSError, RuntimeError, TimeoutError, TypeError, ValueError) as exc:
                 logger.warning(
                     "end_call: Telnyx media mark wait failed for %s: %s; hanging up fail-closed",
@@ -175,18 +252,13 @@ class EndCallHangupAfterOutputProcessor(FrameProcessor if PIPECAT_AVAILABLE else
         else:
             logger.warning("end_call: Telnyx transport has no output mark support; hanging up fail-closed")
 
-        answer_watch = getattr(self._call_record, "_voicemail_answer_watch", None)
-        if frame.listen_first and answer_watch is not None:
-            # Not inline: frames keep flowing here while the line is listened to.
-            self._listen_task = asyncio.create_task(
-                self._hang_up_unless_answered(frame, answer_watch),
-                name="voicemail-answer-window-%s" % frame.call_id,
-            )
-            return
-
-        await self._dispatch_hangup(frame)
+        # Whatever ended the wait early, the hang-up never cuts off audio still playing.
+        rest = self._output_playout_remaining()
+        if rest > 0:
+            await self._unless_answered(asyncio.sleep(rest), answer_watch)
 
     async def _hang_up_unless_answered(self, frame: EndCallHangupFrame, answer_watch: Any) -> None:
+        await self._wait_for_output_playout(frame, answer_watch)
         if not await answer_watch.nobody_answered():
             self._dispatched = False
             return

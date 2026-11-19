@@ -82,6 +82,10 @@ class VoicemailAnswerWatch(FrameProcessor if PIPECAT_AVAILABLE else object):  # 
     def answered(self) -> bool:
         return self._answered.is_set()
 
+    async def wait_answered(self) -> None:
+        """Return once a person has answered her message."""
+        await self._answered.wait()
+
     async def process_frame(self, frame: Any, direction: Any) -> None:
         await super().process_frame(frame, direction)
         if PIPECAT_AVAILABLE:
