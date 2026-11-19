@@ -46,6 +46,8 @@ try:
         InputAudioRawFrame,
         InputDTMFFrame,
         InterruptionFrame,
+        LLMFullResponseEndFrame,
+        LLMFullResponseStartFrame,
         OutputAudioRawFrame,
         StartFrame,
     )
@@ -657,6 +659,27 @@ class TelnyxOutputTransport(BaseOutputTransport if PIPECAT_AVAILABLE else object
         # everything sent so far (time.monotonic()), so the hang-up step knows
         # how long to wait for the end of playback.
         self._playout_ends_at: float = 0.0
+        # Model responses whose start has left this transport and whose end has
+        # not. The TTS sends a response's end frame only after all of that
+        # response's audio, so while one is open, more of its speech may still be
+        # on the way (call e9b92727: the last sentence was still being synthesized
+        # when the hang-up frame got here).
+        self._responses_started = 0
+        self._responses_ended = 0
+
+    def speech_in_progress(self) -> bool:
+        """True while a model response's speech may still be coming to this transport."""
+        return self._responses_started > self._responses_ended
+
+    async def push_frame(self, frame: Any, direction: FrameDirection = FrameDirection.DOWNSTREAM) -> None:
+        # Frames leave the base output's media queue in order with the audio, so
+        # a response's end passes here only after its audio has been written.
+        if direction == FrameDirection.DOWNSTREAM:
+            if isinstance(frame, LLMFullResponseStartFrame):
+                self._responses_started += 1
+            elif isinstance(frame, LLMFullResponseEndFrame):
+                self._responses_ended = min(self._responses_started, self._responses_ended + 1)
+        await super().push_frame(frame, direction)
 
     def playout_remaining(self) -> float:
         """Seconds of sent audio the carrier has not played yet (an estimate)."""
@@ -711,6 +734,8 @@ class TelnyxOutputTransport(BaseOutputTransport if PIPECAT_AVAILABLE else object
             cleared = await self._send_serialized_frame(frame, warn_on_drop=False)
             if cleared or not self._websocket:
                 self._reset_playout()
+            # An interrupted response's end frame may never come.
+            self._responses_ended = self._responses_started
         await super().process_frame(frame, direction)
 
     async def _send_serialized_frame(self, frame: Any, *, warn_on_drop: bool) -> bool:
@@ -934,6 +959,10 @@ class TelnyxTransport(BaseTransport if PIPECAT_AVAILABLE else object):  # type: 
     def output_playout_remaining(self) -> float:
         """Seconds until the carrier has played all audio sent to it (an estimate)."""
         return self._output.playout_remaining()
+
+    def output_speech_in_progress(self) -> bool:
+        """True while the current model response may still send more audio."""
+        return self._output.speech_in_progress()
 
     async def wait_for_output_mark(self, name: str, timeout: float = 2.0) -> bool:
         """Send a Telnyx mark and wait for its echo after preceding media plays."""

@@ -32,6 +32,19 @@ END_CALL_MEDIA_MARK_TIMEOUT_SECONDS = 2.0
 # playback reaches it. So the wait covers the estimated rest of playback plus this.
 END_CALL_PLAYOUT_MARGIN_SECONDS = 1.5
 END_CALL_MEDIA_MARK_MAX_WAIT_SECONDS = 60.0
+# The hang-up frame can get here before the turn's last sentence has been
+# synthesized (call e9b92727): the TTS closes a turn's audio context after 0.5 s
+# without audio and lets frames queued behind it through. Wait this long at most
+# for the rest of the turn's speech. Kokoro made that 9 s sentence in 0.54 s; this
+# covers a slow CPU fallback over several sentences, and a TTS that never finishes
+# still ends the call. It counts towards END_CALL_MEDIA_MARK_MAX_WAIT_SECONDS.
+END_CALL_SPEECH_PRODUCTION_MAX_WAIT_SECONDS = 20.0
+# Audio still to play below this counts as played (estimate rounding).
+_PLAYOUT_SETTLED_SECONDS = 0.1
+_SPEECH_POLL_SECONDS = 0.05
+# A hangup already sent to the carrier is let finish when the pipeline is torn
+# down (the carrier's own hangup tears it down), so the record gets its status.
+END_CALL_HANGUP_TEARDOWN_WAIT_SECONDS = 5.0
 
 
 @dataclass
@@ -130,6 +143,7 @@ class EndCallHangupAfterOutputProcessor(FrameProcessor if PIPECAT_AVAILABLE else
         mark_timeout_seconds: float = END_CALL_MEDIA_MARK_TIMEOUT_SECONDS,
         playout_margin_seconds: float = END_CALL_PLAYOUT_MARGIN_SECONDS,
         max_mark_wait_seconds: float = END_CALL_MEDIA_MARK_MAX_WAIT_SECONDS,
+        speech_production_max_wait_seconds: float = END_CALL_SPEECH_PRODUCTION_MAX_WAIT_SECONDS,
     ) -> None:
         if PIPECAT_AVAILABLE:
             super().__init__(name="end_call_hangup_after_output")
@@ -140,8 +154,10 @@ class EndCallHangupAfterOutputProcessor(FrameProcessor if PIPECAT_AVAILABLE else
         self._mark_timeout_seconds = mark_timeout_seconds
         self._playout_margin_seconds = playout_margin_seconds
         self._max_mark_wait_seconds = max_mark_wait_seconds
+        self._speech_production_max_wait_seconds = speech_production_max_wait_seconds
         self._dispatched = False
         self._listen_task: asyncio.Task[None] | None = None
+        self._hangup_task: asyncio.Task[None] | None = None
 
     async def process_frame(self, frame: Any, direction: Any) -> None:
         if not PIPECAT_AVAILABLE:
@@ -186,6 +202,15 @@ class EndCallHangupAfterOutputProcessor(FrameProcessor if PIPECAT_AVAILABLE else
         except (AttributeError, RuntimeError, TypeError, ValueError):
             return 0.0
 
+    def _output_speech_in_progress(self) -> bool:
+        speech_in_progress = getattr(self._transport, "output_speech_in_progress", None)
+        if not callable(speech_in_progress):
+            return False
+        try:
+            return bool(speech_in_progress())
+        except (AttributeError, RuntimeError, TypeError, ValueError):
+            return False
+
     @staticmethod
     async def _unless_answered(work: Awaitable[Any], answer_watch: Any) -> tuple[bool, Any]:
         """Await ``work`` unless a person answers first. Returns (answered, result)."""
@@ -204,29 +229,98 @@ class EndCallHangupAfterOutputProcessor(FrameProcessor if PIPECAT_AVAILABLE else
             return False, work_task.result()
         return True, None
 
-    async def _wait_for_output_playout(self, frame: EndCallHangupFrame, answer_watch: Any = None) -> None:
-        """Return once the carrier has played the audio sent before ``frame``.
+    async def _wait_for_turn_speech(self, frame: EndCallHangupFrame, answer_watch: Any, deadline: float) -> bool:
+        """Wait while the turn's speech is still being produced. False if a person answered.
 
-        The mark echo is the proof. Without it, never return before the estimated
-        end of playback. Returns early only if a person answers her message.
+        Read from the transport, not from frames: on a live call this processor's
+        own frame handling is blocked while it waits.
         """
-        playout = self._output_playout_remaining()
-        timeout = min(
-            max(self._mark_timeout_seconds, playout + self._playout_margin_seconds),
-            max(self._mark_timeout_seconds, self._max_mark_wait_seconds),
-        )
-        if playout > self._mark_timeout_seconds:
-            logger.info(
-                "end_call: waiting up to %.1fs for the last %.1fs of audio to play on %s",
-                timeout,
-                playout,
-                frame.call_id,
-            )
+        if not self._output_speech_in_progress():
+            return True
         started = time.monotonic()
-        mark_name = "end_call_%s_%s" % (frame.call_id, getattr(frame, "id", "mark"))
+        logger.info(
+            "end_call: speech for this turn is still being produced on %s; waiting for it (up to %.0fs)",
+            frame.call_id,
+            max(0.0, deadline - started),
+        )
+        while self._output_speech_in_progress():
+            if answer_watch is not None and bool(getattr(answer_watch, "answered", False)):
+                return False
+            if time.monotonic() >= deadline:
+                logger.warning(
+                    "end_call: speech for this turn on %s was still being produced after %.1fs; going on",
+                    frame.call_id,
+                    time.monotonic() - started,
+                )
+                return True
+            await asyncio.sleep(_SPEECH_POLL_SECONDS)
+        logger.info(
+            "end_call: the turn's speech on %s finished being produced after %.1fs",
+            frame.call_id,
+            time.monotonic() - started,
+        )
+        return True
+
+    async def _wait_for_output_playout(self, frame: EndCallHangupFrame, answer_watch: Any = None) -> None:
+        """Return once the carrier has played all of the turn's speech.
+
+        First the turn's speech must exist (it can still be in the TTS when this
+        frame arrives), then it must have played: the mark echo is the proof, the
+        playback estimate the floor. Audio handed over during a wait gets a new
+        mark. Returns early only if a person answers her message.
+        """
+        started = time.monotonic()
+        deadline = started + max(self._mark_timeout_seconds, self._max_mark_wait_seconds)
+        production_deadline = min(deadline, started + self._speech_production_max_wait_seconds)
         wait_for_output_mark = getattr(self._transport, "wait_for_output_mark", None)
-        drained = False
-        if callable(wait_for_output_mark):
+        if not callable(wait_for_output_mark):
+            logger.warning("end_call: Telnyx transport has no output mark support; hanging up fail-closed")
+        first_round = True
+        while True:
+            if not await self._wait_for_turn_speech(frame, answer_watch, production_deadline):
+                return
+            playout = self._output_playout_remaining()
+            if not first_round and playout <= _PLAYOUT_SETTLED_SECONDS:
+                return
+            budget = deadline - time.monotonic()
+            if budget <= 0:
+                logger.warning(
+                    "end_call: gave up waiting for playback on %s after %.0fs (estimated %.1fs still to play)",
+                    frame.call_id,
+                    time.monotonic() - started,
+                    playout,
+                )
+                return
+            timeout = min(
+                max(self._mark_timeout_seconds if first_round else 0.0, playout + self._playout_margin_seconds),
+                budget,
+            )
+            if not first_round:
+                logger.info(
+                    "end_call: more audio was handed over on %s while waiting; waiting for its %.1fs too",
+                    frame.call_id,
+                    playout,
+                )
+            elif playout > self._mark_timeout_seconds:
+                logger.info(
+                    "end_call: waiting up to %.1fs for the last %.1fs of audio to play on %s",
+                    timeout,
+                    playout,
+                    frame.call_id,
+                )
+            first_round = False
+            if not callable(wait_for_output_mark):
+                rest = self._output_playout_remaining()
+                if rest <= 0:
+                    return
+                answered, _ = await self._unless_answered(asyncio.sleep(min(rest, budget)), answer_watch)
+                if answered:
+                    return
+                continue
+
+            mark_started = time.monotonic()
+            mark_name = "end_call_%s_%s_%d" % (frame.call_id, getattr(frame, "id", "mark"), int(mark_started * 1000))
+            drained = False
             try:
                 answered, drained = await self._unless_answered(
                     wait_for_output_mark(mark_name, timeout=timeout), answer_watch
@@ -235,27 +329,28 @@ class EndCallHangupAfterOutputProcessor(FrameProcessor if PIPECAT_AVAILABLE else
                     return
                 if drained:
                     logger.info("end_call: Telnyx media mark drained for %s", frame.call_id)
-                    return
-                logger.warning(
-                    "end_call: Telnyx media mark did not confirm drain for %s after %.1fs "
-                    "(estimated playback %.1fs); hanging up fail-closed",
-                    frame.call_id,
-                    time.monotonic() - started,
-                    playout,
-                )
+                else:
+                    logger.warning(
+                        "end_call: Telnyx media mark did not confirm drain for %s after %.1fs "
+                        "(estimated playback %.1fs); hanging up fail-closed",
+                        frame.call_id,
+                        time.monotonic() - mark_started,
+                        playout,
+                    )
             except (ConnectionError, OSError, RuntimeError, TimeoutError, TypeError, ValueError) as exc:
                 logger.warning(
                     "end_call: Telnyx media mark wait failed for %s: %s; hanging up fail-closed",
                     frame.call_id,
                     exc,
                 )
-        else:
-            logger.warning("end_call: Telnyx transport has no output mark support; hanging up fail-closed")
-
-        # Whatever ended the wait early, the hang-up never cuts off audio still playing.
-        rest = self._output_playout_remaining()
-        if rest > 0:
-            await self._unless_answered(asyncio.sleep(rest), answer_watch)
+            if not drained:
+                # Whatever ended the wait early, never cut off audio still playing.
+                rest = self._output_playout_remaining()
+                budget = deadline - time.monotonic()
+                if rest > 0 and budget > 0:
+                    answered, _ = await self._unless_answered(asyncio.sleep(min(rest, budget)), answer_watch)
+                    if answered:
+                        return
 
     async def _hang_up_unless_answered(self, frame: EndCallHangupFrame, answer_watch: Any) -> None:
         await self._wait_for_output_playout(frame, answer_watch)
@@ -268,14 +363,33 @@ class EndCallHangupAfterOutputProcessor(FrameProcessor if PIPECAT_AVAILABLE else
         await self._dispatch_hangup(frame)
 
     async def cleanup(self) -> None:
+        # The carrier tears the pipeline down when it carries out our own hangup,
+        # often before the hangup request has returned (call e9b92727). Let that
+        # request finish so the record gets its terminal status here.
+        hangup_task = self._hangup_task
+        if hangup_task is not None and not hangup_task.done():
+            try:
+                await asyncio.wait_for(asyncio.shield(hangup_task), timeout=END_CALL_HANGUP_TEARDOWN_WAIT_SECONDS)
+            except TimeoutError:
+                logger.warning(
+                    "end_call: Telnyx hangup request still open at teardown for %s",
+                    getattr(self._call_record, "call_id", ""),
+                )
+            except Exception as exc:  # noqa: BLE001 - logged; teardown goes on
+                logger.debug("end_call: hangup request ended with %s at teardown", exc)
         if self._listen_task is not None and not self._listen_task.done():
             self._listen_task.cancel()
         await super().cleanup()
 
     async def _dispatch_hangup(self, frame: EndCallHangupFrame) -> None:
-        await dispatch_telnyx_end_call_hangup(
-            telnyx_client=self._telnyx_client,
-            call_control_id=str(self._call_control_id_getter() or ""),
-            call_record=self._call_record,
-            reason_text=frame.reason,
+        # Its own task, shielded: cancelling the caller (teardown) must not cut the
+        # request off between the carrier acting on it and the record being marked.
+        self._hangup_task = asyncio.ensure_future(
+            dispatch_telnyx_end_call_hangup(
+                telnyx_client=self._telnyx_client,
+                call_control_id=str(self._call_control_id_getter() or ""),
+                call_record=self._call_record,
+                reason_text=frame.reason,
+            )
         )
+        await asyncio.shield(self._hangup_task)
