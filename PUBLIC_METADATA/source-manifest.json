@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "8bdbca8024f68100402febd62409188d0176f34c",
-  "sha256": "dd2808110bb24979cdad3af9fd0a0befb89bb0b6ee7df2257787ec257aee37e0",
+  "revision": "ae52efff03542095bba522dacb40b64ce3be8459",
+  "sha256": "df9cde001545b3797d47999a73ec7b1277a6bb26a9fe31a0464e3934e687bc73",
   "files": [
     {
       "path": ".env.example",
@@ -1645,8 +1645,8 @@
     },
     {
       "path": "intent/approval.py",
-      "sha256": "6bcfbe9d4ab68e32c7ba8021d54649da57d418538cfe42f7c0cf8b03ae49e9cf",
-      "bytes": 73873
+      "sha256": "b3c19eab281a9a80275607910b7429c597cb70b3de4c1be46e834e1d68eadc66",
+      "bytes": 74672
     },
     {
       "path": "intent/capability_resolver.py",
@@ -5820,8 +5820,8 @@
     },
     {
       "path": "telephony/call_tools.py",
-      "sha256": "b960b888c9bd24cbb7b56bf76b23934cb9c163f4fb351e84095e5ba400837525",
-      "bytes": 74213
+      "sha256": "6c23ca2d12c761c6e35c2bc07da77952f050700ddb0f3d2e19c7d05e984cc8ad",
+      "bytes": 74771
     },
     {
       "path": "telephony/caller_validation.py",
