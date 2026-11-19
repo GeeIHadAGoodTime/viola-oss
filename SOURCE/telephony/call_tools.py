@@ -871,14 +871,15 @@ async def present_call_plan_handler(params) -> None:
         result = await ask_user_handler(plan_text, context="pre-call briefing")
         if result.ok:
             user_feedback = result.data["answer"]
-            from intent.approval import ApprovalManager
+            from intent.approval import ApprovalManager, approval_question_asked
             from intent.tool_types import RiskLevel
 
-            decision = await ApprovalManager()._classify_response(
-                user_feedback,
-                "place the planned phone call to %s" % label,
-                RiskLevel.CONFIRM,
-            )
+            with approval_question_asked(plan_text):
+                decision = await ApprovalManager()._classify_response(
+                    user_feedback,
+                    "place the planned phone call to %s" % label,
+                    RiskLevel.CONFIRM,
+                )
             approved = decision in ("strong_affirm", "affirm")
     except Exception as exc:
         logger.warning("present_call_plan ask_user failed: %s", exc)

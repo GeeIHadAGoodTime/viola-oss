@@ -4811,11 +4811,12 @@ async def run_agent_loop(
                     # Approval has not happened and the action was not executed.
                     # End this turn before model prose can claim it succeeded;
                     # the existing approval store binds the next user's turn.
+                    from intent.approval import confirm_or_cancel_question
+
                     confirmation = tool_result.data if isinstance(tool_result.data, dict) else {}
-                    action = str(confirmation.get("action_description") or "").strip() or "run the requested action"
                     _set_final_response(
                         executor,
-                        "Please confirm or cancel before I %s." % action,
+                        confirm_or_cancel_question(str(confirmation.get("action_description") or "")),
                         continue_listening=True,
                         params=dict(confirmation),
                     )

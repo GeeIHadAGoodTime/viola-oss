@@ -55,18 +55,56 @@ _ApprovalDecision = Literal["strong_affirm", "affirm", "deny", "unclear"]
 
 _APPROVAL_CLASSIFY_SYSTEM_PROMPT = (
     "You are interpreting a user's response to a yes/no approval prompt for a safety-gated "
-    "action. Classify the response into exactly one of four categories.\n\n"
+    "action. You get the action, its risk level, Viola's question exactly as she asked it, and "
+    "the user's response. Classify the response into exactly one of four categories.\n\n"
+    "A response that picks one of the choices Viola's question offered is a clear answer, even a "
+    'single word: "confirm", "confirmed", "I confirm", "approve", "approved", "do it" and "yes" '
+    'pick going ahead (affirm or strong_affirm); "cancel" picks not going ahead (deny). '
+    "A response that agrees to a different action than the one asked about is unclear.\n\n"
     "- strong_affirm: the user explicitly and deliberately confirms a destructive or "
     'irreversible action with no hedging (e.g. "yes I\'m sure", "yes go ahead and do it", '
     '"approved, do it"). Use this only when the user\'s intent is unambiguous and explicit.\n'
     "- affirm: the user affirms but without explicit destructive-action emphasis "
-    '(e.g. "sure", "ok", "yes", "go ahead", "yes please").\n'
-    '- deny: the user denies (e.g. "no", "cancel", "stop", "don\'t do that", '
-    '"actually never mind", "hold off", "not now").\n'
+    '(e.g. "sure", "ok", "yes", "go ahead", "yes please", "confirm", "confirmed", "approve", '
+    '"do it").\n'
+    "- deny: the user denies or wants things left as they are, whatever the action "
+    '(e.g. "no", "cancel", "stop", "don\'t do that", "actually never mind", "never mind, keep it", '
+    '"hold off", "not now").\n'
     '- unclear: cannot tell with high confidence (e.g. "maybe", "hmm", "what does that mean", '
-    "off-topic, mixed signals).\n\n"
+    '"confirm what?", a question about the action, off-topic, mixed signals).\n\n'
     'Return strictly the JSON object: {"decision": "<category>"} — no prose, no other keys.'
 )
+
+
+def confirm_or_cancel_question(action_description: str) -> str:
+    """Viola's question for a pending confirmation, worded once.
+
+    The agent loop shows it as the turn's answer, the no-channel fallback
+    speaks it, and the approval classifier is told it was the question, so
+    the three cannot drift apart. A reply that picks one of its two choices
+    ("confirm" / "cancel") is a clear answer to it.
+    """
+    action = str(action_description or "").strip() or "run the requested action"
+    return "Please confirm or cancel before I %s." % action
+
+
+# The question Viola asked, when it is not the confirm-or-cancel question above
+# (the interactive channel's yes/no prompt, a plan or a call briefing). Bound by
+# the caller around ``_classify_response`` with ``approval_question_asked``.
+_QUESTION_ASKED: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "viola_approval_question_asked", default=None
+)
+
+
+@contextlib.contextmanager
+def approval_question_asked(question: str) -> Iterator[None]:
+    """Tell ``_classify_response`` which question the user is answering."""
+
+    token = _QUESTION_ASKED.set(str(question or "").strip() or None)
+    try:
+        yield
+    finally:
+        _QUESTION_ASKED.reset(token)
 # Device control while untrusted content is in the conversation (founder rule
 # 2026-11-07): it runs only when the user's own message for this turn asks for
 # it. Viola never asks first, so this is not a yes/no reading of a reply; it is
@@ -1143,9 +1181,7 @@ class ApprovalManager:
                 risk.value,
                 action_description,
             )
-            await self._speak_fallback(
-                "Action '%s' requires confirmation. Please confirm or cancel in the conversation." % action_description
-            )
+            await self._speak_fallback(confirm_or_cancel_question(action_description))
             raise self.defer_confirmation(
                 action_description=action_description,
                 risk=risk,
@@ -1211,7 +1247,8 @@ class ApprovalManager:
         # collapses to ``unclear`` -> deny. Closes the G11 NL-yes voice
         # parity gap (docs/legal/review_2026_05_22/01_DECISIONS.md:197).
         logger.debug("Approval response: '%s' for risk=%s", response_text, risk.value)
-        decision = await self._classify_response(response_text, action_description, risk)
+        with approval_question_asked(prompt):
+            decision = await self._classify_response(response_text, action_description, risk)
 
         if risk == RiskLevel.DANGEROUS:
             if decision == "strong_affirm":
@@ -1220,9 +1257,11 @@ class ApprovalManager:
             if decision == "affirm":
                 # Affirm without explicit destructive-action emphasis — re-prompt for
                 # a stronger confirmation, then re-classify that response.
-                second = await self._channel.ask("This is a destructive action. Please confirm explicitly to proceed.")
+                second_question = "This is a destructive action. Please confirm explicitly to proceed."
+                second = await self._channel.ask(second_question)
                 if second:
-                    second_decision = await self._classify_response(second, action_description, risk)
+                    with approval_question_asked(second_question):
+                        second_decision = await self._classify_response(second, action_description, risk)
                     if second_decision == "strong_affirm":
                         logger.info(
                             "DANGEROUS action approved on second try: %s",
@@ -1384,9 +1423,10 @@ class ApprovalManager:
         # ``request_approval``). Plan-level approval is always CONFIRM
         # risk (DANGEROUS tools were already excluded above), so both
         # ``strong_affirm`` and ``affirm`` count as approval.
-        decision = await self._classify_response(
-            response_text, "approve plan with %d steps" % len(plan), RiskLevel.CONFIRM
-        )
+        with approval_question_asked(summary):
+            decision = await self._classify_response(
+                response_text, "approve plan with %d steps" % len(plan), RiskLevel.CONFIRM
+            )
         if decision in ("strong_affirm", "affirm"):
             logger.info(
                 "Plan approved — pre-approving tools: %s",
@@ -1479,6 +1519,11 @@ class ApprovalManager:
         or malformed response collapses to ``"unclear"`` so the
         caller's safe default (re-prompt or deny) applies.
 
+        The model is also told the question the user is answering (see
+        ``approval_question_asked``; by default the confirm-or-cancel
+        question), so a reply that picks one of its offered choices, such
+        as a bare "confirm", is read as the clear answer it is.
+
         Tests may monkeypatch this method directly to bypass the LLM
         call.
 
@@ -1504,10 +1549,14 @@ class ApprovalManager:
             _CLASSIFIER_FAILED.set(True)
             return "unclear"
 
+        # The question the user is answering: the one a caller bound, else the
+        # confirm-or-cancel question every deferred confirmation is asked with.
+        question = _QUESTION_ASKED.get() or confirm_or_cancel_question(action_description)
         user_content = (
             "Action requiring confirmation: %s\n"
             "Risk level: %s\n"
-            "User's response: %s\n" % (action_description, risk.value, text)
+            "Viola's question: %s\n"
+            "User's response: %s\n" % (action_description, risk.value, question, text)
         )
 
         try:
