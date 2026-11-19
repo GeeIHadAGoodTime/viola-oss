@@ -13,6 +13,7 @@ import asyncio
 import logging
 import re
 import sys
+import time
 import unittest
 from contextlib import suppress
 from dataclasses import dataclass
@@ -63,7 +64,7 @@ def _execute_nodes(relative, names, namespace):
 
 def _load_namespace():
     namespace = {
-        "asyncio": asyncio, "re": re, "suppress": suppress, "dataclass": dataclass,
+        "asyncio": asyncio, "re": re, "suppress": suppress, "dataclass": dataclass, "time": time,
         "datetime": datetime, "UTC": UTC, "Enum": Enum, "logger": logging.getLogger(__name__),
         "PIPECAT_AVAILABLE": True, "ControlFrame": _Frame, "FrameProcessor": _Processor,
         "FrameDirection": _Direction, "get_event_bus": lambda: None,
@@ -79,7 +80,8 @@ def _load_namespace():
         "CallStatus", "_TERMINAL_CALL_STATUSES", "_is_terminal_call_status", "TranscriptCollector",
     }, namespace)
     _execute_nodes("telephony/end_call_hangup.py", {
-        "END_CALL_MEDIA_MARK_TIMEOUT_SECONDS", "EndCallHangupFrame",
+        "END_CALL_MEDIA_MARK_TIMEOUT_SECONDS", "END_CALL_PLAYOUT_MARGIN_SECONDS",
+        "END_CALL_MEDIA_MARK_MAX_WAIT_SECONDS", "EndCallHangupFrame",
         "dispatch_telnyx_end_call_hangup", "EndCallHangupAfterOutputProcessor",
     }, namespace)
     _execute_nodes("telephony/call_tools.py", {

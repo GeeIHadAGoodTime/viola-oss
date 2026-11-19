@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from collections.abc import Callable
 from typing import Any
 
@@ -650,6 +651,31 @@ class TelnyxOutputTransport(BaseOutputTransport if PIPECAT_AVAILABLE else object
         self._audio_bytes_sent = 0
         self._audio_frames_dropped_after_disconnect = 0
         self._serializer = _new_telnyx_frame_serializer()
+        # Audio goes to the carrier as fast as it is produced, and the carrier
+        # plays it in real time: a 10 s voicemail message was all sent within
+        # 1.7 s on call c33057ff. This is when the carrier will have played
+        # everything sent so far (time.monotonic()), so the hang-up step knows
+        # how long to wait for the end of playback.
+        self._playout_ends_at: float = 0.0
+
+    def playout_remaining(self) -> float:
+        """Seconds of sent audio the carrier has not played yet (an estimate)."""
+        return max(0.0, self._playout_ends_at - time.monotonic())
+
+    def _note_audio_sent(self, frame: Any) -> None:
+        audio = getattr(frame, "audio", b"") or b""
+        sample_rate = int(getattr(frame, "sample_rate", 0) or 0)
+        channels = int(getattr(frame, "num_channels", 0) or 1)
+        if not audio or sample_rate <= 0:
+            return
+        # 16-bit PCM, before serialization.
+        duration = len(audio) / float(sample_rate * channels * 2)
+        now = time.monotonic()
+        self._playout_ends_at = max(now, self._playout_ends_at) + duration
+
+    def _reset_playout(self) -> None:
+        """The carrier's buffer was emptied: nothing sent earlier is still to play."""
+        self._playout_ends_at = time.monotonic()
 
     async def set_ws_connection(self, websocket: Any, stream_id: str = "") -> None:
         """Called by parent transport when Telnyx connects."""
@@ -662,6 +688,7 @@ class TelnyxOutputTransport(BaseOutputTransport if PIPECAT_AVAILABLE else object
             return
         self._websocket = None
         self._stream_id = ""
+        self._reset_playout()
 
     async def start(self, frame: StartFrame) -> None:
         await super().start(frame)
@@ -680,7 +707,10 @@ class TelnyxOutputTransport(BaseOutputTransport if PIPECAT_AVAILABLE else object
 
     async def process_frame(self, frame: Any, direction: FrameDirection) -> None:
         if isinstance(frame, InterruptionFrame):
-            await self._send_serialized_frame(frame, warn_on_drop=False)
+            # Serialized as a Telnyx "clear": the carrier drops what it has not played.
+            cleared = await self._send_serialized_frame(frame, warn_on_drop=False)
+            if cleared or not self._websocket:
+                self._reset_playout()
         await super().process_frame(frame, direction)
 
     async def _send_serialized_frame(self, frame: Any, *, warn_on_drop: bool) -> bool:
@@ -718,10 +748,13 @@ class TelnyxOutputTransport(BaseOutputTransport if PIPECAT_AVAILABLE else object
 
         msg = await self._serializer.serialize(frame)
         if not msg:
+            # Held in the resampler; it goes out with the next frame.
+            self._note_audio_sent(frame)
             return True
 
         try:
             await self._websocket.send(msg)
+            self._note_audio_sent(frame)
             self._audio_frames_sent += 1
             self._audio_bytes_sent += len(frame.audio or b"")
             if self._audio_frames_sent == 1:
@@ -897,6 +930,10 @@ class TelnyxTransport(BaseTransport if PIPECAT_AVAILABLE else object):  # type: 
     async def wait_for_media_disconnect(self, timeout: float | None = None) -> bool:
         """Wait for a media stream end before Viola intentionally stopped it."""
         return await self._input.wait_for_media_disconnect(timeout)
+
+    def output_playout_remaining(self) -> float:
+        """Seconds until the carrier has played all audio sent to it (an estimate)."""
+        return self._output.playout_remaining()
 
     async def wait_for_output_mark(self, name: str, timeout: float = 2.0) -> bool:
         """Send a Telnyx mark and wait for its echo after preceding media plays."""
