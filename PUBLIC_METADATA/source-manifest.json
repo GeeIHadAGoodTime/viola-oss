@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "ae52efff03542095bba522dacb40b64ce3be8459",
-  "sha256": "df9cde001545b3797d47999a73ec7b1277a6bb26a9fe31a0464e3934e687bc73",
+  "revision": "ec8501613c18ed9e9c34d263a2e63a3201e2f764",
+  "sha256": "535e5be448fd734a5490e14ef3cdb4801ac9cbc59057f9670d3a92b6db61f2f0",
   "files": [
     {
       "path": ".env.example",
@@ -5860,8 +5860,8 @@
     },
     {
       "path": "telephony/disclosure_watchdog.py",
-      "sha256": "03e17c0185347121ea89ac37010dfddfa87a2161bb867de33fc803b48896a4f3",
-      "bytes": 6881
+      "sha256": "c0076a3b22a6de762443d63d62719cf6b959153ba895ae96271e0abf768151be",
+      "bytes": 7891
     },
     {
       "path": "telephony/end_call_gate.py",
