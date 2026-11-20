@@ -114,7 +114,7 @@ class DisclosureWatchdog(FrameProcessor if PIPECAT_AVAILABLE else object):  # ty
     async def _process_single_text_frame(self, frame: Any, direction: Any) -> None:
         text = str(getattr(frame, "text", "") or "")
         if not self._has_expected_disclosure(text):
-            text = self._append_disclosure_to_text(text)
+            text = self._prepend_disclosure_to_text(text)
             frame.text = text
 
         await self.push_frame(frame, direction)
@@ -129,7 +129,7 @@ class DisclosureWatchdog(FrameProcessor if PIPECAT_AVAILABLE else object):  # ty
         buffered_frames = self._buffered_frames
         text = self._buffered_text
         if not self._has_expected_disclosure(text):
-            text = self._append_disclosure_to_last_text_frame(buffered_frames)
+            text = self._prepend_disclosure_to_first_text_frame(buffered_frames)
         self._clear_buffer()
 
         for frame, direction in buffered_frames:
@@ -156,23 +156,42 @@ class DisclosureWatchdog(FrameProcessor if PIPECAT_AVAILABLE else object):  # ty
         expected = self._expected_disclosure
         return expected is None or expected in str(text or "")
 
-    def _append_disclosure_to_text(self, text: str) -> str:
+    def _prepend_disclosure_to_text(self, text: str) -> str:
+        """Put the expected sentence at the start of ``text``.
+
+        The notice belongs at the beginning of what she says. Appended, it came
+        after "Goodbye" on voicemail and after the purpose or a question on a live
+        call. It is not inserted after the first sentence: splitting sentences is
+        unsafe with abbreviations such as "Dr.".
+        """
         expected = self._expected_disclosure
         if not expected:
             return text
-        text = str(text or "").strip()
-        return "%s %s" % (text, expected) if text else expected
+        original = str(text or "")
+        if not original.strip():
+            return expected
+        return "%s %s" % (expected, original.lstrip())
 
-    def _append_disclosure_to_last_text_frame(self, buffered_frames: list[tuple[Any, Any]]) -> str:
-        for frame, _direction in reversed(buffered_frames):
-            if isinstance(frame, TextFrame):
-                text = self._append_disclosure_to_text(getattr(frame, "text", ""))
-                frame.text = text
-                if self._buffered_text_parts:
-                    self._buffered_text_parts[-1] = text
-                else:
-                    self._buffered_text_parts = [text]
-                return self._buffered_text
+    def _prepend_disclosure_to_first_text_frame(self, buffered_frames: list[tuple[Any, Any]]) -> str:
+        """Prepend the sentence to the turn's first text frame; later frames stay as they are.
+
+        A leading frame that holds only whitespace is passed over, so the sentence
+        is never glued to the next word ("transcribed.This"). With no text at all,
+        the first text frame carries the sentence alone.
+        """
+        text_frames = [frame for frame, _direction in buffered_frames if isinstance(frame, TextFrame)]
+        if not text_frames:
+            return self._buffered_text
+        position = next(
+            (index for index, frame in enumerate(text_frames) if str(getattr(frame, "text", "") or "").strip()),
+            0,
+        )
+        target = text_frames[position]
+        target.text = self._prepend_disclosure_to_text(getattr(target, "text", ""))
+        if len(self._buffered_text_parts) == len(text_frames):
+            self._buffered_text_parts[position] = target.text
+        else:
+            self._buffered_text_parts = [str(getattr(frame, "text", "") or "") for frame in text_frames]
         return self._buffered_text
 
     def _log_unconfirmed_live_turn(self) -> None:
