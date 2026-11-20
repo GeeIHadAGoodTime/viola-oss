@@ -30,10 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "56dce308876084337a369616a468b31c9a5b3c06bb55337ff85d836e6ed2126a",
-  "source_tree_sha256": "535e5be448fd734a5490e14ef3cdb4801ac9cbc59057f9670d3a92b6db61f2f0",
+  "source_manifest_sha256": "46bbf96023053b0a799af974a5c085946b951f3df4b32ad05052eca8af2c19bf",
+  "source_tree_sha256": "9d368cb4fed264e2c294a6614bb3fb7692b06ad2a1cb6c3eb34227615f9f46b8",
   "source_file_count": 2830,
-  "source_revision": "ec8501613c18ed9e9c34d263a2e63a3201e2f764",
+  "source_revision": "0755d84faf8dc533a31eda7aeedec666c15ae9c7",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "LICENSES/SPEECH_COMPONENT_NOTICES.md",
@@ -712,8 +712,8 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "ec8501613c18ed9e9c34d263a2e63a3201e2f764",
-    "kind": "phone disclosure notice first"
+    "source_commit": "0755d84faf8dc533a31eda7aeedec666c15ae9c7",
+    "kind": "phone disclosure first and voicemail turn guard"
   },
   "historical_bindings": [
     {

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "ec8501613c18ed9e9c34d263a2e63a3201e2f764",
-  "sha256": "535e5be448fd734a5490e14ef3cdb4801ac9cbc59057f9670d3a92b6db61f2f0",
+  "revision": "0755d84faf8dc533a31eda7aeedec666c15ae9c7",
+  "sha256": "9d368cb4fed264e2c294a6614bb3fb7692b06ad2a1cb6c3eb34227615f9f46b8",
   "files": [
     {
       "path": ".env.example",
@@ -6120,8 +6120,8 @@
     },
     {
       "path": "telephony/voicemail_detection.py",
-      "sha256": "2d8aaf95c0f144ceec1d66865725f0260dd0503a39f0fca8f2605eae679d1563",
-      "bytes": 46125
+      "sha256": "c4ba26296a7b07531deedeffb746c78b2c9244e25f8e87cd3e0fa1bedc7b81be",
+      "bytes": 46551
     },
     {
       "path": "tests/customer_speech/test_real_cjk_pronunciation.py",
