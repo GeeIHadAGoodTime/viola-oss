@@ -401,16 +401,20 @@ class PipecatVoicemailDetectionHandler:
     def recording_talking_over_message(self) -> bool:
         """True when far-end speech right now is the recording talking over her message.
 
-        Her voicemail message is in progress (its generation is in flight, or she is
-        speaking in voicemail mode) and the newest speech did not begin after her
-        message did. Such speech must not interrupt her: a recording does not take
-        turns. Speech that began after her message began is a person answering
+        Her voicemail message is in progress or already delivered (its generation is
+        in flight, it was delivered to speech synthesis, or she is speaking in
+        voicemail mode) and the newest speech did not begin after her message did.
+        Such speech must not interrupt her: a recording does not take turns. Speech
+        that began after her message began is a person answering
         (``VoicemailAnswerWatch``), and that still interrupts and reopens the call.
 
-        The in-flight half matters: the disclosure watchdog holds her first turn
-        until the model finishes it, so her audio can start only after the text is
-        already counted as delivered. An interruption in that gap would cut a
-        message the call then treats as left.
+        "Delivered" is covered on its own, not only "speaking". On the three voicemail
+        proof calls (c33057ff, e9b92727, bc5bf732) about 0.9 s passed between the
+        message being delivered and her first audio, while speech was synthesized;
+        and the phone TTS closes its audio context after 0.5 s without audio, which
+        sends BotStoppedSpeaking between two sentences of the same message. In both
+        gaps she is neither in flight nor speaking, and a recording transcript there
+        used to start a turn and cut her off.
         """
         record = self._record
         if not bool(getattr(record, "voicemail_detected", False)) or bool(
@@ -420,6 +424,8 @@ class PipecatVoicemailDetectionHandler:
         answer_watch = getattr(record, "_voicemail_answer_watch", None)
         if answer_watch is not None and answer_watch.latest_speech_answers_message():
             return False
+        if bool(getattr(record, "voicemail_message_delivered", False)):
+            return True
         bot_speaking = bool(getattr(answer_watch, "_bot_speaking", False))
         return bool(self._response_gate.message_in_flight or bot_speaking)
 
